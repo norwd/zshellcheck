@@ -328,19 +328,25 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 	// subshell body, not an array literal. Dispatch through
 	// parseStatement so loops and conditionals inside subshells
 	// like `time (for x in a; do …; done)` parse correctly.
-	switch p.curToken.Type {
-	case token.FOR, token.WHILE, token.If, token.CASE,
-		token.DoubleLparen, token.LDBRACKET, token.BANG, token.TYPESET,
-		token.DECLARE, token.LET, token.SELECT, token.COPROC:
-		statements := []ast.Statement{}
-		for !p.curTokenIs(token.RPAREN) && !p.curTokenIs(token.EOF) {
-			stmt := p.parseStatement()
-			if stmt != nil {
-				statements = append(statements, stmt)
+	//
+	// Exception: inside `[[ … ]]` the group is a glob alternation,
+	// so keywords are literal pattern words (`[[ $x = (select|cont) ]]`).
+	// Fall through to the glob-alt branch when inDoubleBracket.
+	if !p.inDoubleBracket {
+		switch p.curToken.Type {
+		case token.FOR, token.WHILE, token.If, token.CASE,
+			token.DoubleLparen, token.LDBRACKET, token.BANG, token.TYPESET,
+			token.DECLARE, token.LET, token.SELECT, token.COPROC:
+			statements := []ast.Statement{}
+			for !p.curTokenIs(token.RPAREN) && !p.curTokenIs(token.EOF) {
+				stmt := p.parseStatement()
+				if stmt != nil {
+					statements = append(statements, stmt)
+				}
+				p.nextToken()
 			}
-			p.nextToken()
+			return &ast.GroupedExpression{Token: tok, Expression: &ast.BlockStatement{Statements: statements}}
 		}
-		return &ast.GroupedExpression{Token: tok, Expression: &ast.BlockStatement{Statements: statements}}
 	}
 
 	// Array Literal / glob alternation mode. Inside `[[ ]]` a
@@ -797,6 +803,12 @@ func (p *Parser) parseDollarParenExpression() ast.Expression {
 	if !p.expectPeek(token.RPAREN) {
 		return nil
 	}
+	// Signal that an inner expression consumed its own closing `)`.
+	// parseBlockStatement uses the flag to skip RPAREN as its own
+	// terminator and advance past it instead, so an enclosing
+	// `( … )` subshell body doesn't end at the inner `)` of
+	// `HOST=$(cmd)`.
+	p.consumedParenTerminator = true
 	return exp
 }
 
