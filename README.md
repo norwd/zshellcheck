@@ -94,16 +94,13 @@ Three forms (trailing, preceding, file-wide) → [USER_GUIDE](docs/USER_GUIDE.md
 
 ## Integrations
 
-Each release runs a parse + lint sweep across the script trees of every Zsh project listed in [INTEGRATIONS.md](INTEGRATIONS.md) — no panics, no crashes, deterministic output. Featured today:
-
-[oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh) ·
-[prezto](https://github.com/sorin-ionescu/prezto) ·
-[powerlevel10k](https://github.com/romkatv/powerlevel10k) ·
-[zinit](https://github.com/zdharma-continuum/zinit) ·
-[fzf](https://github.com/junegunn/fzf) ·
-[zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting)
-
-19 verified projects today, 300+ targeted before v2 — see the [full matrix](INTEGRATIONS.md).
+| Category | Integrations |
+| :--- | :--- |
+| Frameworks | [oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh) `497`, [prezto](https://github.com/sorin-ionescu/prezto) `41`, [zephyr](https://github.com/mattmc3/zephyr) `21`, [zsh-utils](https://github.com/belak/zsh-utils) `5`, [zimfw](https://github.com/zimfw/zimfw) `1` |
+| Plugin managers | [antidote](https://github.com/mattmc3/antidote) `24`, [zinit](https://github.com/zdharma-continuum/zinit) `9` |
+| Plugin tooling | [fzf-tab](https://github.com/Aloxaf/fzf-tab) `5`, [fast-syntax-highlighting](https://github.com/zdharma-continuum/fast-syntax-highlighting) `4`, [fzf](https://github.com/junegunn/fzf) `2` |
+| Plugins | [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting) `301`, [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions) `13`, [zsh-autocomplete](https://github.com/marlonrichert/zsh-autocomplete) `3`, [zsh-history-substring-search](https://github.com/zsh-users/zsh-history-substring-search) `2`, [zsh-vi-mode](https://github.com/jeffreytse/zsh-vi-mode) `2`, [zsh-completions](https://github.com/zsh-users/zsh-completions) `1` |
+| Prompts | [spaceship-prompt](https://github.com/spaceship-prompt/spaceship-prompt) `119`, [powerlevel10k](https://github.com/romkatv/powerlevel10k) `16`, [starship](https://github.com/starship/starship) `1` |
 
 ## Documentation
 
