@@ -1,6 +1,8 @@
 # Integrations
 
-ZShellCheck is verified against the script corpora of these popular Zsh ecosystems. Every release runs a parse + lint sweep over each — no panics, no crashes, deterministic output. The list grows each release; the goal is 300+ corpora before v2.
+ZShellCheck is verified against the script corpora of these popular Zsh ecosystems.
+Every release runs a parse + lint sweep over each — no panics, no crashes, deterministic output.
+The list grows each release; the goal is 300+ corpora before v2.
 
 ## Summary
 
@@ -78,7 +80,9 @@ The corpora we test most heavily and link from the docs.
 
 ## How the sweep runs
 
-Each release tag triggers a parse + lint pass over every corpus listed in the **Featured** + per-category tables above. Sandbox lives at `~/.config/zsh/zshellcheck/integration/` (local-only) and never touches the user's actual `~/.config/zsh` modules. A run produces:
+Each release tag triggers a parse + lint pass over every corpus listed in the **Featured** + per-category tables above.
+Sandbox lives at `~/.config/zsh/zshellcheck/integration/` (local-only) and never touches the user's actual `~/.config/zsh` modules.
+A run produces:
 
 - `parse_errors` — total parser failures across the corpus.
 - `violations` — total kata hits (all severities).
@@ -88,4 +92,5 @@ A bug surfaced by the sweep gets a GitHub issue, a PR fixes it, and the corpus s
 
 ## Adding an integration
 
-If you maintain (or rely on) a popular Zsh project not listed above and want it covered by every release sweep, open an issue tagged `integration` with the repo URL and a short note on what it covers. We add it to the next sweep and credit the request in the changelog entry.
+If you maintain (or rely on) a popular Zsh project not listed above and want it covered by every release sweep, open an issue tagged `integration` with the repo URL and a short note on what it covers.
+We add it to the next sweep and credit the request in the changelog entry.

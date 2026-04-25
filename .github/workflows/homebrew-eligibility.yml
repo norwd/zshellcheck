@@ -1,0 +1,81 @@
+# Homebrew-core eligibility tracker.
+# Polls the repo's star/fork/watcher counts on a weekly schedule and opens (or
+# bumps) a tracking issue when the non-self submission threshold is met. The
+# author can submit at the higher self-submission bar; community members can
+# submit at the lower non-self bar — both fail today.
+#
+# Documented thresholds (https://docs.brew.sh/Acceptable-Formulae):
+#   - non-self:   ≥75 stars  OR ≥30 forks  OR ≥30 watchers
+#   - self-submit: ≥225 stars OR ≥90 forks OR ≥90 watchers
+#
+# When the non-self bar is hit, file the homebrew-core PR; until then the
+# README + ROADMAP point to ./install.sh / go install / binary archive.
+
+name: homebrew-eligibility
+
+on:
+  schedule:
+    - cron: "11 6 * * 1"   # 06:11 UTC every Monday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query repo stats + decide eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          read -r stars forks watchers < <(
+            gh api "repos/${GH_REPO}" \
+              --jq '[.stargazers_count, .forks_count, .subscribers_count] | @tsv'
+          )
+          echo "stars=${stars} forks=${forks} watchers=${watchers}"
+
+          # Non-self thresholds
+          NONSELF_STARS=75
+          NONSELF_FORKS=30
+          NONSELF_WATCHERS=30
+
+          eligible=false
+          if [[ ${stars}    -ge ${NONSELF_STARS}    ]]; then eligible=true; fi
+          if [[ ${forks}    -ge ${NONSELF_FORKS}    ]]; then eligible=true; fi
+          if [[ ${watchers} -ge ${NONSELF_WATCHERS} ]]; then eligible=true; fi
+
+          if ! ${eligible}; then
+            echo "Below non-self threshold; no action."
+            exit 0
+          fi
+
+          title="Homebrew-core threshold reached — file the new-formula PR"
+          existing=$(gh issue list --state open --search "in:title \"${title}\"" \
+                       --json number --jq '.[0].number // empty')
+          body=$(cat <<EOF
+          The repo has crossed the homebrew-core notability threshold.
+
+          Current: stars=${stars}, forks=${forks}, watchers=${watchers}.
+          Non-self bar:  75 stars / 30 forks / 30 watchers.
+          Self bar:     225 stars / 90 forks / 90 watchers.
+
+          Next steps tracked in ROADMAP.md "Homebrew" entry. Anyone in the
+          community is welcome to file the [homebrew-core](https://github.com/Homebrew/homebrew-core)
+          new-formula PR on the project's behalf — third-party submissions
+          face the lower bar.
+
+          Auto-filed by .github/workflows/homebrew-eligibility.yml on
+          $(date -u +%Y-%m-%dT%H:%M:%SZ).
+          EOF
+          )
+
+          if [[ -z ${existing} ]]; then
+            gh issue create --title "${title}" --body "${body}" --label "release"
+          else
+            gh issue comment "${existing}" --body "${body}"
+          fi

@@ -120,7 +120,9 @@ We use the standard Go testing framework.
 
 ### Adding an Auto-Fix
 
-A kata becomes auto-fixable when its rewrite is **context-free, idempotent, and byte-exact**. The auto-fixer runs every kata's `Fix` function over the source; conflicting overlaps resolve outer-wins on the first pass, with the inner edit picked up on a subsequent pass. The fixer caps at five passes by default so nested rewrites converge in a single `-fix` invocation.
+A kata becomes auto-fixable when its rewrite is **context-free, idempotent, and byte-exact**.
+The auto-fixer runs every kata's `Fix` function over the source; conflicting overlaps resolve outer-wins on the first pass, with the inner edit picked up on a subsequent pass.
+The fixer caps at five passes by default so nested rewrites converge in a single `-fix` invocation.
 
 Set the `Fix` field on the kata struct alongside `Check`:
 
@@ -140,9 +142,11 @@ The `Fix` signature is:
 func fixZCXXXX(node ast.Node, v Violation, source []byte) []FixEdit
 ```
 
-Return a slice of `FixEdit` — each carrying a 1-based `Line` + `Column`, a byte-span `Length` to replace, and the replacement string. `pkg/katas/fixutil.go` exposes `LineColToByteOffset` and related helpers that handle multi-byte UTF-8 alignment.
+Return a slice of `FixEdit` — each carrying a 1-based `Line` + `Column`, a byte-span `Length` to replace, and the replacement string.
+`pkg/katas/fixutil.go` exposes `LineColToByteOffset` and related helpers that handle multi-byte UTF-8 alignment.
 
-If the rewrite cannot be made safe (the offending span depends on surrounding context, the new code might shift semantics, or the kata is advisory rather than mechanical), **leave `Fix` nil**. Detection-only katas remain valuable.
+If the rewrite cannot be made safe (the offending span depends on surrounding context, the new code might shift semantics, or the kata is advisory rather than mechanical), **leave `Fix` nil**.
+Detection-only katas remain valuable.
 
 #### Catalog of shipped rewrite shapes
 
@@ -158,7 +162,8 @@ When a new kata introduces a rewrite shape that doesn't fit one of these, extend
 
 ### Severity Levels
 
-Every kata must declare a severity via the Go constants `SeverityError`, `SeverityWarning`, `SeverityInfo`, `SeverityStyle` (defined in `pkg/katas/katas.go`). See the [Severity Levels reference](USER_GUIDE.md#severity-levels) for the rubric and when to pick each level.
+Every kata must declare a severity via the Go constants `SeverityError`, `SeverityWarning`, `SeverityInfo`, `SeverityStyle` (defined in `pkg/katas/katas.go`).
+See the [Severity Levels reference](USER_GUIDE.md#severity-levels) for the rubric and when to pick each level.
 
 ---
 
@@ -179,11 +184,15 @@ graph TD
 
 ### Core Components
 
-1.  **Lexer (`pkg/lexer`)**: Scans source code into a stream of **Tokens**. Handles Zsh-specific quoting and expansions.
-2.  **Parser (`pkg/parser`)**: Consumes tokens to build an **Abstract Syntax Tree (AST)**. Implements a recursive descent parser.
+1. **Lexer (`pkg/lexer`)**: Scans source code into a stream of **Tokens**.
+   Handles Zsh-specific quoting and expansions.
+2. **Parser (`pkg/parser`)**: Consumes tokens to build an **Abstract Syntax Tree (AST)**.
+   Implements a recursive descent parser.
 3.  **AST (`pkg/ast`)**: Defines the tree structure (Nodes, Statements, Expressions).
-4.  **Katas (`pkg/katas`)**: The check rules. Each Kata registers to listen for specific AST Node types.
-5.  **Reporter (`pkg/reporter`)**: Formats violations into Text, JSON, or SARIF output. Supports `--severity` filtering and `--no-color` mode.
+4. **Katas (`pkg/katas`)**: The check rules.
+   Each Kata registers to listen for specific AST Node types.
+5. **Reporter (`pkg/reporter`)**: Formats violations into Text, JSON, or SARIF output.
+   Supports `--severity` filtering and `--no-color` mode.
 
 ---
 
@@ -194,12 +203,18 @@ Understanding AST nodes is crucial for writing Katas.
 ### Common Node Types
 
 **Statements**
--   **`SimpleCommandNode`** — basic command: `ls -la`. Fields: `Name` (Expression), `Arguments` ([]Expression), `Redirections`.
--   **`IfStatementNode`** — `if … then … elif … else … fi`. Fields: `Condition`, `Consequence`, `Alternative`.
--   **`WhileLoopStatementNode`** — `while … do … done`. Fields: `Condition`, `Body`.
--   **`ForLoopStatementNode`** — both `for x in …` and C-style `for ((init; cond; post))`. Fields: `Init`, `Condition`, `Post`, `Items`, `Body`.
--   **`CaseStatementNode`** — `case … in … esac`. Fields: `Subject`, `Cases`.
--   **`FunctionDefinitionNode`** — `name() { … }` and `function name { … }`. Fields: `Name`, `Params`, `Body`.
+- **`SimpleCommandNode`** — basic command: `ls -la`.
+  Fields: `Name` (Expression), `Arguments` ([]Expression), `Redirections`.
+- **`IfStatementNode`** — `if … then … elif … else … fi`.
+  Fields: `Condition`, `Consequence`, `Alternative`.
+- **`WhileLoopStatementNode`** — `while … do … done`.
+  Fields: `Condition`, `Body`.
+- **`ForLoopStatementNode`** — both `for x in …` and C-style `for ((init; cond; post))`.
+  Fields: `Init`, `Condition`, `Post`, `Items`, `Body`.
+- **`CaseStatementNode`** — `case … in … esac`.
+  Fields: `Subject`, `Cases`.
+- **`FunctionDefinitionNode`** — `name() { … }` and `function name { … }`.
+  Fields: `Name`, `Params`, `Body`.
 -   **`BlockStatementNode`** — statement lists.
 -   **`LetStatementNode`** — `let x=1`.
 -   **`DeclarationStatementNode`** — `typeset`, `declare`, `local`, `readonly`, `export`.
@@ -219,7 +234,8 @@ Understanding AST nodes is crucial for writing Katas.
 -   **`DoubleBracketExpressionNode`** — `[[ … ]]`.
 -   **`RedirectionNode`** — wraps a statement with `>`, `<`, `>>`, `<<`, `>&`, `<&`.
 
-Not every Zsh construct has its own node yet. Known gaps: parameter-expansion modifiers `${var:-default}` / `${var##glob}` (tracked in [#129](https://github.com/afadesigns/zshellcheck/issues/129)).
+Not every Zsh construct has its own node yet.
+Known gaps: parameter-expansion modifiers `${var:-default}` / `${var##glob}` (tracked in [#129](https://github.com/afadesigns/zshellcheck/issues/129)).
 
 ### Visitor Pattern
 
@@ -238,7 +254,8 @@ ast.Walk(rootNode, func(node ast.Node) bool {
 
 ## Release Process
 
-Since v1.0.10 ZShellCheck follows standard [semantic versioning](https://semver.org) and `pkg/version/version.go` is **hand-maintained** — the kata-count formula is retired. Tags are cut **manually** by the maintainer.
+Since v1.0.10 ZShellCheck follows standard [semantic versioning](https://semver.org) and `pkg/version/version.go` is **hand-maintained** — the kata-count formula is retired.
+Tags are cut **manually** by the maintainer.
 
 1.  **Hand-bump** `pkg/version/version.go`:
     ```go
@@ -260,13 +277,18 @@ Since v1.0.10 ZShellCheck follows standard [semantic versioning](https://semver.
     git push origin v1.0.14
     ```
 5.  **Release workflow fires** on tag push: GoReleaser builds signed binaries for Linux/macOS/Windows × x86_64/arm64/i386, attaches cosign signatures + SBOMs, and publishes SLSA provenance.
-6.  **Release title** = tag name only (e.g. `v1.0.14`). No descriptive suffix.
+6. **Release title** = tag name only (e.g.
+   `v1.0.14`).
+   No descriptive suffix.
 
 ### Gotchas
 
--   Commit bodies must **not** contain the literal strings `#patch`, `#minor`, or `#major` — Release-Drafter matches these as version-bump keywords and will create ghost drafts. Use `#none` as a safety directive when the phrasing risks a match.
--   Tags must be **signed** (`-s`). The required GPG key is `B5690EEEBB952194`.
--   Never force-push `main`. For behind feature branches use merge-forward, not rebase.
+- Commit bodies must **not** contain the literal strings `#patch`, `#minor`, or `#major` — Release-Drafter matches these as version-bump keywords and will create ghost drafts.
+  Use `#none` as a safety directive when the phrasing risks a match.
+- Tags must be **signed** (`-s`).
+  The required GPG key is `B5690EEEBB952194`.
+- Never force-push `main`.
+  For behind feature branches use merge-forward, not rebase.
 
 ---
 

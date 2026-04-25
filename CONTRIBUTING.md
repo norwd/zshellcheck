@@ -1,6 +1,7 @@
 # Contributing to ZShellCheck
 
-Thanks for helping improve ZShellCheck. This guide covers the PR workflow, how to add a kata, and the local checks you should run before pushing.
+Thanks for helping improve ZShellCheck.
+This guide covers the PR workflow, how to add a kata, and the local checks you should run before pushing.
 
 For deeper internals (lexer/parser/AST design, release process, architecture diagrams), see the [Developer Guide](docs/DEVELOPER.md).
 
@@ -12,7 +13,8 @@ cd zshellcheck
 ./install.sh
 ```
 
-The installer builds from source when run inside the repo, or downloads the signed release binary otherwise. See [Developer Guide — Getting Started](docs/DEVELOPER.md#getting-started) for prerequisites.
+The installer builds from source when run inside the repo, or downloads the signed release binary otherwise.
+See [Developer Guide — Getting Started](docs/DEVELOPER.md#getting-started) for prerequisites.
 
 ## Pull Request Workflow
 
@@ -32,13 +34,16 @@ The installer builds from source when run inside the repo, or downloads the sign
    - `docs: update USER_GUIDE for inline directives`
    - `ci: tighten golangci timeout`
    - `chore: bump go-release action pin`
-   - Commits are **GPG-signed**. `commit.gpgsign=true` or append `-S`.
+   - Commits are **GPG-signed**.
+     `commit.gpgsign=true` or append `-S`.
 5. **Push + PR:**
    ```bash
    git push -u origin <branch>
    gh pr create --fill
    ```
-6. **Review:** CODEOWNERS (@afadesigns) must approve. All required checks (`test`, `security`, `sbom`) must pass. CI will reject unsigned commits.
+6. **Review:** CODEOWNERS (@afadesigns) must approve.
+   All required checks (`test`, `security`, `sbom`) must pass.
+   CI will reject unsigned commits.
 7. **Merge:** maintainer squash-merges on green.
 
 ### Link issues
@@ -65,24 +70,31 @@ go test -fuzz=FuzzParser -fuzztime=10s ./pkg/parser
 
 ## Adding a New Kata
 
-A kata is a Zsh-specific detection rule. Full scaffold + conventions live in the [Developer Guide — Creating a New Kata](docs/DEVELOPER.md#creating-a-new-kata). Short form:
+A kata is a Zsh-specific detection rule.
+Full scaffold + conventions live in the [Developer Guide — Creating a New Kata](docs/DEVELOPER.md#creating-a-new-kata).
+Short form:
 
 1. Pick the next ID: `ls pkg/katas/zc*.go | sort | tail -1`
 2. Create `pkg/katas/zc<NNNN>.go` registering the kata.
 3. Create `pkg/katas/katatests/zc<NNNN>_test.go` with valid + invalid fixtures.
-4. Once committed, **fix — don't remove** a kata. Retire duplicates as no-op stubs (pattern: `ZC1018`, `ZC1022`).
+4. Once committed, **fix — don't remove** a kata.
+   Retire duplicates as no-op stubs (pattern: `ZC1018`, `ZC1022`).
 
 ### Kata Conventions
 
 - **Zsh-specific only.** Reject generic POSIX-sh anti-patterns — ShellCheck covers those.
-- **Severity required.** One of `SeverityError`, `SeverityWarning`, `SeverityInfo`, `SeverityStyle`. See [Severity Levels](docs/USER_GUIDE.md#severity-levels).
-- **Never `panic()` in `Check`.** Use `ok`-checked type assertions. A kata panic kills the linter.
+- **Severity required.** One of `SeverityError`, `SeverityWarning`, `SeverityInfo`, `SeverityStyle`.
+  See [Severity Levels](docs/USER_GUIDE.md#severity-levels).
+- **Never `panic()` in `Check`.** Use `ok`-checked type assertions.
+  A kata panic kills the linter.
 - **No duplicates.** Grep existing katas before writing a new one.
-- **Backtick-quote shell syntax** in titles, descriptions, and messages. End sentences with a period.
+- **Backtick-quote shell syntax** in titles, descriptions, and messages.
+  End sentences with a period.
 
 ### Adding an Auto-Fix
 
-A kata becomes auto-fixable when the rewrite is **context-free, idempotent, and byte-exact**. If any of those conditions fails, leave `Fix` nil and ship detection-only.
+A kata becomes auto-fixable when the rewrite is **context-free, idempotent, and byte-exact**.
+If any of those conditions fails, leave `Fix` nil and ship detection-only.
 
 1. Set the `Fix` field on the kata struct:
 
@@ -96,10 +108,14 @@ A kata becomes auto-fixable when the rewrite is **context-free, idempotent, and 
    })
    ```
 
-2. Implement `fixZC####(node ast.Node, v Violation, source []byte) []FixEdit` returning a slice of byte-span replacements. `FixEdit` carries 1-based `Line` + `Column`, byte `Length`, and the replacement string. `pkg/katas/fixutil.go` exposes helpers (`LineColToByteOffset`, etc.).
-3. Re-confirm the rewrite is safe across whitespace, quoting, and trailing-comment variants. The fixer runs multi-pass (up to five) so nested rewrites can co-exist.
+2. Implement `fixZC####(node ast.Node, v Violation, source []byte) []FixEdit` returning a slice of byte-span replacements.
+   `FixEdit` carries 1-based `Line` + `Column`, byte `Length`, and the replacement string.
+   `pkg/katas/fixutil.go` exposes helpers (`LineColToByteOffset`, etc.).
+3. Re-confirm the rewrite is safe across whitespace, quoting, and trailing-comment variants.
+   The fixer runs multi-pass (up to five) so nested rewrites can co-exist.
 4. Add a fix-side test in `pkg/katas/katatests/zc####_test.go` covering at least one applied-edit case and one no-op case.
-5. Re-run `go run ./internal/tools/gen-katas-md` to refresh `KATAS.md`. The new entry will report `Auto-fix: yes` and the summary count will increment.
+5. Re-run `go run ./internal/tools/gen-katas-md` to refresh `KATAS.md`.
+   The new entry will report `Auto-fix: yes` and the summary count will increment.
 
 Reference rewrite shapes already in the catalog:
 
@@ -113,9 +129,21 @@ Reference rewrite shapes already in the catalog:
 
 If your rewrite doesn't fit one of these shapes, document the new pattern under this list in the same PR.
 
+## Helping with distribution
+
+Two install channels are explicitly community-submittable — the project benefits from a third party filing the upstream PR rather than the author self-submitting.
+
+- **Homebrew (homebrew-core)** — third-party submissions face a lower notability bar (≥75 stars / ≥30 forks / ≥30 watchers) than self-submissions (≥225 stars / ≥90 forks / ≥90 watchers).
+  When the repo crosses the lower bar, the `homebrew-eligibility` workflow opens a tracking issue.
+  A community member is welcome to file the new-formula PR against [`Homebrew/homebrew-core`](https://github.com/Homebrew/homebrew-core) at that point — credit goes to the submitter in the PR.
+  The author will not self-submit until the higher bar is met, to keep the path of least resistance open.
+- **AUR** (`zshellcheck-bin`) — anyone with an AUR account can host the package; coordination happens through an issue tagged `distribution`.
+  Goreleaser writes the `PKGBUILD` automatically when the project's release workflow has the credentials, but a community-maintained AUR package is welcome until that lands.
+
 ## Security
 
-Do not file vulnerabilities as public issues. See [SECURITY.md](SECURITY.md) for the reporting process.
+Do not file vulnerabilities as public issues.
+See [SECURITY.md](SECURITY.md) for the reporting process.
 
 ## Labels
 

@@ -8,16 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **`-no-banner` CLI flag.** Suppresses the startup banner. Useful for CI runs, scripted invocations, and embedding zshellcheck output inside other tools where the banner is noise. Banner remains the default for interactive use.
+- **`-no-banner` CLI flag.** Suppresses the startup banner.
+  Useful for CI runs, scripted invocations, and embedding zshellcheck output inside other tools where the banner is noise.
+  Banner remains the default for interactive use.
 - **Auto-fix coverage expanded to 67 katas.** The first-wave shipped 3 (`ZC1002`, `ZC1005`, `ZC1092`); the registry now ships rewrites for parameter-name renames (`$BASH_ALIASES` → `$aliases`, `$BASH_REMATCH` → `$match`, `$BASH_VERSION` → `$ZSH_VERSION`, `$TIMEFORMAT` → `$TIMEFMT`, `$BASH_CMDS` → `$commands`, ZSH array helpers, etc.), command/flag rewrites (`echo -E` → `print -r`, `read -a` → `read -A`), and several modernisations across the ZC1300 series.
-- **Demo recording.** `docs/assets/demo.gif` showcases the lint → diff → fix → re-lint loop on a sample script, embedded in the README. Source tape at `docs/assets/demo.tape` for reproducible re-renders via [VHS](https://github.com/charmbracelet/vhs).
-- **CLI banner refreshed.** Terminal-art rendering of the project logo replaces the prior block-letter ASCII. Tagline matches the project slogan: `The quiet linter for a quiet shell.`
+- **Demo recording.** `docs/assets/demo.gif` showcases the lint → diff → fix → re-lint loop on a sample script, embedded in the README.
+  Source tape at `docs/assets/demo.tape` for reproducible re-renders via [VHS](https://github.com/charmbracelet/vhs).
+- **CLI banner refreshed.** Terminal-art rendering of the project logo replaces the prior block-letter ASCII.
+  Tagline matches the project slogan: `The quiet linter for a quiet shell.`
 - **`KATAS.md` shows fix coverage.** Generator now emits an `Auto-fix: yes/no` line per entry and a `with auto-fix` row in the summary table.
 
 ### Changed
-- **Column pointer character.** Lint output now uses `↑` (U+2191) under the offending column instead of `^`. Matches the convention modern compilers (rustc, swiftc) use when pointing to a column.
-- **Multi-pass `-fix`.** `applyFixesUntilStable` now loops `fix.Apply` while `collectEdits` keeps producing edits, capped at five passes. Nested rewrites (e.g. `` `which git` `` → `$(whence git)`) resolve in a single `-fix` invocation.
-- **Fix summary footer.** Multi-file `-fix` runs now print `fix summary: N edit(s) across M file(s) (scanned K)` to stderr. Single-file invocations stay silent for backward compatibility.
+- **Column pointer character.** Lint output now uses `↑` (U+2191) under the offending column instead of `^`.
+  Matches the convention modern compilers (rustc, swiftc) use when pointing to a column.
+- **Multi-pass `-fix`.** `applyFixesUntilStable` now loops `fix.Apply` while `collectEdits` keeps producing edits, capped at five passes.
+  Nested rewrites (e.g.
+  `` `which git` `` → `$(whence git)`) resolve in a single `-fix` invocation.
+- **Fix summary footer.** Multi-file `-fix` runs now print `fix summary: N edit(s) across M file(s) (scanned K)` to stderr.
+  Single-file invocations stay silent for backward compatibility.
 
 ### Fixed
 - **Typed-nil `ast.Node` handling.** Guarded `Walk` against typed-nil interface values so downstream visitors no longer panic on partially-constructed trees produced by parser recovery paths.
@@ -27,14 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.14] - 2026-04-24
 
 ### Added
-- **Auto-fixer core.** New `pkg/fix` package applies per-kata `Fix` edits to source files. Handles 1-based line/column to byte-offset resolution, conflict resolution when edits overlap (outer span wins, inner picked up on rerun), and a built-in unified-diff renderer for preview mode.
-- **CLI fix flags** — `-fix` (apply in place), `-diff` (preview as unified diff), `-dry-run` (with `-fix`, report without writing). File permissions are preserved across in-place rewrites.
-- **Kata `Fix` hook.** `Kata` now carries an optional `Fix func(ast.Node, Violation, []byte) []FixEdit`. Checks that declare a Fix participate in auto-fixing; those that do not continue to lint-only.
+- **Auto-fixer core.** New `pkg/fix` package applies per-kata `Fix` edits to source files.
+  Handles 1-based line/column to byte-offset resolution, conflict resolution when edits overlap (outer span wins, inner picked up on rerun), and a built-in unified-diff renderer for preview mode.
+- **CLI fix flags** — `-fix` (apply in place), `-diff` (preview as unified diff), `-dry-run` (with `-fix`, report without writing).
+  File permissions are preserved across in-place rewrites.
+- **Kata `Fix` hook.** `Kata` now carries an optional `Fix func(ast.Node, Violation, []byte) []FixEdit`.
+  Checks that declare a Fix participate in auto-fixing; those that do not continue to lint-only.
 - **First-wave Fix coverage:**
   - `ZC1002` — `` `cmd` `` to `$(cmd)`.
   - `ZC1005` — `which` to `whence`.
   - `ZC1092` — `echo` to `print -r --` for the no-flag form.
-- **Zsh-ecosystem compatibility harness.** New `scripts/test-zsh-compat.sh` clones a local corpus of well-known Zsh projects (oh-my-zsh, powerlevel10k, prezto, zsh-autosuggestions, zsh-syntax-highlighting, zsh-completions, spaceship-prompt) into `testdata/external-corpora/` (git-ignored) and reports parser errors plus violation summaries. The corpora are local-only; the gitignore rule keeps them out of commits.
+- **Zsh-ecosystem compatibility harness.** New `scripts/test-zsh-compat.sh` clones a local corpus of well-known Zsh projects (oh-my-zsh, powerlevel10k, prezto, zsh-autosuggestions, zsh-syntax-highlighting, zsh-completions, spaceship-prompt) into `testdata/external-corpora/` (git-ignored) and reports parser errors plus violation summaries.
+  The corpora are local-only; the gitignore rule keeps them out of commits.
 
 ### Changed
 - `CheckAndFix` registry method added alongside `Check` so the walker can collect violations and their fix edits in a single pass.
@@ -42,26 +54,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.13] - 2026-04-22
 
 ### Fixed
-- **Parser**: bare `$+name` / `$+name[key]` inside `(( … ))` no longer errors with `expected next token to be IDENT, got + instead`. Equivalent shape to the working `${+name[key]}` path. (#1047)
-- **Parser**: `(( A )) && (( B ))` / `||` chains (and mixed) no longer error with `no prefix parse function for && found`. Logical operators after an arithmetic command now parse into a normal `InfixExpression`. (#1047)
+- **Parser**: bare `$+name` / `$+name[key]` inside `(( … ))` no longer errors with `expected next token to be IDENT, got + instead`.
+  Equivalent shape to the working `${+name[key]}` path.
+  (#1047)
+- **Parser**: `(( A )) && (( B ))` / `||` chains (and mixed) no longer error with `no prefix parse function for && found`.
+  Logical operators after an arithmetic command now parse into a normal `InfixExpression`.
+  (#1047)
 
 ### Changed
-- `.pre-commit-hooks.yaml` — `language: go` → `language: golang`, the canonical pre-commit language identifier. Fixes installation under `prek`. (#1046)
+- `.pre-commit-hooks.yaml` — `language: go` → `language: golang`, the canonical pre-commit language identifier.
+  Fixes installation under `prek`.
+  (#1046)
 
 ## [1.0.12] - 2026-04-20
 
 ### Changed
-- `action.yml` — extend `name` to `ZshellCheck v1` (the `ZshellCheck` form from v1.0.11 still collided with an existing Marketplace registry entry). The action identifier (`afadesigns/zshellcheck@vX.Y.Z`) is unchanged.
+- `action.yml` — extend `name` to `ZshellCheck v1` (the `ZshellCheck` form from v1.0.11 still collided with an existing Marketplace registry entry).
+  The action identifier (`afadesigns/zshellcheck@vX.Y.Z`) is unchanged.
 
 ## [1.0.11] - 2026-04-20
 
 ### Changed
-- `action.yml` — rename `name` from `ZShellCheck` to `ZshellCheck` (lowercase `h`). Marketplace requires a unique action name; the original capitalization collided with an existing registry entry. The action identifier (`afadesigns/zshellcheck@vX.Y.Z`) is unchanged.
+- `action.yml` — rename `name` from `ZShellCheck` to `ZshellCheck` (lowercase `h`).
+  Marketplace requires a unique action name; the original capitalization collided with an existing registry entry.
+  The action identifier (`afadesigns/zshellcheck@vX.Y.Z`) is unchanged.
 
 ## [1.0.10] - 2026-04-20
 
 **Versioning switch.** The kata-count formula (MAJOR = count/1000,
-MINOR = (count%1000)/100, PATCH = count%100) retires here. Going
+MINOR = (count%1000)/100, PATCH = count%100) retires here.
+Going
 forward ZShellCheck follows standard [semantic versioning](https://semver.org).
 `pkg/version/version.go` is now hand-maintained; `scripts/update-version.sh`,
 `scripts/HOTFIX`, and the `update-version` pre-commit hook are removed.
@@ -71,17 +93,21 @@ push — tags are cut manually.
 ## [1.0.9] - 2026-04-20
 
 Hotfix rollup for every fix merged between the v1.0.0 tag and the
-GitHub Marketplace debut. No new katas — kata count stays at 1000.
+GitHub Marketplace debut.
+No new katas — kata count stays at 1000.
 
 ### Added
 - **Inline `# zshellcheck disable=…` directives** — suppress katas
   per-line (trailing comment), per-next-line (standalone comment above
   code), or file-wide (standalone comment with no following code).
-  Multiple IDs may be comma- or whitespace-separated. Merges with the
-  config-level `disabled_katas` list. (#127)
+  Multiple IDs may be comma- or whitespace-separated.
+Merges with the
+  config-level `disabled_katas` list.
+(#127)
 - **XDG Base Directory support** — `$XDG_CONFIG_HOME/zshellcheck/config.{yml,yaml}`
   is now merged with `~/.zshellcheckrc` and `./.zshellcheckrc`, with the
-  project-local file winning. (#309)
+  project-local file winning.
+(#309)
 - **`scripts/HOTFIX` offset file** — tracks monotonic patch-release
   bumps so hotfix releases can ship between kata additions without
   colliding with the kata-count formula.
@@ -89,24 +115,31 @@ GitHub Marketplace debut. No new katas — kata count stays at 1000.
 ### Fixed
 - **Parser panic on `dd if=src of=dst`** — the lexer now demotes
   keyword tokens to `IDENT` when immediately followed by `=`, so
-  `if=`, `of=`, etc. parse as ordinary key=value argument pairs. (#435)
+  `if=`, `of=`, etc. parse as ordinary key=value argument pairs.
+(#435)
 - **`elif` chain mis-nesting** — `parseIfStatement` now terminates the
   consequence block on `ELIF` and builds a right-nested `IfStatement`
-  chain, fixing false-positives on multi-branch conditionals. (#126)
+  chain, fixing false-positives on multi-branch conditionals.
+(#126)
 - **Parser crash on `/dev/sdX` literals** in arithmetic and redirection
-  positions. (#347)
+  positions.
+(#347)
 - **14 duplicate katas retired** as no-op stubs (ZC1022–1029, 1033,
-  1035, 1018, 1019, 1277, 1278). Canonical detections remain in the
+  1035, 1018, 1019, 1277, 1278).
+Canonical detections remain in the
   surviving sibling IDs; retired IDs still parse in `.zshellcheckrc`
-  so legacy configs keep working. (#341–#345)
+  so legacy configs keep working.
+(#341–#345)
 - **5 overlapping kata pairs narrowed** — ZC1441 skips when
   `--volumes` is present (ZC1545 owns that case); ZC1978 narrows to
   `tftp` (ZC1200 owns `ftp`); ZC1327 drops `-c`/`-d` (ZC1487 owns);
   ZC1826 drops numeric modes (ZC1892 owns); ZC1999 rewritten as a
   typo-detector pointing at ZC1934 `AUTO_NAME_DIRS`.
 - **10 Style katas rebalanced to Warning** — ZC1075, 1078, 1079, 1084,
-  1085, 1090, 1136, 1139, 1141, 1258. These flag patterns with real
-  correctness or safety impact, not cosmetic preference. (#346)
+  1085, 1090, 1136, 1139, 1141, 1258.
+These flag patterns with real
+  correctness or safety impact, not cosmetic preference.
+(#346)
 
 ### CI
 - **OSV-Scanner** workflow drops the removed `--skip-git` flag that
@@ -126,12 +159,14 @@ GitHub Marketplace debut. No new katas — kata count stays at 1000.
 
 **1000 Katas milestone.** The kata-count formula (MAJOR = count/1000,
 MINOR = (count%1000)/100, PATCH = count%100) now resolves to exactly
-`1.0.0`. This is the first stable release of ZShellCheck, targeted at
+`1.0.0`.
+This is the first stable release of ZShellCheck, targeted at
 the GitHub Marketplace launch.
 
 ### Added
 - **665 new Katas** bringing the total from 335 (v0.3.35) to **1000**
-  (ZC1339 through ZC2003). Highlights:
+  (ZC1339 through ZC2003).
+Highlights:
   - **Zsh semantics & `setopt` subtleties** — `PROMPT_SUBST`,
     `GLOBAL_RCS`, `POSIX_IDENTIFIERS`, `CHASE_DOTS`, `SH_FILE_EXPANSION`,
     `CSH_JUNKIE_QUOTES`, `REMATCH_PCRE`, `KSH_TYPESET`, `BRACE_CCL`,
@@ -167,7 +202,8 @@ the GitHub Marketplace launch.
 ## [0.3.35] - 2026-04-17
 
 **Public beta.** First release with successfully built, signed, and
-attested binaries. The kata-count formula now maps correctly to the
+attested binaries.
+The kata-count formula now maps correctly to the
 `MAJOR.MINOR.PATCH` scheme (335 katas → 0.3.35); prior tag series was
 produced before the release pipeline was functional and contained no
 published artifacts.

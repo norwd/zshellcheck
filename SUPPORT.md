@@ -1,6 +1,7 @@
 # Support
 
-Thanks for using ZShellCheck. The fastest path to the right answer is below.
+Thanks for using ZShellCheck.
+The fastest path to the right answer is below.
 
 ## Where to file what
 
@@ -21,10 +22,15 @@ Thanks for using ZShellCheck. The fastest path to the right answer is below.
 
 ## What you'll get back
 
-- **Bugs**: triaged within a few days. Confirmed bugs get a milestone and a fix in the next patch release.
-- **Kata requests**: triaged into the [ROADMAP](ROADMAP.md). Severity and fixability are decided per-pattern.
-- **Discussions**: best-effort, usually within a week. The author is the only maintainer; please be patient.
+- **Bugs**: triaged within a few days.
+  Confirmed bugs get a milestone and a fix in the next patch release.
+- **Kata requests**: triaged into the [ROADMAP](ROADMAP.md).
+  Severity and fixability are decided per-pattern.
+- **Discussions**: best-effort, usually within a week.
+  The author is the only maintainer; please be patient.
 
 ## Sponsoring / commercial support
 
-ZShellCheck is MIT-licensed and free to use commercially. There is no paid support tier today. If you depend on it heavily and want to support development, sponsor the author at [github.com/sponsors/afadesigns](https://github.com/sponsors/afadesigns) once that page is live; until then a star and a thoughtful issue or PR is the best way to help.
+ZShellCheck is MIT-licensed and free to use commercially.
+There is no paid support tier today.
+If you depend on it heavily and want to support development, sponsor the author at [github.com/sponsors/afadesigns](https://github.com/sponsors/afadesigns) once that page is live; until then a star and a thoughtful issue or PR is the best way to help.

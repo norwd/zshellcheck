@@ -12,17 +12,22 @@ This document contains the glossary, governance model, and comparison with other
 
 ## Governance
 
-ZShellCheck is led by **@afadesigns** (Andreas Fahl), the lead maintainer and sole current committer. Everything below describes how community contribution is expected to work as the project grows.
+ZShellCheck is led by **@afadesigns** (Andreas Fahl), the lead maintainer and sole current committer.
+Everything below describes how community contribution is expected to work as the project grows.
 
 ### Roles
 
-- **Lead Maintainer** — final say on roadmap, release cadence, and architectural direction. Currently @afadesigns.
-- **Maintainers** — review and merge PRs, triage issues. No additional maintainers at time of writing; CODEOWNERS routes all reviews to @afadesigns.
+- **Lead Maintainer** — final say on roadmap, release cadence, and architectural direction.
+  Currently @afadesigns.
+- **Maintainers** — review and merge PRs, triage issues.
+  No additional maintainers at time of writing; CODEOWNERS routes all reviews to @afadesigns.
 - **Contributors** — anyone who opens an issue or PR.
 
 ### Decision Making
 
-Non-trivial direction is discussed on GitHub issues or PRs. Consensus preferred; the lead maintainer has the casting vote in deadlocks. Breaking changes and major features require a design-discussion issue before implementation.
+Non-trivial direction is discussed on GitHub issues or PRs.
+Consensus preferred; the lead maintainer has the casting vote in deadlocks.
+Breaking changes and major features require a design-discussion issue before implementation.
 
 ### Review Requirements (enforced)
 

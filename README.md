@@ -31,7 +31,8 @@ Static analysis and auto-fix for the setopts, hooks, and globs Bash never learne
 curl -fsSL https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.sh | bash
 ```
 
-Drops a signed binary into `~/.local/bin` (or `/usr/local/bin` as root). Both are on the standard `$PATH`, so `zshellcheck` is callable from any directory.
+Drops a signed binary into `~/.local/bin` (or `/usr/local/bin` as root).
+Both are on the standard `$PATH`, so `zshellcheck` is callable from any directory.
 
 <details>
 <summary><b>Other install methods</b></summary>
@@ -93,7 +94,8 @@ zshellcheck -fix  path/to/script.zsh    # apply it
 
 ## Tested integrations
 
-ZShellCheck is verified against the script corpora of these popular Zsh ecosystems. Every release runs a parse + lint sweep over each — no panics, no crashes, deterministic output.
+ZShellCheck is verified against the script corpora of these popular Zsh ecosystems.
+Every release runs a parse + lint sweep over each — no panics, no crashes, deterministic output.
 
 | Frameworks                                                                | Plugin / theme managers                                                            | Plugins + utilities                                                                                                                                                                                          | Themes / prompts                                                                                                          |
 | :------------------------------------------------------------------------ | :--------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ |
@@ -114,15 +116,20 @@ ZShellCheck is verified against the script corpora of these popular Zsh ecosyste
 
 ## Contributing
 
-PRs welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md). Questions and ideas: [discussions](https://github.com/afadesigns/zshellcheck/discussions). Bugs: [issues](https://github.com/afadesigns/zshellcheck/issues).
+PRs welcome.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md).
+Questions and ideas: [discussions](https://github.com/afadesigns/zshellcheck/discussions).
+Bugs: [issues](https://github.com/afadesigns/zshellcheck/issues).
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](LICENSE).
+Distributed under the MIT License.
+See [LICENSE](LICENSE).
 
 ## Credits
 
-Andreas Fahl (**@afadesigns**) — author and maintainer. Inspired by [ShellCheck](https://www.shellcheck.net/); ZShellCheck is an independent Go implementation focused on Zsh-specific semantics.
+Andreas Fahl (**@afadesigns**) — author and maintainer.
+Inspired by [ShellCheck](https://www.shellcheck.net/); ZShellCheck is an independent Go implementation focused on Zsh-specific semantics.
 
 <div align="center">
   <a href="https://github.com/afadesigns/zshellcheck/graphs/contributors">
