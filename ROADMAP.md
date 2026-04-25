@@ -53,7 +53,7 @@ Our mission is to provide the most comprehensive, fast, and reliable tooling for
 
 ## Progress Tracking
 
-**Current release:** v1.0.13 — 1000 katas.
+**Current release:** v1.0.15 — 1000 katas.
 
 ```
 [================================================================================] 1000/1000

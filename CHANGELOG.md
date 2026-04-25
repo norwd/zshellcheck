@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.15] - 2026-04-25
+
+### Breaking
+- **Inline directive renamed `# zshellcheck disable=…` → `# noka`.**
+  The legacy form is no longer recognised — every silenced violation needs its directive rewritten.
+  Three forms remain available:
+    - `cmd  # noka`              — silences every kata on this line.
+    - `cmd  # noka: ZC1234`      — silences one kata on this line.
+    - `cmd  # noka: ZC1234, ZC1075` — multiple, comma- or space-separated.
+  Standalone `# noka` directives still apply to the next non-blank code line; placed at file tail with no code after them, they apply file-wide.
+  Rationale: shorter (18 vs 30 chars), distinctive ("no kata"), aligns with the python ecosystem's `# noqa` convention.
+  Refactored cleanly while the project is still early — no fork-side migration to coordinate.
 
 ### Added
 - **`-no-banner` CLI flag.** Suppresses the startup banner.
@@ -17,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CLI banner refreshed.** Terminal-art rendering of the project logo replaces the prior block-letter ASCII.
   Tagline matches the project slogan: `The quiet linter for a quiet shell.`
 - **`KATAS.md` shows fix coverage.** Generator now emits an `Auto-fix: yes/no` line per entry and a `with auto-fix` row in the summary table.
+- **`--help` redesign.** Flags grouped by intent (OUTPUT / FILTER / AUTO-FIX / DIAGNOSTICS), six-entry EXAMPLES block, ANSI colour gated on TTY + `NO_COLOR`.
+- **Windows installer (`install.ps1`).** PowerShell 5.1+ compatible, mirrors `install.sh`: SHA-256 + cosign verification, user-scoped install into `%LOCALAPPDATA%\Programs\zshellcheck\bin`, clean `-Uninstall` reversal.
+- **Linux native packages.** Goreleaser `nfpms:` block emits signed `.deb`, `.rpm`, and `.apk` artifacts on every tag, alongside the existing tarballs.
+- **Multi-arch Docker image.** `FROM scratch`, ≈ 2 MB, published to `ghcr.io/afadesigns/zshellcheck` for `linux/amd64` and `linux/arm64`. Manifest signed with cosign.
+- **`INSTALL.md` canonical install guide.** Single source of truth split into macOS / Windows / Linux / Cross-platform sections with explicit uninstall paths everywhere.
+- **`INTEGRATIONS.md` at repo root.** Per-project tables (frameworks, plugin managers, tooling, plugins, prompts) plus the targeted-next list.
+- **Homebrew-eligibility tracker.** New weekly workflow opens a tracking issue when stargazers / forks / watchers cross the third-party homebrew-core notability threshold.
 
 ### Changed
 - **Column pointer character.** Lint output now uses `↑` (U+2191) under the offending column instead of `^`.
@@ -26,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `` `which git` `` → `$(whence git)`) resolve in a single `-fix` invocation.
 - **Fix summary footer.** Multi-file `-fix` runs now print `fix summary: N edit(s) across M file(s) (scanned K)` to stderr.
   Single-file invocations stay silent for backward compatibility.
+- **Repo description + homepage.** Synced to the locked README slogan/subheader; homepage points at the repo root.
+- **README structure.** New quick-link nav row above the fold, demo GIF replaces the prior Katas-at-a-glance teaser, Install section rebuilt around the three primary channels (macOS/Linux, Windows, Go), Integrations table trimmed to a featured spotlight + link to `INTEGRATIONS.md`, Documentation table reordered with `INSTALL.md` and `INTEGRATIONS.md` added.
+- **All top-level docs reflowed to semantic line breaks.** One sentence per source line. Rendered output unchanged (CommonMark soft breaks); diff hygiene improved.
 
 ### Fixed
 - **Typed-nil `ast.Node` handling.** Guarded `Walk` against typed-nil interface values so downstream visitors no longer panic on partially-constructed trees produced by parser recovery paths.

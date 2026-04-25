@@ -31,3 +31,6 @@ bin/
 # powerlevel10k, prezto, etc.); never commit them.
 /testdata/external-corpora/
 /.compat-err
+
+# Local-only — linguist hint for workflow lock files (kept off remote).
+.gitattributes

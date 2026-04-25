@@ -261,24 +261,24 @@ Tags are cut **manually** by the maintainer.
     ```go
     const Version = "1.0.14"
     ```
-2.  **Update** `CHANGELOG.md` with a new `[1.0.14] - YYYY-MM-DD` section.
+2.  **Update** `CHANGELOG.md` with a new `[1.0.15] - YYYY-MM-DD` section.
 3.  **Commit** the bump via PR → merge to main:
     ```bash
-    git switch -c chore/bump-v1.0.14
+    git switch -c chore/bump-v1.0.15
     git add pkg/version/version.go CHANGELOG.md
-    git commit -S -m "chore: bump version to 1.0.14"
-    git push -u origin chore/bump-v1.0.14
+    git commit -S -m "chore: bump version to 1.0.15"
+    git push -u origin chore/bump-v1.0.15
     gh pr create --fill && gh pr merge --squash --auto
     ```
 4.  **Sign + push the tag** at the merge SHA:
     ```bash
     git switch main && git pull --ff-only
-    git tag -s v1.0.14 $(git rev-parse main) -m 'v1.0.14'
-    git push origin v1.0.14
+    git tag -s v1.0.15 $(git rev-parse main) -m 'v1.0.15'
+    git push origin v1.0.15
     ```
 5.  **Release workflow fires** on tag push: GoReleaser builds signed binaries for Linux/macOS/Windows × x86_64/arm64/i386, attaches cosign signatures + SBOMs, and publishes SLSA provenance.
 6. **Release title** = tag name only (e.g.
-   `v1.0.14`).
+   `v1.0.15`).
    No descriptive suffix.
 
 ### Gotchas

@@ -67,11 +67,13 @@ disabled_katas:
 .fi
 
 .SS Inline directives
-Silence a kata from inside a script with a comment:
+Silence one or more katas from inside a script with a \fB# noka\fR comment:
 .nf
-rm -rf /tmp/noisy  # zshellcheck disable=ZC1136
+rm -rf /tmp/noisy  # noka: ZC1136
+rm -rf /tmp/noisy  # noka                   (silences every kata on this line)
+rm -rf /tmp/noisy  # noka: ZC1136, ZC1075   (multiple IDs, comma-separated)
 .fi
-A directive on its own line above code applies to the next code line; placed at the file tail with no code after it, it applies file-wide.
+A \fB# noka\fR comment on its own line above code applies to the next code line; placed at the file tail with no code after it, the directive applies file-wide.
 
 .SH EXAMPLES
 .TP

@@ -12,7 +12,7 @@
     and the PATH entry it added — no leftover files.
 
 .PARAMETER Version
-    Tag to install (default: latest). Example: -Version v1.0.14
+    Tag to install (default: latest). Example: -Version v1.0.15
 
 .PARAMETER Yes
     Skip the confirmation prompt before adding to PATH.
@@ -29,7 +29,7 @@
     iwr -useb https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.ps1 | iex
 
 .EXAMPLE
-    .\install.ps1 -Version v1.0.14 -Yes
+    .\install.ps1 -Version v1.0.15 -Yes
 
 .EXAMPLE
     .\install.ps1 -Uninstall

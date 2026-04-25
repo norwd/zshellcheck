@@ -70,7 +70,7 @@ Katas with a deterministic, reversible rewrite ship a `Fix` implementation.
 Run `zshellcheck -fix <path>` to apply them in place, or `zshellcheck -diff <path>` to preview the result.
 The fixer only rewrites the exact span the kata points at — arguments, quoting, and surrounding whitespace are preserved byte-for-byte.
 
-Silenced violations (via `.zshellcheckrc` or inline `# zshellcheck disable=…` directives) keep their fixes silenced too.
+Silenced violations (via `.zshellcheckrc` or inline `# noka` directives) keep their fixes silenced too.
 
 The fixer runs multi-pass (default cap of five).
 Nested rewrites — for example `` result=`which git` `` collapsing to `result=$(whence git)` — converge in a single `zshellcheck -fix` call.
@@ -143,21 +143,24 @@ disabled_katas:
 
 Refer to `KATAS.md` for the list of IDs.
 
-### Inline Disable Directives
+### Inline `noka` directives
 
-Silence katas directly inside a script without touching `.zshellcheckrc`.
-Comments are recognised in three forms:
+Silence katas directly inside a script with a `# noka` comment — no `.zshellcheckrc` edit required.
+The bare keyword silences every kata in scope; the colon-prefixed form narrows to a list:
 
 ```zsh
-# Trailing — silence only this line:
-rm -rf /tmp/noise  # zshellcheck disable=ZC1136,ZC1075
+# Trailing — silence specific katas on this line:
+rm -rf /tmp/noise  # noka: ZC1136, ZC1075
 
-# Preceding — silence only the next non-blank code line:
-# zshellcheck disable=ZC1030
+# Trailing — silence every kata on this line:
+rm -rf /tmp/noise  # noka
+
+# Preceding — applies to the next non-blank code line:
+# noka: ZC1030
 echo "ok"
 
-# File-tail — a directive with no code after it disables the IDs file-wide:
-# zshellcheck disable=ZC1092
+# File-tail — a directive with no code after it goes file-wide:
+# noka: ZC1092
 ```
 
 Multiple IDs may be separated by commas or whitespace.
@@ -222,7 +225,7 @@ Add to `.pre-commit-config.yaml`:
 
 ```yaml
 -   repo: https://github.com/afadesigns/zshellcheck
-    rev: v1.0.13
+    rev: v1.0.15
     hooks:
     -   id: zshellcheck
 ```
@@ -261,8 +264,9 @@ See [REFERENCE.md#comparison-vs-shellcheck](REFERENCE.md#comparison-vs-shellchec
 
 ### How do I exempt one line without editing the whole file?
 
-Add a trailing comment: `some-command # zshellcheck disable=ZC1234`.
-See [Inline Disable Directives](#inline-disable-directives) above.
+Add a trailing `# noka` comment: `some-command  # noka: ZC1234`.
+The bare `# noka` form silences every kata on the line.
+See [Inline `noka` directives](#inline-noka-directives) above.
 
 ### Is there an auto-fixer (`-fix`)?
 

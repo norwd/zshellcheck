@@ -369,7 +369,7 @@ func processFile(filename string, out, errOut io.Writer, cfg config.Config, regi
 		return true // Continue walking
 	})
 
-	// Drop violations silenced by a per-line `# zshellcheck disable=…` directive.
+	// Drop violations silenced by a per-line `# noka` directive.
 	if len(directives.PerLine) > 0 {
 		kept := violations[:0]
 		for _, v := range violations {

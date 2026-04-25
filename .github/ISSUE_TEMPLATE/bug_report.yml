@@ -51,7 +51,7 @@ body:
     attributes:
       label: ZShellCheck Version
       description: Run `zshellcheck -version` (or `git rev-parse HEAD` if built from source).
-      placeholder: v1.0.13
+      placeholder: v1.0.15
 
   - type: dropdown
     id: os
