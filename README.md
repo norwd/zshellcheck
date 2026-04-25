@@ -28,14 +28,41 @@ Static analysis and auto-fix for the setopts, hooks, and globs Bash never learne
 ## Install
 
 ```bash
-# Automatic — downloads signed binary, or builds if Go is present
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.sh | bash
+```
 
-# Or via Go toolchain
+Drops a signed binary into `~/.local/bin` (or `/usr/local/bin` as root). Both are on the standard `$PATH`, so `zshellcheck` is callable from any directory.
+
+<details>
+<summary><b>Other install methods</b></summary>
+
+<br/>
+
+**From a local checkout** (gives you the `--version` / `--uninstall` flags):
+
+```bash
+./install.sh -y
+```
+
+**Go toolchain** (latest tag, into `$GOBIN`):
+
+```bash
 go install github.com/afadesigns/zshellcheck/cmd/zshellcheck@latest
 ```
 
-The installer drops the binary into `~/.local/bin` (or `/usr/local/bin` when run as root) — both already on the standard `$PATH`, so `zshellcheck` is callable from any directory after install.
+**Pre-built archives** — [Releases](https://github.com/afadesigns/zshellcheck/releases/latest) ships Linux / macOS / Windows × x86_64 / arm64 / i386, each with cosign signature, SBOM, and SLSA Level 3 provenance.
+
+**Verify a downloaded archive** with `cosign`:
+
+```bash
+cosign verify-blob --certificate zshellcheck_Linux_x86_64.tar.gz.pem \
+  --signature zshellcheck_Linux_x86_64.tar.gz.sig \
+  --certificate-identity-regexp 'https://github.com/afadesigns/zshellcheck/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  zshellcheck_Linux_x86_64.tar.gz
+```
+
+</details>
 
 ## Run
 
@@ -63,19 +90,6 @@ zshellcheck -fix  path/to/script.zsh    # apply it
       - id: zshellcheck
 ```
 
-## Example output
-
-```text
-scripts/backup.zsh:14:5: warning: [ZC1136] Avoid `rm -rf $path` without a guard — an empty `$path` deletes `/`.
-  rm -rf $path
-      ^
-
-scripts/backup.zsh:22:1: style: [ZC1030] Prefer `print -r --` over `echo` for predictable output.
-  echo "done"
-  ^
-
-Found 2 violations.
-```
 
 ## ShellCheck vs ZShellCheck
 
