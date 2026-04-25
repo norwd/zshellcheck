@@ -1,7 +1,7 @@
 name: Bug Report
 description: Create a report to help us improve ZShellCheck
 title: "[BUG] "
-labels: ["fix", "needs-triage"]
+labels: ["fix", "status/needs-triage"]
 body:
   - type: markdown
     attributes:

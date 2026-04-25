@@ -5,6 +5,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    labels:
+      - "deps"
     groups:
       go-dependencies:
         patterns: ["*"]
@@ -15,6 +17,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    labels:
+      - "deps"
     groups:
       github-actions:
         patterns: ["*"]

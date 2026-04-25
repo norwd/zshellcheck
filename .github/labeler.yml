@@ -1,28 +1,37 @@
 # .github/labeler.yml
+# Auto-applies labels to PRs based on changed paths.
+# Label taxonomy documented in .github/LABELS.md.
 
-# Label CI/CD changes
 ci:
   - changed-files:
       - any-glob-to-any-file: '.github/**'
       - any-glob-to-any-file: '.goreleaser.yml'
       - any-glob-to-any-file: '.pre-commit-config.yaml'
+      - any-glob-to-any-file: '.golangci.yml'
 
-# Label Documentation changes
 docs:
   - changed-files:
       - any-glob-to-any-file: 'docs/**'
       - any-glob-to-any-file: '*.md'
       - any-glob-to-any-file: 'man/**'
 
-# Label Source Code changes
-pkg:
+area/parser:
   - changed-files:
-      - any-glob-to-any-file: 'pkg/**'
-      - any-glob-to-any-file: 'cmd/**'
-      - any-glob-to-any-file: 'go.mod'
-      - any-glob-to-any-file: 'go.sum'
+      - any-glob-to-any-file: 'pkg/lexer/**'
+      - any-glob-to-any-file: 'pkg/parser/**'
+      - any-glob-to-any-file: 'pkg/ast/**'
 
-# Label Test changes
+area/katas:
+  - changed-files:
+      - any-glob-to-any-file: 'pkg/katas/**'
+
+area/cli:
+  - changed-files:
+      - any-glob-to-any-file: 'cmd/**'
+      - any-glob-to-any-file: 'install.sh'
+      - any-glob-to-any-file: 'install.ps1'
+      - any-glob-to-any-file: 'man/**'
+
 test:
   - changed-files:
       - any-glob-to-any-file: 'tests/**'

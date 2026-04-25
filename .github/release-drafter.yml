@@ -11,10 +11,10 @@ categories:
     labels:
       - 'chore'
       - 'ci'
-      - 'build'
       - 'refactor'
       - 'perf'
       - 'test'
+      - 'deps'
   - title: '📚 Documentation'
     labels:
       - 'docs'

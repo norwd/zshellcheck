@@ -1,7 +1,7 @@
 name: Feature Request
 description: Suggest a new idea or a new Kata (check) for ZShellCheck
 title: "[FEAT] "
-labels: ["feat", "needs-triage"]
+labels: ["feat", "status/needs-triage"]
 body:
   - type: markdown
     attributes:
