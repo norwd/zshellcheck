@@ -1,20 +1,20 @@
 # Integrations
 
-ZShellCheck is verified against the script corpora of these popular Zsh ecosystems.
+ZShellCheck is verified against the script trees of these popular Zsh projects.
 Every release runs a parse + lint sweep over each — no panics, no crashes, deterministic output.
-The list grows each release; the goal is 300+ corpora before v2.
+The list grows each release; the goal is 300+ projects before v2.
 
 ## Summary
 
 |   |   |
 | ---: | :--- |
-| **19** | corpora verified today |
+| **19** | projects verified today |
 | **0** | panics on the current sweep |
-| **300+** | targeted before v2 — see [ROADMAP.md](../ROADMAP.md) |
+| **300+** | targeted before v2 — see [ROADMAP.md](ROADMAP.md) |
 
 ## Featured
 
-The corpora we test most heavily and link from the docs.
+The projects we test most heavily and link from the docs.
 
 | Project | Category | Files |
 | :--- | :--- | ---: |
@@ -80,15 +80,15 @@ The corpora we test most heavily and link from the docs.
 
 ## How the sweep runs
 
-Each release tag triggers a parse + lint pass over every corpus listed in the **Featured** + per-category tables above.
+Each release tag triggers a parse + lint pass over every project listed in the **Featured** + per-category tables above.
 Sandbox lives at `~/.config/zsh/zshellcheck/integration/` (local-only) and never touches the user's actual `~/.config/zsh` modules.
 A run produces:
 
-- `parse_errors` — total parser failures across the corpus.
+- `parse_errors` — total parser failures across the project.
 - `violations` — total kata hits (all severities).
-- A per-corpus markdown report under `~/.config/zsh/zshellcheck/integration/reports/`.
+- A per-project markdown report under `~/.config/zsh/zshellcheck/integration/reports/`.
 
-A bug surfaced by the sweep gets a GitHub issue, a PR fixes it, and the corpus stays in the matrix on every subsequent release.
+A bug surfaced by the sweep gets a GitHub issue, a PR fixes it, and the project stays in the matrix on every subsequent release.
 
 ## Adding an integration
 

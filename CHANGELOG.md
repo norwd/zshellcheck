@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Typed-nil `ast.Node` handling.** Guarded `Walk` against typed-nil interface values so downstream visitors no longer panic on partially-constructed trees produced by parser recovery paths.
-- **32 kata nil-guards.** Hardened `*ast.Identifier` dereferences across ZC1122, ZC1191, and the ZC1297–ZC1333 series so external corpora that produce nil identifier values no longer crash the linter.
+- **32 kata nil-guards.** Hardened `*ast.Identifier` dereferences across ZC1122, ZC1191, and the ZC1297–ZC1333 series so external projects that produce nil identifier values no longer crash the linter.
 - **Parser compat.** Routed `cmd --flag arg` through the simple-command path (refactored 23 mangled-name katas onto `FlagArgPosition`); added bracket-cond glob-alt literal support; fixed inner `$()` `RPAREN` containment via `consumedParenTerminator`; multi-line `$(…)` newline drain; case-pattern glob-alt label advance.
 
 ## [1.0.14] - 2026-04-24

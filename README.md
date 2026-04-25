@@ -15,6 +15,8 @@ Static analysis and auto-fix for the setopts, hooks, and globs Bash never learne
 [![Scorecard](https://api.securityscorecards.dev/projects/github.com/afadesigns/zshellcheck/badge)](https://securityscorecards.dev/viewer/?uri=github.com/afadesigns/zshellcheck)
 [![SLSA](https://img.shields.io/badge/SLSA-Level%203-brightgreen)](https://slsa.dev)
 
+[**Install**](INSTALL.md) · [**User guide**](docs/USER_GUIDE.md) · [**Katas**](KATAS.md) · [**Integrations**](INTEGRATIONS.md) · [**Roadmap**](ROADMAP.md) · [**Changelog**](CHANGELOG.md)
+
 </div>
 
 ---
@@ -51,25 +53,35 @@ go install github.com/afadesigns/zshellcheck/cmd/zshellcheck@latest
 ## Run
 
 ```bash
+# Lint
 zshellcheck path/to/script.zsh
+
+# Write SARIF for GitHub Code Scanning
 zshellcheck -severity warning -format sarif ./scripts > zshellcheck.sarif
-zshellcheck -diff path/to/script.zsh    # preview the auto-fix
-zshellcheck -fix  path/to/script.zsh    # apply it
+
+# Preview every auto-fix as a unified diff
+zshellcheck -diff path/to/script.zsh
+
+# Apply the fixes
+zshellcheck -fix path/to/script.zsh
 ```
 
-### GitHub Actions
+Exits *0* on a clean run, *1* when anything was flagged.
+`zshellcheck -h` lists every flag, grouped by intent.
+
+### In CI
 
 ```yaml
-- uses: afadesigns/zshellcheck@v1.0.13
+# .github/workflows/lint.yml
+- uses: afadesigns/zshellcheck@v1.0.14
   with:
     args: -format sarif -severity warning ./scripts
 ```
 
-### Pre-commit
-
 ```yaml
+# .pre-commit-config.yaml
 -   repo: https://github.com/afadesigns/zshellcheck
-    rev: v1.0.13
+    rev: v1.0.14
     hooks:
       - id: zshellcheck
 ```
@@ -77,7 +89,7 @@ zshellcheck -fix  path/to/script.zsh    # apply it
 
 ## Tested integrations
 
-ZShellCheck is verified against the script corpora of these popular Zsh ecosystems.
+ZShellCheck is verified against the script trees of these popular Zsh projects.
 Every release runs a parse + lint sweep over each — no panics, no crashes, deterministic output.
 
 | Frameworks                                                                | Plugin / theme managers                                                            | Plugins + utilities                                                                                                                                                                                          | Themes / prompts                                                                                                          |
@@ -87,15 +99,15 @@ Every release runs a parse + lint sweep over each — no panics, no crashes, det
 ## Documentation
 
 | Doc | What's inside |
-| --- | --- |
-| [USER_GUIDE.md](docs/USER_GUIDE.md) | CLI reference, configuration, inline directives, integrations, FAQ |
-| [DEVELOPER.md](docs/DEVELOPER.md) | Architecture, AST reference, kata authoring, release process |
-| [REFERENCE.md](docs/REFERENCE.md) | Governance, glossary, ShellCheck comparison table |
-| [KATAS.md](KATAS.md) | Every kata with description and severity |
+| :--- | :--- |
+| [INSTALL.md](INSTALL.md) | Install + uninstall paths for macOS, Windows, Linux, Docker |
+| [USER_GUIDE.md](docs/USER_GUIDE.md) | CLI reference, configuration, inline directives, FAQ |
+| [KATAS.md](KATAS.md) | Every kata with description, severity, and auto-fix status |
+| [INTEGRATIONS.md](INTEGRATIONS.md) | Verified Zsh projects — frameworks, plugins, prompts |
+| [DEVELOPER.md](docs/DEVELOPER.md) | Architecture, AST reference, kata authoring, auto-fix catalog |
+| [REFERENCE.md](docs/REFERENCE.md) | Governance, glossary, ShellCheck comparison |
+| [ROADMAP.md](ROADMAP.md) | LSP, distribution channels, plugin system |
 | [CHANGELOG.md](CHANGELOG.md) | Per-release history |
-| [SECURITY.md](SECURITY.md) | Vulnerability disclosure |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | PR workflow, local checks, conventions |
-| [ROADMAP.md](ROADMAP.md) | LSP, auto-fixer, plugins |
 
 ## Contributing
 
