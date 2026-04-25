@@ -124,23 +124,26 @@ Three forms (trailing, preceding, file-wide) → [USER_GUIDE](docs/USER_GUIDE.md
 
 ## Contributing
 
-PRs welcome.
-Start with [CONTRIBUTING.md](CONTRIBUTING.md).
-Questions and ideas: [discussions](https://github.com/afadesigns/zshellcheck/discussions).
-Bugs: [issues](https://github.com/afadesigns/zshellcheck/issues).
+Contributions of all kinds are welcome — read [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+
+- Have a question or idea? Join [discussions](https://github.com/afadesigns/zshellcheck/discussions).
+- Found a bug? Report it in [issues](https://github.com/afadesigns/zshellcheck/issues).
+- Want to write a kata? See the kata-authoring guide in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Distributed under the MIT License.
-See [LICENSE](LICENSE).
+ZShellCheck is licensed under the [MIT License](LICENSE).
 
 ## Credits
 
-Andreas Fahl (**@afadesigns**) — author and maintainer.
-Inspired by [ShellCheck](https://www.shellcheck.net/); ZShellCheck is an independent Go implementation focused on Zsh-specific semantics.
+Authored and maintained by Andreas Fahl ([@afadesigns](https://github.com/afadesigns)). Inspired by [ShellCheck](https://www.shellcheck.net/).
 
 <div align="center">
-  <a href="https://github.com/afadesigns/zshellcheck/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=afadesigns/zshellcheck" alt="Contributors" />
-  </a>
+
+[![Website](https://img.shields.io/badge/Website-afadesign.co-262626?style=flat-square&logo=googlechrome&logoColor=white&labelColor=262626)](https://afadesign.co)
+[![GitHub](https://img.shields.io/badge/GitHub-afadesigns-262626?style=flat-square&logo=github&logoColor=white&labelColor=262626)](https://github.com/afadesigns)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-andreasfahl-262626?style=flat-square&logo=linkedin&logoColor=white&labelColor=262626)](https://linkedin.com/in/andreasfahl)
+[![Instagram](https://img.shields.io/badge/Instagram-afadesign.official-262626?style=flat-square&logo=instagram&logoColor=white&labelColor=262626)](https://instagram.com/afadesign.official)
+[![Facebook](https://img.shields.io/badge/Facebook-andreas.fahl.5-262626?style=flat-square&logo=facebook&logoColor=white&labelColor=262626)](https://facebook.com/andreas.fahl.5)
+
 </div>
