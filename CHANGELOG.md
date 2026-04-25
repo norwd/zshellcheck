@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`-no-banner` CLI flag.** Suppresses the startup banner. Useful for CI runs, scripted invocations, and embedding zshellcheck output inside other tools where the banner is noise. Banner remains the default for interactive use.
+- **Auto-fix coverage expanded to 67 katas.** The first-wave shipped 3 (`ZC1002`, `ZC1005`, `ZC1092`); the registry now ships rewrites for parameter-name renames (`$BASH_ALIASES` → `$aliases`, `$BASH_REMATCH` → `$match`, `$BASH_VERSION` → `$ZSH_VERSION`, `$TIMEFORMAT` → `$TIMEFMT`, `$BASH_CMDS` → `$commands`, ZSH array helpers, etc.), command/flag rewrites (`echo -E` → `print -r`, `read -a` → `read -A`), and several modernisations across the ZC1300 series.
+- **Demo recording.** `docs/assets/demo.gif` showcases the lint → diff → fix → re-lint loop on a sample script, embedded in the README. Source tape at `docs/assets/demo.tape` for reproducible re-renders via [VHS](https://github.com/charmbracelet/vhs).
+- **CLI banner refreshed.** Terminal-art rendering of the project logo replaces the prior block-letter ASCII. Tagline matches the project slogan: `The quiet linter for a quiet shell.`
+- **`KATAS.md` shows fix coverage.** Generator now emits an `Auto-fix: yes/no` line per entry and a `with auto-fix` row in the summary table.
+
+### Changed
+- **Column pointer character.** Lint output now uses `↑` (U+2191) under the offending column instead of `^`. Matches the convention modern compilers (rustc, swiftc) use when pointing to a column.
+- **Multi-pass `-fix`.** `applyFixesUntilStable` now loops `fix.Apply` while `collectEdits` keeps producing edits, capped at five passes. Nested rewrites (e.g. `` `which git` `` → `$(whence git)`) resolve in a single `-fix` invocation.
+- **Fix summary footer.** Multi-file `-fix` runs now print `fix summary: N edit(s) across M file(s) (scanned K)` to stderr. Single-file invocations stay silent for backward compatibility.
+
+### Fixed
+- **Typed-nil `ast.Node` handling.** Guarded `Walk` against typed-nil interface values so downstream visitors no longer panic on partially-constructed trees produced by parser recovery paths.
+- **32 kata nil-guards.** Hardened `*ast.Identifier` dereferences across ZC1122, ZC1191, and the ZC1297–ZC1333 series so external corpora that produce nil identifier values no longer crash the linter.
+- **Parser compat.** Routed `cmd --flag arg` through the simple-command path (refactored 23 mangled-name katas onto `FlagArgPosition`); added bracket-cond glob-alt literal support; fixed inner `$()` `RPAREN` containment via `consumedParenTerminator`; multi-line `$(…)` newline drain; case-pattern glob-alt label advance.
+
 ## [1.0.14] - 2026-04-24
 
 ### Added

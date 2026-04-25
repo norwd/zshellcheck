@@ -43,6 +43,13 @@ func main() {
 	defer w.Flush()
 
 	count := len(ids)
+	fixCount := 0
+	for _, id := range ids {
+		if registry.KatasByID[id].Fix != nil {
+			fixCount++
+		}
+	}
+
 	fmt.Fprintf(w, "# ZShellCheck Katas\n\n")
 	fmt.Fprintf(w, "Auto-generated list of all %d implemented checks. Do not edit by hand — regenerate via `go run ./internal/tools/gen-katas-md`.\n\n", count)
 
@@ -55,12 +62,20 @@ func main() {
 	for _, sev := range []katas.Severity{katas.SeverityError, katas.SeverityWarning, katas.SeverityInfo, katas.SeverityStyle} {
 		fmt.Fprintf(w, "| `%s` | %d |\n", sev, sevCount[sev])
 	}
-	fmt.Fprintf(w, "| **total** | **%d** |\n\n", count)
+	fmt.Fprintf(w, "| **total** | **%d** |\n", count)
+	fmt.Fprintf(w, "| **with auto-fix** | **%d** |\n\n", fixCount)
+
+	fmt.Fprintf(w, "Auto-fix availability is marked per-entry below as **Auto-fix:** `yes` or `no`. ")
+	fmt.Fprintf(w, "Run `zshellcheck -fix path/...` to apply every available rewrite, or `-diff` to preview without writing.\n\n")
 
 	fmt.Fprintf(w, "## Table of Contents\n\n")
 	for _, id := range ids {
 		k := registry.KatasByID[id]
-		fmt.Fprintf(w, "- [%s: %s](#%s)\n", k.ID, escapeTitle(k.Title), strings.ToLower(k.ID))
+		marker := ""
+		if k.Fix != nil {
+			marker = " · auto-fix"
+		}
+		fmt.Fprintf(w, "- [%s: %s](#%s)%s\n", k.ID, escapeTitle(k.Title), strings.ToLower(k.ID), marker)
 	}
 	fmt.Fprintf(w, "\n---\n\n")
 
@@ -68,7 +83,12 @@ func main() {
 		k := registry.KatasByID[id]
 		fmt.Fprintf(w, "<a id=\"%s\"></a>\n", strings.ToLower(k.ID))
 		fmt.Fprintf(w, "### %s — %s\n\n", k.ID, k.Title)
-		fmt.Fprintf(w, "**Severity:** `%s`\n\n", k.Severity)
+		fmt.Fprintf(w, "**Severity:** `%s`  \n", k.Severity)
+		fix := "no"
+		if k.Fix != nil {
+			fix = "yes"
+		}
+		fmt.Fprintf(w, "**Auto-fix:** `%s`\n\n", fix)
 		fmt.Fprintf(w, "%s\n\n", k.Description)
 		fmt.Fprintf(w, "Disable by adding `%s` to `disabled_katas` in `.zshellcheckrc`.\n\n", k.ID)
 		fmt.Fprintf(w, "---\n\n")

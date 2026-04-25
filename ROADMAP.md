@@ -34,7 +34,7 @@ ZShellCheck is an evolving static analysis tool for Zsh. Our mission is to provi
 ### Version 1.x - Beyond the Milestone
 - [ ] **Language Server Protocol (LSP)**: Build an official LSP implementation to support VS Code, Neovim, and other editors natively with inline diagnostics and "Quick Fix" actions.
 - [x] **Auto-Fixer core** (v1.0.14+): `-fix`, `-diff`, `-dry-run` flags applying deterministic per-kata rewrites. The set of fix-enabled katas grows with each release.
-- [ ] **Auto-Fixer coverage**: expand fix support to every kata where a deterministic rewrite exists.
+- [ ] **Auto-Fixer coverage**: 67 of 1000 katas (6.7%) ship a deterministic rewrite as of the latest tag. Expansion continues per release; the structural ceiling is the subset of detections that admit a context-free, idempotent, byte-exact rewrite — many advisory or context-dependent detections will remain detection-only.
 - [ ] **Plugin System**: Allow users to write their own custom checks in Lua or Wasm.
 
 ## Long-Term Vision
