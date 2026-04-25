@@ -27,43 +27,26 @@ Static analysis and auto-fix for the setopts, hooks, and globs Bash never learne
 
 ## Install
 
+**The binary is the same wherever it lands.** Three ways to put it there:
+
 ```bash
+# macOS, Linux, WSL
 curl -fsSL https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.sh | bash
 ```
 
-Drops a signed binary into `~/.local/bin` (or `/usr/local/bin` as root).
-Both are on the standard `$PATH`, so `zshellcheck` is callable from any directory.
-
-<details>
-<summary><b>Other install methods</b></summary>
-
-<br/>
-
-**From a local checkout** (gives you the `--version` / `--uninstall` flags):
-
-```bash
-./install.sh -y
+```powershell
+# Windows
+irm https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.ps1 | iex
 ```
 
-**Go toolchain** (latest tag, into `$GOBIN`):
-
 ```bash
+# Anywhere Go is installed
 go install github.com/afadesigns/zshellcheck/cmd/zshellcheck@latest
 ```
 
-**Pre-built archives** — [Releases](https://github.com/afadesigns/zshellcheck/releases/latest) ships Linux / macOS / Windows × x86_64 / arm64 / i386, each with cosign signature, SBOM, and SLSA Level 3 provenance.
+`--uninstall` reverses any of them.
 
-**Verify a downloaded archive** with `cosign`:
-
-```bash
-cosign verify-blob --certificate zshellcheck_Linux_x86_64.tar.gz.pem \
-  --signature zshellcheck_Linux_x86_64.tar.gz.sig \
-  --certificate-identity-regexp 'https://github.com/afadesigns/zshellcheck/.*' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  zshellcheck_Linux_x86_64.tar.gz
-```
-
-</details>
+**On every tag:** native `.deb`, `.rpm`, `.apk`, and a multi-arch container at `ghcr.io/afadesigns/zshellcheck`. The *full ledger* — pinning, cosign verification, distro one-liners — sits in [INSTALL.md](INSTALL.md).
 
 ## Run
 
