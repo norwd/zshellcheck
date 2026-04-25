@@ -26,28 +26,21 @@ func main() {
 }
 
 func run() int {
+	format := flag.String("format", "text", "Output format. One of text, json, sarif.")
+	cpuprofile := flag.String("cpuprofile", "", "Write a Go pprof CPU profile to this path.")
+	showVersion := flag.Bool("version", false, "Print the version and exit.")
+	verbose := flag.Bool("verbose", false, "Include the full kata description under each violation.")
+	noColor := flag.Bool("no-color", false, "Disable ANSI colours in the report.")
+	noBanner := flag.Bool("no-banner", false, "Suppress the startup banner — useful for CI and scripted runs.")
+	severityFilter := flag.String("severity", "", "Comma-separated minimum severities to surface (error, warning, info, style).")
+	fixMode := flag.Bool("fix", false, "Apply auto-fixes in place for katas that ship a deterministic rewrite.")
+	diffMode := flag.Bool("diff", false, "Print a unified diff of the fixes instead of writing them.")
+	dryRun := flag.Bool("dry-run", false, "With -fix, report what would change without modifying files.")
 	flag.Usage = func() {
-		fmt.Fprint(os.Stderr, config.Banner)
-		fmt.Fprintf(os.Stderr, "ZShellCheck - The Zsh Static Analysis Tool\n\n")
-		fmt.Fprintf(os.Stderr, "Usage: zshellcheck [flags] <file1.zsh> [file2.zsh]\n\n")
-		fmt.Fprintf(os.Stderr, "Flags:\n")
-		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  zshellcheck script.zsh\n")
-		fmt.Fprintf(os.Stderr, "  zshellcheck -format json script.zsh\n")
-		fmt.Fprintf(os.Stderr, "  zshellcheck ./scripts/\n")
+		// Help suppresses banner whenever -no-banner / NO_COLOR is set or
+		// stdout is not a TTY. The banner constant is opt-in either way.
+		printUsage(os.Stderr, flag.CommandLine, !*noBanner)
 	}
-
-	format := flag.String("format", "text", "The output format (text, json, or sarif)")
-	cpuprofile := flag.String("cpuprofile", "", "Write CPU profile to file")
-	showVersion := flag.Bool("version", false, "Show version and exit")
-	verbose := flag.Bool("verbose", false, "Show detailed Kata descriptions in text output")
-	noColor := flag.Bool("no-color", false, "Disable colored output")
-	noBanner := flag.Bool("no-banner", false, "Suppress the startup banner (useful for CI and scripted invocations)")
-	severityFilter := flag.String("severity", "", "Comma-separated list of severities to show (error,warning,info,style)")
-	fixMode := flag.Bool("fix", false, "Apply auto-fixes in place for katas that declare a Fix")
-	diffMode := flag.Bool("diff", false, "Print a unified diff of the fixes instead of writing them")
-	dryRun := flag.Bool("dry-run", false, "When used with -fix, do not modify files; just list what would change")
 	flag.Parse()
 
 	if *showVersion {
