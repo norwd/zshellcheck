@@ -69,6 +69,20 @@ Katas with a deterministic, reversible rewrite ship a `Fix` implementation. Run 
 
 Silenced violations (via `.zshellcheckrc` or inline `# zshellcheck disable=…` directives) keep their fixes silenced too.
 
+The fixer runs multi-pass (default cap of five). Nested rewrites — for example `` result=`which git` `` collapsing to `result=$(whence git)` — converge in a single `zshellcheck -fix` call.
+
+Combine flags freely:
+
+| Combination | Effect |
+| --- | --- |
+| `-fix` | Apply rewrites to disk. |
+| `-diff` | Print a unified diff of the rewrites. Source unchanged. |
+| `-fix -dry-run` | Report which files would change without writing. |
+| `-fix -severity warning` | Apply every available rewrite; suppress style-level violations from the human-facing report. |
+| `-no-banner -fix` | Apply rewrites without the startup banner — useful in CI. |
+
+[`KATAS.md`](../KATAS.md) lists every kata with an explicit `Auto-fix: yes/no` line, and the summary table reports the current count.
+
 ---
 
 ## Severity Levels
