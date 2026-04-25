@@ -48,7 +48,9 @@ go install github.com/afadesigns/zshellcheck/cmd/zshellcheck@latest
 
 `--uninstall` reverses any of them.
 
-**On every tag:** native `.deb`, `.rpm`, `.apk`, and a multi-arch container at `ghcr.io/afadesigns/zshellcheck`. The *full ledger* — pinning, cosign verification, distro one-liners — sits in [INSTALL.md](INSTALL.md).
+**On every tag:** native `.deb`, `.rpm`, `.apk`, and a multi-arch container at `ghcr.io/afadesigns/zshellcheck`.
+
+Pinning, cosign verification, distro one-liners → [INSTALL.md](INSTALL.md).
 
 ## Run
 
