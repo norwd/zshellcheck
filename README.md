@@ -86,15 +86,18 @@ Exits *0* on a clean run, *1* when anything was flagged.
       - id: zshellcheck
 ```
 
+## Integrations
 
-## Tested integrations
+Each release runs a parse + lint sweep across the script trees of every Zsh project listed in [INTEGRATIONS.md](INTEGRATIONS.md) — no panics, no crashes, deterministic output. Featured today:
 
-ZShellCheck is verified against the script trees of these popular Zsh projects.
-Every release runs a parse + lint sweep over each — no panics, no crashes, deterministic output.
+[oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh) ·
+[prezto](https://github.com/sorin-ionescu/prezto) ·
+[powerlevel10k](https://github.com/romkatv/powerlevel10k) ·
+[zinit](https://github.com/zdharma-continuum/zinit) ·
+[fzf](https://github.com/junegunn/fzf) ·
+[zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting)
 
-| Frameworks                                                                | Plugin / theme managers                                                            | Plugins + utilities                                                                                                                                                                                          | Themes / prompts                                                                                                          |
-| :------------------------------------------------------------------------ | :--------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ |
-| oh-my-zsh · prezto · zimfw · antidote · zinit · zephyr · zsh-utils        | fzf · fzf-tab · fast-syntax-highlighting                                           | zsh-autosuggestions · zsh-syntax-highlighting · zsh-history-substring-search · zsh-vi-mode · zsh-autocomplete · zsh-completions                                                                                | powerlevel10k · spaceship-prompt · starship                                                                               |
+19 verified projects today, 300+ targeted before v2 — see the [full matrix](INTEGRATIONS.md).
 
 ## Documentation
 
