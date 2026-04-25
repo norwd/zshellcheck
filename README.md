@@ -104,16 +104,23 @@ Three forms (trailing, preceding, file-wide) → [USER_GUIDE](docs/USER_GUIDE.md
 
 ## Documentation
 
-| Doc | What's inside |
-| :--- | :--- |
-| [INSTALL.md](INSTALL.md) | Install + uninstall paths for macOS, Windows, Linux, Docker |
-| [USER_GUIDE.md](docs/USER_GUIDE.md) | CLI reference, configuration, inline directives, FAQ |
-| [KATAS.md](KATAS.md) | Every kata with description, severity, and auto-fix status |
-| [INTEGRATIONS.md](INTEGRATIONS.md) | Verified Zsh projects — frameworks, plugins, prompts |
-| [DEVELOPER.md](docs/DEVELOPER.md) | Architecture, AST reference, kata authoring, auto-fix catalog |
-| [REFERENCE.md](docs/REFERENCE.md) | Governance, glossary, ShellCheck comparison |
-| [ROADMAP.md](ROADMAP.md) | LSP, distribution channels, plugin system |
-| [CHANGELOG.md](CHANGELOG.md) | Per-release history |
+**Use it**
+- [INSTALL.md](INSTALL.md) — Install + uninstall paths for macOS, Windows, Linux, Docker.
+- [USER_GUIDE.md](docs/USER_GUIDE.md) — CLI reference, configuration, inline directives, FAQ.
+- [KATAS.md](KATAS.md) — Every kata with description, severity, and auto-fix status.
+- [INTEGRATIONS.md](INTEGRATIONS.md) — Verified Zsh projects — frameworks, plugins, prompts.
+
+**Develop with it**
+- [DEVELOPER.md](docs/DEVELOPER.md) — Architecture, AST reference, kata authoring, auto-fix catalog.
+- [REFERENCE.md](docs/REFERENCE.md) — Governance, glossary, ShellCheck comparison.
+- [ROADMAP.md](ROADMAP.md) — LSP, distribution channels, plugin system.
+- [CHANGELOG.md](CHANGELOG.md) — Per-release history.
+
+**Contribute**
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Workflow, signing requirements, kata standards.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — Community expectations.
+- [SECURITY.md](SECURITY.md) — Vulnerability disclosure.
+- [SUPPORT.md](SUPPORT.md) — Bug, kata, discussion routing.
 
 ## Contributing
 
