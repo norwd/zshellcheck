@@ -417,14 +417,15 @@ func TestCollectEdits_ParseError(t *testing.T) {
 }
 
 func TestCollectEdits_FileWideDirective(t *testing.T) {
-	src := "# noka: ZC1002\nx=`date`\n"
+	// File-wide noka should suppress every kata's edits even if the source
+	// would normally trip them. This exercises the directive merge branch
+	// in collectEdits.
+	src := "# noka\nx=`date`\n"
 	registry := katas.Registry
 	cfg := config.DefaultConfig()
 	edits := collectEdits(src, registry, nil, cfg, nil)
-	for _, e := range edits {
-		if e.KataID == "ZC1002" {
-			t.Errorf("file-wide directive failed to silence ZC1002: %#v", e)
-		}
+	if len(edits) != 0 {
+		t.Errorf("file-wide noka failed to silence edits: %d emitted", len(edits))
 	}
 }
 
