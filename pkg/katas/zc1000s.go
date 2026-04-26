@@ -4836,46 +4836,25 @@ func checkZC1071(node ast.Node) []Violation {
 	if !ok || infix.Operator != "=" {
 		return nil
 	}
-
 	ident, ok := infix.Left.(*ast.Identifier)
 	if !ok {
 		return nil
 	}
-	varName := ident.Value
-
 	arrayLit, ok := infix.Right.(*ast.ArrayLiteral)
 	if !ok {
 		return nil
 	}
-
 	found := false
 	checkNode := func(n ast.Node) bool {
 		if found {
 			return false
 		}
-		if aa, ok := n.(*ast.ArrayAccess); ok {
-			if id, ok := aa.Left.(*ast.Identifier); ok && id.Value == varName {
-				found = true
-				return false
-			}
-		}
-		if id, ok := n.(*ast.Identifier); ok {
-			if id.Value == "$"+varName || id.Value == "${"+varName+"}" {
-				found = true
-				return false
-			}
-		}
-		if prefix, ok := n.(*ast.PrefixExpression); ok {
-			if prefix.Operator == "$" {
-				if id, ok := prefix.Right.(*ast.Identifier); ok && id.Value == varName {
-					found = true
-					return false
-				}
-			}
+		if zc1071SelfReferences(n, ident.Value) {
+			found = true
+			return false
 		}
 		return true
 	}
-
 	for _, elem := range arrayLit.Elements {
 		if found {
 			break
@@ -4896,6 +4875,23 @@ func checkZC1071(node ast.Node) []Violation {
 	}
 
 	return nil
+}
+
+func zc1071SelfReferences(n ast.Node, varName string) bool {
+	switch v := n.(type) {
+	case *ast.ArrayAccess:
+		id, ok := v.Left.(*ast.Identifier)
+		return ok && id.Value == varName
+	case *ast.Identifier:
+		return v.Value == "$"+varName || v.Value == "${"+varName+"}"
+	case *ast.PrefixExpression:
+		if v.Operator != "$" {
+			return false
+		}
+		id, ok := v.Right.(*ast.Identifier)
+		return ok && id.Value == varName
+	}
+	return false
 }
 
 func init() {

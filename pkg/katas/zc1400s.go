@@ -3418,36 +3418,47 @@ func init() {
 	})
 }
 
+var (
+	zc1466FirewallStopVerbs = map[string]struct{}{"stop": {}, "disable": {}, "mask": {}}
+	zc1466FirewallUnits     = map[string]struct{}{
+		"firewalld": {}, "firewalld.service": {},
+		"ufw": {}, "ufw.service": {},
+		"nftables": {}, "nftables.service": {},
+		"iptables": {}, "iptables.service": {},
+	}
+)
+
 func checkZC1466(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-
-	if ident.Value == "ufw" && len(cmd.Arguments) >= 1 {
-		if cmd.Arguments[0].String() == "disable" {
+	switch CommandIdentifier(cmd) {
+	case "ufw":
+		if len(cmd.Arguments) >= 1 && cmd.Arguments[0].String() == "disable" {
 			return violateZC1466(cmd, "ufw disable")
 		}
-	}
-
-	if ident.Value == "systemctl" && len(cmd.Arguments) >= 2 {
-		verb := cmd.Arguments[0].String()
-		unit := cmd.Arguments[1].String()
-		if (verb == "stop" || verb == "disable" || verb == "mask") &&
-			(unit == "firewalld" || unit == "firewalld.service" ||
-				unit == "ufw" || unit == "ufw.service" ||
-				unit == "nftables" || unit == "nftables.service" ||
-				unit == "iptables" || unit == "iptables.service") {
-			return violateZC1466(cmd, "systemctl "+verb+" "+unit)
+	case "systemctl":
+		if where := zc1466SystemctlFirewallStop(cmd); where != "" {
+			return violateZC1466(cmd, where)
 		}
 	}
-
 	return nil
+}
+
+func zc1466SystemctlFirewallStop(cmd *ast.SimpleCommand) string {
+	if len(cmd.Arguments) < 2 {
+		return ""
+	}
+	verb := cmd.Arguments[0].String()
+	if _, hit := zc1466FirewallStopVerbs[verb]; !hit {
+		return ""
+	}
+	unit := cmd.Arguments[1].String()
+	if _, hit := zc1466FirewallUnits[unit]; !hit {
+		return ""
+	}
+	return "systemctl " + verb + " " + unit
 }
 
 func violateZC1466(cmd *ast.SimpleCommand, what string) []Violation {

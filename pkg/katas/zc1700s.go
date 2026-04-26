@@ -1034,70 +1034,77 @@ func init() {
 // argument's start offset for the literal flag bytes and delete the
 // span (plus the leading whitespace, so the surrounding source stays
 // byte-identical).
+var zc1717DockerSubs = map[string]struct{}{
+	"pull": {}, "push": {}, "build": {}, "create": {}, "run": {},
+}
+
 func fixZC1717(node ast.Node, _ Violation, source []byte) []FixEdit {
 	cmd, ok := node.(*ast.SimpleCommand)
+	if !ok || CommandIdentifier(cmd) != "docker" {
+		return nil
+	}
+	flagArg := zc1717FindDisableTrustFlag(cmd.Arguments)
+	if flagArg == nil {
+		return nil
+	}
+	off, ok := zc1717ResolveFlagOffset(source, flagArg)
 	if !ok {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok || ident.Value != "docker" {
+	start, end := zc1717TrimWhitespaceLeft(source, off, off+len("--disable-content-trust"))
+	startLine, startCol := offsetLineColZC1717(source, start)
+	if startLine < 0 {
 		return nil
 	}
+	return []FixEdit{{Line: startLine, Column: startCol, Length: end - start, Replace: ""}}
+}
+
+func zc1717FindDisableTrustFlag(args []ast.Expression) ast.Expression {
 	const flag = "--disable-content-trust"
 	sawSub := false
-	for _, arg := range cmd.Arguments {
+	for _, arg := range args {
 		v := arg.String()
 		if !sawSub {
-			switch v {
-			case "pull", "push", "build", "create", "run":
+			if _, hit := zc1717DockerSubs[v]; hit {
 				sawSub = true
-				continue
 			}
-		}
-		if !sawSub || v != flag {
 			continue
 		}
-		tok := arg.TokenLiteralNode()
-		anchor := LineColToByteOffset(source, tok.Line, tok.Column)
-		if anchor < 0 {
-			return nil
+		if v == flag {
+			return arg
 		}
-		// The lexer reports `--` as a separate token, then the rest
-		// of the flag is concatenated into a ConcatenatedExpression.
-		// The token's column lands on the second `-` for the
-		// `DASHDASH` token type, so search a 2-byte window around the
-		// anchor for the full flag literal in source bytes.
-		off := -1
-		for _, delta := range []int{-1, 0, 1} {
-			cand := anchor + delta
-			if cand < 0 || cand+len(flag) > len(source) {
-				continue
-			}
-			if string(source[cand:cand+len(flag)]) == flag {
-				off = cand
-				break
-			}
-		}
-		if off < 0 {
-			return nil
-		}
-		start := off
-		for start > 0 && (source[start-1] == ' ' || source[start-1] == '\t') {
-			start--
-		}
-		end := off + len(flag)
-		startLine, startCol := offsetLineColZC1717(source, start)
-		if startLine < 0 {
-			return nil
-		}
-		return []FixEdit{{
-			Line:    startLine,
-			Column:  startCol,
-			Length:  end - start,
-			Replace: "",
-		}}
 	}
 	return nil
+}
+
+// zc1717ResolveFlagOffset finds the actual source offset of the
+// `--disable-content-trust` literal. The lexer emits `--` as its own
+// token then concatenates the flag body, so the token column may land
+// one byte off — scan a 3-byte window for the literal.
+func zc1717ResolveFlagOffset(source []byte, arg ast.Expression) (int, bool) {
+	const flag = "--disable-content-trust"
+	tok := arg.TokenLiteralNode()
+	anchor := LineColToByteOffset(source, tok.Line, tok.Column)
+	if anchor < 0 {
+		return 0, false
+	}
+	for _, delta := range []int{-1, 0, 1} {
+		cand := anchor + delta
+		if cand < 0 || cand+len(flag) > len(source) {
+			continue
+		}
+		if string(source[cand:cand+len(flag)]) == flag {
+			return cand, true
+		}
+	}
+	return 0, false
+}
+
+func zc1717TrimWhitespaceLeft(source []byte, start, end int) (int, int) {
+	for start > 0 && (source[start-1] == ' ' || source[start-1] == '\t') {
+		start--
+	}
+	return start, end
 }
 
 func offsetLineColZC1717(source []byte, offset int) (int, int) {

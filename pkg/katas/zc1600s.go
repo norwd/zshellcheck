@@ -447,53 +447,58 @@ func init() {
 	})
 }
 
+var (
+	zc1608ExecFlags = map[string]struct{}{"-exec": {}, "-execdir": {}}
+	zc1608Shells    = map[string]struct{}{
+		"sh": {}, "bash": {}, "zsh": {},
+		"/bin/sh": {}, "/bin/bash": {},
+	}
+)
+
 func checkZC1608(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "find" {
 		return nil
 	}
+	if !zc1608HasExecShellQuotedBrace(cmd.Arguments) {
+		return nil
+	}
+	return []Violation{{
+		KataID: "ZC1608",
+		Message: "`find -exec sh -c '... {} ...'` interpolates filenames into the " +
+			"shell script — metacharacters break out. Pass `{}` as a positional " +
+			"arg: `sh -c '... \"$1\"' _ {} \\;`.",
+		Line:   cmd.Token.Line,
+		Column: cmd.Token.Column,
+		Level:  SeverityWarning,
+	}}
+}
 
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-	if ident.Value != "find" {
-		return nil
-	}
-
+func zc1608HasExecShellQuotedBrace(args []ast.Expression) bool {
 	hasExec := false
 	hasShellC := false
-	for i, arg := range cmd.Arguments {
+	for i, arg := range args {
 		v := arg.String()
-		if v == "-exec" || v == "-execdir" {
+		if _, hit := zc1608ExecFlags[v]; hit {
 			hasExec = true
 			continue
 		}
 		if !hasExec {
 			continue
 		}
-		if (v == "sh" || v == "bash" || v == "zsh" || v == "/bin/sh" || v == "/bin/bash") &&
-			i+1 < len(cmd.Arguments) && cmd.Arguments[i+1].String() == "-c" {
+		if _, isShell := zc1608Shells[v]; isShell &&
+			i+1 < len(args) && args[i+1].String() == "-c" {
 			hasShellC = true
 			continue
 		}
 		if !hasShellC {
 			continue
 		}
-		if (strings.HasPrefix(v, "'") || strings.HasPrefix(v, "\"")) &&
-			strings.Contains(v, "{}") {
-			return []Violation{{
-				KataID: "ZC1608",
-				Message: "`find -exec sh -c '... {} ...'` interpolates filenames into the " +
-					"shell script — metacharacters break out. Pass `{}` as a positional " +
-					"arg: `sh -c '... \"$1\"' _ {} \\;`.",
-				Line:   cmd.Token.Line,
-				Column: cmd.Token.Column,
-				Level:  SeverityWarning,
-			}}
+		if (strings.HasPrefix(v, "'") || strings.HasPrefix(v, "\"")) && strings.Contains(v, "{}") {
+			return true
 		}
 	}
-	return nil
+	return false
 }
 
 func init() {

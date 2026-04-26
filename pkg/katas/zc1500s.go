@@ -3890,68 +3890,66 @@ var secretEnvPrefixes = []string{
 	"GITHUB_TOKEN", "GH_TOKEN", "NPM_TOKEN",
 }
 
+var zc1572Runtimes = map[string]struct{}{"docker": {}, "podman": {}, "nerdctl": {}}
+
 func checkZC1572(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	if _, hit := zc1572Runtimes[CommandIdentifier(cmd)]; !hit {
 		return nil
 	}
-	if ident.Value != "docker" && ident.Value != "podman" && ident.Value != "nerdctl" {
-		return nil
-	}
-
 	if len(cmd.Arguments) == 0 || cmd.Arguments[0].String() != "run" {
 		return nil
 	}
+	if form, name := zc1572FirstSecretEnv(cmd.Arguments); name != "" {
+		return []Violation{{
+			KataID: "ZC1572",
+			Message: "`" + form + name + "=<value>` writes the secret into `docker " +
+				"inspect` and `/proc/1/environ`. Use `--env-file` 0600 or " +
+				"`--secret`.",
+			Line:   cmd.Token.Line,
+			Column: cmd.Token.Column,
+			Level:  SeverityWarning,
+		}}
+	}
+	return nil
+}
 
-	var prevE bool
-	for _, arg := range cmd.Arguments[1:] {
+func zc1572FirstSecretEnv(args []ast.Expression) (form, name string) {
+	prevE := false
+	for _, arg := range args[1:] {
 		v := arg.String()
 		if prevE {
 			prevE = false
-			name, value, ok := strings.Cut(v, "=")
-			if !ok || value == "" {
-				// `-e NAME` (value from caller env) is fine.
-				continue
+			if n := zc1572SecretAssignment(v); n != "" {
+				return "-e ", n
 			}
-			if looksLikeSecret(name) {
-				return []Violation{{
-					KataID: "ZC1572",
-					Message: "`-e " + name + "=<value>` writes the secret into `docker " +
-						"inspect` and `/proc/1/environ`. Use `--env-file` 0600 or " +
-						"`--secret`.",
-					Line:   cmd.Token.Line,
-					Column: cmd.Token.Column,
-					Level:  SeverityWarning,
-				}}
-			}
+			continue
 		}
 		if v == "-e" || v == "--env" {
 			prevE = true
 			continue
 		}
-		// Joined form: --env=NAME=value
 		if strings.HasPrefix(v, "--env=") {
-			inner := v[len("--env="):]
-			name, value, ok := strings.Cut(inner, "=")
-			if ok && value != "" && looksLikeSecret(name) {
-				return []Violation{{
-					KataID: "ZC1572",
-					Message: "`--env=" + name + "=<value>` writes the secret into `docker " +
-						"inspect` and `/proc/1/environ`. Use `--env-file` 0600 or " +
-						"`--secret`.",
-					Line:   cmd.Token.Line,
-					Column: cmd.Token.Column,
-					Level:  SeverityWarning,
-				}}
+			if n := zc1572SecretAssignment(v[len("--env="):]); n != "" {
+				return "--env=", n
 			}
 		}
 	}
-	return nil
+	return "", ""
+}
+
+func zc1572SecretAssignment(v string) string {
+	name, value, ok := strings.Cut(v, "=")
+	if !ok || value == "" {
+		return ""
+	}
+	if !looksLikeSecret(name) {
+		return ""
+	}
+	return name
 }
 
 func looksLikeSecret(name string) bool {
