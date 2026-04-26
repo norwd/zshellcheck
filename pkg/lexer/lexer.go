@@ -253,12 +253,20 @@ func (l *Lexer) dispatchSimpleByte(hasSpace bool) token.Token {
 	return l.dispatchBracketsAndOps(hasSpace)
 }
 
+// simpleBracketTokens maps single-byte tokens whose lex result has no
+// state side-effect — they just become the matching token type.
+var simpleBracketTokens = map[byte]token.Type{
+	'{': token.LBRACE, '}': token.RBRACE,
+	'`': token.BACKTICK, '~': token.TILDE,
+	'^': token.CARET, '/': token.SLASH,
+	'.': token.DOT, '$': token.DOLLAR,
+}
+
 func (l *Lexer) dispatchBracketsAndOps(hasSpace bool) token.Token {
+	if t, ok := simpleBracketTokens[l.ch]; ok {
+		return newToken(t, l.ch, l.line, l.column)
+	}
 	switch l.ch {
-	case '{':
-		return newToken(token.LBRACE, l.ch, l.line, l.column)
-	case '}':
-		return newToken(token.RBRACE, l.ch, l.line, l.column)
 	case '[':
 		return l.readOpenBracket()
 	case ']':
@@ -267,29 +275,10 @@ func (l *Lexer) dispatchBracketsAndOps(hasSpace bool) token.Token {
 		return l.readAmpersandLead()
 	case '|':
 		return l.readPipeLead()
-	case '`':
-		return newToken(token.BACKTICK, l.ch, l.line, l.column)
-	case '~':
-		return newToken(token.TILDE, l.ch, l.line, l.column)
-	case '^':
-		return newToken(token.CARET, l.ch, l.line, l.column)
 	case '%':
 		return l.readArithCompoundOr(token.PERCENT)
-	case '/':
-		// Inside arithmetic `/` is the division operator. Outside,
-		// `/` is reached only via the identifier path; if it falls
-		// through here it lexes as SLASH so the parser's prefix
-		// registration (`echo /etc/hostname`) handles it.
-		return newToken(token.SLASH, l.ch, l.line, l.column)
-	case '.':
-		return newToken(token.DOT, l.ch, l.line, l.column)
 	case '"', '\'':
 		return l.readQuotedString(l.ch)
-	case '$':
-		// readDollarToken claimed `$` early when it recognised one of
-		// the specialised forms; falling through here means the
-		// generic DOLLAR token is the right answer.
-		return newToken(token.DOLLAR, l.ch, l.line, l.column)
 	case 0:
 		return token.Token{Type: token.EOF, Line: l.line, Column: l.column}
 	}
