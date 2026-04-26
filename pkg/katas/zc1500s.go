@@ -2295,54 +2295,64 @@ func init() {
 	})
 }
 
+var (
+	zc1543MovingTags = []string{"@latest", "@master", "@main"}
+	zc1543CargoPins  = map[string]struct{}{"--rev": {}, "--tag": {}, "--branch": {}, "--locked": {}}
+)
+
 func checkZC1543(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-
-	args := make([]string, 0, len(cmd.Arguments))
-	for _, a := range cmd.Arguments {
-		args = append(args, a.String())
-	}
-
-	// go install ...@latest / no @
-	if ident.Value == "go" && len(args) >= 2 && args[0] == "install" {
-		for _, a := range args[1:] {
-			if strings.HasPrefix(a, "-") {
-				continue
-			}
-			if strings.HasSuffix(a, "@latest") || strings.HasSuffix(a, "@master") ||
-				strings.HasSuffix(a, "@main") {
-				return zc1543Violation(cmd, "go install "+a)
-			}
-			if !strings.Contains(a, "@") && strings.Contains(a, "/") {
-				return zc1543Violation(cmd, "go install "+a+" (no @version)")
-			}
+	args := zc1464StringArgs(cmd)
+	switch CommandIdentifier(cmd) {
+	case "go":
+		if where := zc1543GoInstall(args); where != "" {
+			return zc1543Violation(cmd, where)
 		}
-	}
-
-	// cargo install --git <url>  with no --rev / --tag / --branch
-	if ident.Value == "cargo" && len(args) >= 2 && args[0] == "install" {
-		var hasGit, hasPin bool
-		for _, a := range args[1:] {
-			if a == "--git" {
-				hasGit = true
-			}
-			if a == "--rev" || a == "--tag" || a == "--branch" || a == "--locked" {
-				hasPin = true
-			}
-		}
-		if hasGit && !hasPin {
+	case "cargo":
+		if zc1543CargoInstallUnpinned(args) {
 			return zc1543Violation(cmd, "cargo install --git (no --rev/--tag/--branch)")
 		}
 	}
 	return nil
+}
+
+func zc1543GoInstall(args []string) string {
+	if len(args) < 2 || args[0] != "install" {
+		return ""
+	}
+	for _, a := range args[1:] {
+		if strings.HasPrefix(a, "-") {
+			continue
+		}
+		for _, suffix := range zc1543MovingTags {
+			if strings.HasSuffix(a, suffix) {
+				return "go install " + a
+			}
+		}
+		if !strings.Contains(a, "@") && strings.Contains(a, "/") {
+			return "go install " + a + " (no @version)"
+		}
+	}
+	return ""
+}
+
+func zc1543CargoInstallUnpinned(args []string) bool {
+	if len(args) < 2 || args[0] != "install" {
+		return false
+	}
+	hasGit, hasPin := false, false
+	for _, a := range args[1:] {
+		if a == "--git" {
+			hasGit = true
+		}
+		if _, hit := zc1543CargoPins[a]; hit {
+			hasPin = true
+		}
+	}
+	return hasGit && !hasPin
 }
 
 func zc1543Violation(cmd *ast.SimpleCommand, what string) []Violation {
@@ -3145,46 +3155,58 @@ var privGroups = map[string]struct{}{
 	"disk":    {},
 }
 
+var (
+	zc1558UserModTools = map[string]struct{}{"usermod": {}, "gpasswd": {}, "adduser": {}}
+	zc1558GroupFlags   = map[string]struct{}{
+		"-aG": {}, "-Ga": {}, "-G": {}, "--groups": {}, "--append": {},
+	}
+)
+
 func checkZC1558(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	tool := CommandIdentifier(cmd)
+	if _, hit := zc1558UserModTools[tool]; !hit {
 		return nil
 	}
-	if ident.Value != "usermod" && ident.Value != "gpasswd" && ident.Value != "adduser" {
-		return nil
+	args := zc1464StringArgs(cmd)
+	if g := zc1558PrivGroupViaFlag(args); g != "" {
+		return zc1558Violation(cmd, g)
 	}
-
-	// Look for the group argument after -aG / -G / -a
-	args := make([]string, 0, len(cmd.Arguments))
-	for _, a := range cmd.Arguments {
-		args = append(args, a.String())
-	}
-
-	for i, a := range args {
-		if (a == "-aG" || a == "-Ga" || a == "-G" || a == "--groups" || a == "--append") &&
-			i+1 < len(args) {
-			groups := strings.Split(args[i+1], ",")
-			for _, g := range groups {
-				g = strings.TrimSpace(g)
-				if _, bad := privGroups[g]; bad {
-					return zc1558Violation(cmd, g)
-				}
-			}
-		}
-	}
-	// gpasswd -a user <group>  => -a then user then group
-	if ident.Value == "gpasswd" && len(args) >= 3 && args[0] == "-a" {
-		g := args[2]
-		if _, bad := privGroups[g]; bad {
+	if tool == "gpasswd" {
+		if g := zc1558GpasswdAddPrivGroup(args); g != "" {
 			return zc1558Violation(cmd, g)
 		}
 	}
 	return nil
+}
+
+func zc1558PrivGroupViaFlag(args []string) string {
+	for i, a := range args {
+		if _, hit := zc1558GroupFlags[a]; !hit || i+1 >= len(args) {
+			continue
+		}
+		for _, g := range strings.Split(args[i+1], ",") {
+			g = strings.TrimSpace(g)
+			if _, bad := privGroups[g]; bad {
+				return g
+			}
+		}
+	}
+	return ""
+}
+
+func zc1558GpasswdAddPrivGroup(args []string) string {
+	if len(args) < 3 || args[0] != "-a" {
+		return ""
+	}
+	g := args[2]
+	if _, bad := privGroups[g]; bad {
+		return g
+	}
+	return ""
 }
 
 func zc1558Violation(cmd *ast.SimpleCommand, group string) []Violation {

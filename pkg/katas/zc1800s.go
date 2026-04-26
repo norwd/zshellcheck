@@ -596,42 +596,23 @@ func init() {
 	})
 }
 
+var (
+	zc1809RmRecursiveFlags = map[string]struct{}{
+		"-r": {}, "-R": {}, "-rf": {}, "-fr": {}, "--recursive": {},
+	}
+	zc1809RbForceFlags = map[string]struct{}{"-f": {}, "--force": {}}
+)
+
 func checkZC1809(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "gsutil" {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok || ident.Value != "gsutil" {
+	sub, idx := zc1809FindRmRbSub(cmd.Arguments)
+	if idx == -1 {
 		return nil
 	}
-
-	subIdx := -1
-	for i, arg := range cmd.Arguments {
-		v := arg.String()
-		if v == "rm" || v == "rb" {
-			subIdx = i
-			break
-		}
-	}
-	if subIdx == -1 {
-		return nil
-	}
-	sub := cmd.Arguments[subIdx].String()
-
-	hasDestFlag := false
-	for _, arg := range cmd.Arguments[subIdx+1:] {
-		v := arg.String()
-		if sub == "rm" && (v == "-r" || v == "-R" || v == "-rf" || v == "-fr" || v == "--recursive") {
-			hasDestFlag = true
-			break
-		}
-		if sub == "rb" && (v == "-f" || v == "--force") {
-			hasDestFlag = true
-			break
-		}
-	}
-	if !hasDestFlag {
+	if !zc1809HasDestructiveFlag(cmd.Arguments[idx+1:], sub) {
 		return nil
 	}
 	return []Violation{{
@@ -644,6 +625,29 @@ func checkZC1809(node ast.Node) []Violation {
 		Column: cmd.Token.Column,
 		Level:  SeverityError,
 	}}
+}
+
+func zc1809FindRmRbSub(args []ast.Expression) (string, int) {
+	for i, arg := range args {
+		v := arg.String()
+		if v == "rm" || v == "rb" {
+			return v, i
+		}
+	}
+	return "", -1
+}
+
+func zc1809HasDestructiveFlag(args []ast.Expression, sub string) bool {
+	flags := zc1809RmRecursiveFlags
+	if sub == "rb" {
+		flags = zc1809RbForceFlags
+	}
+	for _, arg := range args {
+		if _, hit := flags[arg.String()]; hit {
+			return true
+		}
+	}
+	return false
 }
 
 var zc1810RecursiveFlags = map[string]bool{
@@ -1239,43 +1243,10 @@ func init() {
 
 func checkZC1819(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "xattr" {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok || ident.Value != "xattr" {
-		return nil
-	}
-
-	hasQuarantineDelete := false
-	hasRecursiveClear := false
-
-	for i, arg := range cmd.Arguments {
-		v := arg.String()
-		if v == "-d" || v == "--delete" {
-			if i+1 < len(cmd.Arguments) &&
-				cmd.Arguments[i+1].String() == "com.apple.quarantine" {
-				hasQuarantineDelete = true
-			}
-		}
-		if strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && len(v) > 1 {
-			hasC := false
-			hasR := false
-			for _, c := range v[1:] {
-				if c == 'c' {
-					hasC = true
-				}
-				if c == 'r' {
-					hasR = true
-				}
-			}
-			if hasC && hasR {
-				hasRecursiveClear = true
-			}
-		}
-	}
-
-	if !hasQuarantineDelete && !hasRecursiveClear {
+	if !zc1819QuarantineDelete(cmd.Arguments) && !zc1819RecursiveClear(cmd.Arguments) {
 		return nil
 	}
 	return []Violation{{
@@ -1288,6 +1259,44 @@ func checkZC1819(node ast.Node) []Violation {
 		Column: cmd.Token.Column,
 		Level:  SeverityWarning,
 	}}
+}
+
+func zc1819QuarantineDelete(args []ast.Expression) bool {
+	for i, arg := range args {
+		v := arg.String()
+		if v != "-d" && v != "--delete" {
+			continue
+		}
+		if i+1 < len(args) && args[i+1].String() == "com.apple.quarantine" {
+			return true
+		}
+	}
+	return false
+}
+
+func zc1819RecursiveClear(args []ast.Expression) bool {
+	for _, arg := range args {
+		if zc1819ShortBundleHasCR(arg.String()) {
+			return true
+		}
+	}
+	return false
+}
+
+func zc1819ShortBundleHasCR(v string) bool {
+	if !strings.HasPrefix(v, "-") || strings.HasPrefix(v, "--") || len(v) <= 1 {
+		return false
+	}
+	hasC, hasR := false, false
+	for _, c := range v[1:] {
+		switch c {
+		case 'c':
+			hasC = true
+		case 'r':
+			hasR = true
+		}
+	}
+	return hasC && hasR
 }
 
 func init() {
