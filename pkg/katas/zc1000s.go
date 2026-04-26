@@ -5825,108 +5825,101 @@ func init() {
 
 func checkZC1083(node ast.Node) []Violation {
 	if strNode, ok := node.(*ast.StringLiteral); ok {
-		val := strNode.Value
-		if strings.Contains(val, "{") && strings.Contains(val, "..") && strings.Contains(val, "$") {
-			return []Violation{{
-				KataID:  "ZC1083",
-				Message: "Brace expansion limits cannot be variables. `{...$var...}` is treated as a literal string. Use `seq` or `for ((...))`.",
-				Line:    strNode.TokenLiteralNode().Line,
-				Column:  strNode.TokenLiteralNode().Column,
-				Level:   SeverityError,
-			}}
-		}
-		return nil
+		return zc1083CheckStringLiteral(strNode)
 	}
-
 	concat, ok := node.(*ast.ConcatenatedExpression)
 	if !ok {
 		return nil
 	}
+	return zc1083CheckConcat(concat)
+}
 
-	startIdx := -1
-	var dotDotIndices []int
-	var varIndices []int
+func zc1083CheckStringLiteral(s *ast.StringLiteral) []Violation {
+	v := s.Value
+	if !strings.Contains(v, "{") || !strings.Contains(v, "..") || !strings.Contains(v, "$") {
+		return nil
+	}
+	return zc1083Hit(s)
+}
 
+func zc1083CheckConcat(concat *ast.ConcatenatedExpression) []Violation {
+	scan := zc1083ScanParts(concat.Parts)
+	if scan.startIdx == -1 {
+		return nil
+	}
+	if !zc1083HasIndexAfter(scan.dotDotIndices, scan.startIdx) {
+		return nil
+	}
+	if !zc1083HasIndexAfter(scan.varIndices, scan.startIdx) {
+		return nil
+	}
+	return zc1083Hit(concat)
+}
+
+type zc1083Scan struct {
+	startIdx       int
+	dotDotIndices  []int
+	varIndices     []int
+}
+
+func zc1083ScanParts(parts []ast.Expression) zc1083Scan {
+	scan := zc1083Scan{startIdx: -1}
 	lastPartWasDot := false
-
-	for i, part := range concat.Parts {
+	for i, part := range parts {
 		if strNode, ok := part.(*ast.StringLiteral); ok {
-			val := strNode.Value
+			zc1083ScanString(&scan, &lastPartWasDot, strNode.Value, i)
+			continue
+		}
+		lastPartWasDot = false
+		if _, isInt := part.(*ast.IntegerLiteral); isInt {
+			continue
+		}
+		if idNode, isIdent := part.(*ast.Identifier); isIdent && strings.Contains(idNode.Value, "..") {
+			scan.dotDotIndices = append(scan.dotDotIndices, i)
+		}
+		scan.varIndices = append(scan.varIndices, i)
+	}
+	return scan
+}
 
-			if strings.Contains(val, "{") {
-				if startIdx == -1 {
-					startIdx = i
-				}
-			}
-
-			switch {
-			case strings.Contains(val, ".."):
-				dotDotIndices = append(dotDotIndices, i)
-				lastPartWasDot = false
-			case val == ".":
-				if lastPartWasDot {
-					dotDotIndices = append(dotDotIndices, i-1) // Mark previous index as start of ..
-					lastPartWasDot = false                     // Consumed
-				} else {
-					lastPartWasDot = true
-				}
-			default:
-				lastPartWasDot = false
-			}
+func zc1083ScanString(scan *zc1083Scan, lastPartWasDot *bool, val string, i int) {
+	if strings.Contains(val, "{") && scan.startIdx == -1 {
+		scan.startIdx = i
+	}
+	switch {
+	case strings.Contains(val, ".."):
+		scan.dotDotIndices = append(scan.dotDotIndices, i)
+		*lastPartWasDot = false
+	case val == ".":
+		if *lastPartWasDot {
+			scan.dotDotIndices = append(scan.dotDotIndices, i-1)
+			*lastPartWasDot = false
 		} else {
-			lastPartWasDot = false
-			if _, ok := part.(*ast.IntegerLiteral); ok {
-				continue
-			}
+			*lastPartWasDot = true
+		}
+	default:
+		*lastPartWasDot = false
+	}
+}
 
-			if idNode, ok := part.(*ast.Identifier); ok {
-				if strings.Contains(idNode.Value, "..") {
-					dotDotIndices = append(dotDotIndices, i)
-				}
-			}
-
-			// Assume any other part is a variable or dynamic expansion
-			varIndices = append(varIndices, i)
+func zc1083HasIndexAfter(indices []int, after int) bool {
+	for _, idx := range indices {
+		if idx > after {
+			return true
 		}
 	}
+	return false
+}
 
-	if startIdx == -1 {
-		return nil
-	}
-
-	// Check if .. is after startIdx
-	hasDotDot := false
-	for _, idx := range dotDotIndices {
-		if idx > startIdx {
-			hasDotDot = true
-			break
-		}
-	}
-
-	if !hasDotDot {
-		return nil
-	}
-
-	// Check if variable is after startIdx
-	hasVar := false
-	for _, idx := range varIndices {
-		if idx > startIdx {
-			hasVar = true
-			break
-		}
-	}
-
-	if hasVar {
-		return []Violation{{
-			KataID:  "ZC1083",
-			Message: "Brace expansion limits cannot be variables. `{...$var...}` is treated as a literal string. Use `seq` or `for ((...))`.",
-			Line:    concat.TokenLiteralNode().Line,
-			Column:  concat.TokenLiteralNode().Column,
-			Level:   SeverityError,
-		}}
-	}
-
-	return nil
+func zc1083Hit(node ast.Node) []Violation {
+	tok := node.TokenLiteralNode()
+	return []Violation{{
+		KataID:  "ZC1083",
+		Message: "Brace expansion limits cannot be variables. `{...$var...}` is treated as a literal string. Use `seq` or `for ((...))`.",
+		Line:    tok.Line,
+		Column:  tok.Column,
+		Level:   SeverityError,
+	}}
 }
 
 func init() {
@@ -7175,47 +7168,16 @@ func init() {
 
 func checkZC1094(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "sed" || len(cmd.Arguments) != 1 {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok || ident.Value != "sed" {
+	val := cmd.Arguments[0].String()
+	if val != "" && val[0] == '-' {
 		return nil
 	}
-
-	// Only flag simple sed invocations: sed 's/pattern/replacement/' or sed 's/pattern/replacement/g'
-	// Skip sed with flags like -i (in-place), -n, -e (multiple expressions), -f (script file)
-	hasComplexFlags := false
-	hasSubstitution := false
-
-	for _, arg := range cmd.Arguments {
-		val := arg.String()
-		if len(val) > 0 && val[0] == '-' {
-			hasComplexFlags = true
-			break
-		}
-		if len(val) >= 4 && val[0] == 's' && (val[1] == '/' || val[1] == '|' || val[1] == '#') {
-			hasSubstitution = true
-		}
-		// Also check quoted forms
-		if len(val) >= 6 && (val[0] == '\'' || val[0] == '"') {
-			inner := val[1 : len(val)-1]
-			if len(inner) >= 4 && inner[0] == 's' && (inner[1] == '/' || inner[1] == '|' || inner[1] == '#') {
-				hasSubstitution = true
-			}
-		}
-	}
-
-	if hasComplexFlags || !hasSubstitution {
+	if !zc1094IsSimpleSubst(val) {
 		return nil
 	}
-
-	// Only flag if sed has exactly one argument (the substitution pattern)
-	if len(cmd.Arguments) != 1 {
-		return nil
-	}
-
 	return []Violation{{
 		KataID: "ZC1094",
 		Message: "Use `${var//pattern/replacement}` instead of piping through `sed` for simple substitutions. " +
@@ -7224,6 +7186,29 @@ func checkZC1094(node ast.Node) []Violation {
 		Column: cmd.Token.Column,
 		Level:  SeverityStyle,
 	}}
+}
+
+// zc1094IsSimpleSubst reports whether v looks like a `s/pat/rep/`
+// expression, optionally surrounded by single or double quotes.
+func zc1094IsSimpleSubst(v string) bool {
+	if zc1094IsRawSubst(v) {
+		return true
+	}
+	if len(v) < 6 || (v[0] != '\'' && v[0] != '"') {
+		return false
+	}
+	return zc1094IsRawSubst(v[1 : len(v)-1])
+}
+
+func zc1094IsRawSubst(v string) bool {
+	if len(v) < 4 || v[0] != 's' {
+		return false
+	}
+	switch v[1] {
+	case '/', '|', '#':
+		return true
+	}
+	return false
 }
 
 func init() {
@@ -7327,68 +7312,45 @@ func checkZC1097(node ast.Node) []Violation {
 	locals := make(map[string]bool)
 
 	ast.Walk(funcDef.Body, func(n ast.Node) bool {
-		// Stop walking into nested function definitions
 		if _, ok := n.(*ast.FunctionDefinition); ok && n != funcDef {
 			return false
 		}
-
-		// Track local declarations
-		if cmd, ok := n.(*ast.SimpleCommand); ok {
-			nameStr := cmd.Name.String()
-			if nameStr == "local" || nameStr == "typeset" || nameStr == "declare" ||
-				nameStr == "integer" || nameStr == "float" || nameStr == "readonly" {
-				for _, arg := range cmd.Arguments {
-					// Arg can be "x" or "x=1" or "-r"
-					argStr := arg.String()
-					if len(argStr) > 0 && argStr[0] == '-' {
-						continue // Skip options
-					}
-					// Extract name before '='
-					varName := argStr
-					for i, c := range argStr {
-						if c == '=' {
-							varName = argStr[:i]
-							break
-						}
-					}
-					locals[varName] = true
-				}
-			}
+		zc1043HarvestLocals(n, locals)
+		zc1097HarvestDeclLocals(n, locals)
+		if v, ok := zc1097UnscopedLoopVar(n, locals); ok {
+			violations = append(violations, v)
 		}
-
-		// Track declaration statements (typeset, declare, integer, etc.)
-		if decl, ok := n.(*ast.DeclarationStatement); ok {
-			// DeclarationStatements are usually "typeset", "declare", "local", "integer", etc.
-			// We treat all variables declared here as local to the function/block.
-			// The parser ensures these are valid declaration commands.
-			for _, assign := range decl.Assignments {
-				if assign.Name != nil {
-					locals[assign.Name.String()] = true
-				}
-			}
-		}
-
-		// Check ForLoopStatement
-		if forLoop, ok := n.(*ast.ForLoopStatement); ok {
-			// Check if Name is set (for-each loop: `for i in ...`)
-			if forLoop.Name != nil {
-				if !locals[forLoop.Name.Value] {
-					violations = append(violations, Violation{
-						KataID: "ZC1097",
-						Message: "Loop variable '" + forLoop.Name.Value + "' is used without 'local'. It will be global. " +
-							"Use `local " + forLoop.Name.Value + "` before the loop.",
-						Line:   forLoop.Name.Token.Line,
-						Column: forLoop.Name.Token.Column,
-						Level:  SeverityStyle,
-					})
-				}
-			}
-		}
-
 		return true
 	})
 
 	return violations
+}
+
+func zc1097HarvestDeclLocals(n ast.Node, locals map[string]bool) {
+	decl, ok := n.(*ast.DeclarationStatement)
+	if !ok {
+		return
+	}
+	for _, assign := range decl.Assignments {
+		if assign.Name != nil {
+			locals[assign.Name.String()] = true
+		}
+	}
+}
+
+func zc1097UnscopedLoopVar(n ast.Node, locals map[string]bool) (Violation, bool) {
+	loop, ok := n.(*ast.ForLoopStatement)
+	if !ok || loop.Name == nil || locals[loop.Name.Value] {
+		return Violation{}, false
+	}
+	return Violation{
+		KataID: "ZC1097",
+		Message: "Loop variable '" + loop.Name.Value + "' is used without 'local'. It will be global. " +
+			"Use `local " + loop.Name.Value + "` before the loop.",
+		Line:   loop.Name.Token.Line,
+		Column: loop.Name.Token.Column,
+		Level:  SeverityStyle,
+	}, true
 }
 
 func init() {
