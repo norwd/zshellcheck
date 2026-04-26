@@ -47,10 +47,6 @@ func checkZC1067(node ast.Node) []Violation {
 }
 
 func containsSubstitutionAfterEquals(expr ast.Expression) bool {
-	// Debug: print node type and string representation
-	// fmt.Printf("DEBUG: Type=%T String=%q\n", expr, expr.String())
-
-	// Check if the argument contains an equals sign "="
 	if stringIndex(expr.String(), "=") < 0 {
 		return false
 	}
