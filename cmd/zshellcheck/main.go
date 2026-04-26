@@ -51,9 +51,11 @@ func run() int {
 		fmt.Printf("zshellcheck version %s\n", version.Version)
 		return 0
 	}
-	if code := startCPUProfile(*flags.cpuprofile); code != 0 {
+	stopProfile, code := startCPUProfile(*flags.cpuprofile)
+	if code != 0 {
 		return code
 	}
+	defer stopProfile()
 	if len(flag.Args()) < 1 {
 		printRunUsage(*flags.noBanner)
 		return 1
@@ -92,22 +94,25 @@ func registerRunFlags() runFlags {
 	}
 }
 
-func startCPUProfile(path string) int {
+func startCPUProfile(path string) (func(), int) {
+	noop := func() {}
 	if path == "" {
-		return 0
+		return noop, 0
 	}
 	f, err := os.Create(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not create CPU profile: %s\n", err)
-		return 1
+		return noop, 1
 	}
 	if err := pprof.StartCPUProfile(f); err != nil {
 		fmt.Fprintf(os.Stderr, "Could not start CPU profile: %s\n", err)
 		_ = f.Close()
-		return 1
+		return noop, 1
 	}
-	// Stop the profiler when run() returns. f stays open until exit.
-	return 0
+	return func() {
+		pprof.StopCPUProfile()
+		_ = f.Close()
+	}, 0
 }
 
 func printRunUsage(noBanner bool) {

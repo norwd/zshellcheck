@@ -43,8 +43,11 @@ jobs:
           go install github.com/fzipp/gocyclo/cmd/gocyclo@v0.6.0
           out=$(gocyclo -over 15 . || true)
           baseline=$(cat .github/gocyclo-baseline 2>/dev/null || echo 0)
-          current=$(echo "$out" | grep -c .)
-          [[ -z "$out" ]] && current=0
+          if [[ -z "$out" ]]; then
+            current=0
+          else
+            current=$(printf '%s\n' "$out" | grep -c . || true)
+          fi
           echo "gocyclo > 15 — baseline: $baseline, current: $current"
           if [[ $current -gt $baseline ]]; then
             echo "::error::gocyclo regressed: $current function(s) over the threshold, baseline allows $baseline"
