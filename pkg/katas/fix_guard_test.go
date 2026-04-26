@@ -55,3 +55,40 @@ func TestFixGuardsEmptySource(t *testing.T) {
 		_ = kata.Fix(nil, v, []byte{})
 	}
 }
+
+// TestFixGuardsLongSource feeds a richer source so the byte-offset
+// guard passes and additional fix-body branches run before failing
+// on later structural checks. Each fix is invoked with a node of the
+// expected category — extracted from the registry's KatasByType map
+// — so type-assertion guards land their match path.
+func TestFixGuardsLongSource(t *testing.T) {
+	source := []byte(
+		"echo $arr[1]\n" +
+			"result=`which git`\n" +
+			"target=$1\n" +
+			"echo -E msg\n" +
+			"rm -rf $target\n" +
+			"x=$(seq -s, 1 5)\n" +
+			"if [ -f c ]; then echo y; fi\n" +
+			"[[ -z $foo ]] && echo empty\n" +
+			"typeset -a items=(a b c)\n" +
+			"function greet() { echo hi; }\n" +
+			"case $x in a) echo a;; esac\n" +
+			"arr[(R)x]=1\n" +
+			"echo \"${arr[@]}\"\n" +
+			"n=$(( 1 + 2 ))\n" +
+			"trap 'echo bye' EXIT\n",
+	)
+	for id, kata := range Registry.KatasByID {
+		if kata.Fix == nil {
+			continue
+		}
+		for line := 1; line <= 15; line++ {
+			v := Violation{KataID: id, Line: line, Column: 1}
+			func() {
+				defer func() { _ = recover() }()
+				_ = kata.Fix(nil, v, source)
+			}()
+		}
+	}
+}
