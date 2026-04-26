@@ -216,3 +216,12 @@ func TestLexerPosixCharClassAvoidsLDBracket(t *testing.T) {
 func TestLexerLineContinuation(t *testing.T) {
 	drainTokens("echo hi \\\nworld\n")
 }
+
+// Zsh number bases: `0x…` hex, `0b…` binary, `0o…` octal, `BASE#…`.
+// Used inside `((…))` arithmetic.
+func TestLexerHexLiteral(t *testing.T)         { drainTokens("(( x = 0xff ))\n") }
+func TestLexerBinaryLiteral(t *testing.T)      { drainTokens("(( x = 0b101 ))\n") }
+func TestLexerOctalLiteral(t *testing.T)       { drainTokens("(( x = 0o755 ))\n") }
+func TestLexerCustomBaseLiteral(t *testing.T)  { drainTokens("(( x = 16#ff ))\n") }
+func TestLexerHexBareNoDigits(t *testing.T)    { drainTokens("(( x == 0x${var} ))\n") }
+func TestLexerBinaryBareNoDigits(t *testing.T) { drainTokens("(( x == 0b${var} ))\n") }

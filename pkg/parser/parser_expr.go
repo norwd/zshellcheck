@@ -138,7 +138,7 @@ func (p *Parser) parseKeywordAsCommand() ast.Expression {
 
 func (p *Parser) parseIntegerLiteral() ast.Expression {
 	lit := &ast.IntegerLiteral{Token: p.curToken}
-	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	value, err := parseZshIntLiteral(p.curToken.Literal)
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
 		p.errors = append(p.errors, msg)
@@ -158,7 +158,48 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 			p.nextToken() // consume fractional INT
 		}
 	}
+	// Zsh number-base concat: `0x${var}`, `16#$base`, `0b${b}` —
+	// arithmetic treats these as a single literal whose value comes
+	// from the surrounding string concat. Absorb glued IDENT / `${…}`
+	// / VARIABLE / HASH+INT tail tokens so the closing `))` lines up.
+	if p.inArithmetic {
+		p.absorbArithmeticNumberTail()
+	}
 	return lit
+}
+
+// parseZshIntLiteral converts a Zsh integer literal to int64. Handles
+// the standard 0x / 0b / 0o / decimal forms via strconv plus the
+// custom-base `BASE#NUM` form (e.g. `16#ff`).
+func parseZshIntLiteral(s string) (int64, error) {
+	if hash := strings.IndexByte(s, '#'); hash > 0 {
+		base, err := strconv.Atoi(s[:hash])
+		if err != nil {
+			return 0, err
+		}
+		return strconv.ParseInt(s[hash+1:], base, 64)
+	}
+	return strconv.ParseInt(s, 0, 64)
+}
+
+// absorbArithmeticNumberTail walks the no-preceding-space tail after
+// an INT, swallowing the tokens that complete a Zsh numeric literal
+// with concat or custom-base form. Stops at the first whitespace gap
+// or non-eligible token.
+func (p *Parser) absorbArithmeticNumberTail() {
+	for !p.peekToken.HasPrecedingSpace {
+		switch p.peekToken.Type {
+		case token.IDENT, token.VARIABLE, token.INT:
+			p.nextToken()
+		case token.DollarLbrace:
+			p.nextToken()
+			p.skipDollarBraceBody()
+		case token.HASH:
+			p.nextToken()
+		default:
+			return
+		}
+	}
 }
 
 func (p *Parser) parseStringLiteral() ast.Expression {
@@ -539,7 +580,7 @@ func (p *Parser) parseDollarArithExpansion(dollarToken token.Token) ast.Expressi
 func (p *Parser) parseDollarSpecialOp(dollarToken token.Token) ast.Expression {
 	p.nextToken()
 	opToken := p.curToken
-	if opToken.Type == token.HASH && p.peekTokenIs(token.IDENT) {
+	if opToken.Type == token.HASH && p.peekIsHashLengthOperand() {
 		p.nextToken()
 		name := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 		return &ast.PrefixExpression{
@@ -554,6 +595,21 @@ func (p *Parser) parseDollarSpecialOp(dollarToken token.Token) ast.Expression {
 	}
 	ident := &ast.Identifier{Token: opToken, Value: opToken.Literal}
 	return &ast.PrefixExpression{Token: dollarToken, Operator: "$", Right: ident}
+}
+
+// peekIsHashLengthOperand reports whether the upcoming token is a valid
+// operand for `$#` (length of). Zsh accepts a name (`$#name`), a
+// positional digit (`$#1`), or `$#*` / `$#?` / `$##` for the count of
+// the special parameter.
+func (p *Parser) peekIsHashLengthOperand() bool {
+	if p.peekToken.HasPrecedingSpace {
+		return false
+	}
+	switch p.peekToken.Type {
+	case token.IDENT, token.INT, token.ASTERISK, token.QUESTION, token.HASH:
+		return true
+	}
+	return false
 }
 
 func (p *Parser) parseDollarPlusName(dollarToken token.Token) ast.Expression {
@@ -715,6 +771,7 @@ func (p *Parser) parseDollarParenExpression() ast.Expression {
 
 		prevInArithmetic := p.inArithmetic
 		p.inArithmetic = true
+		p.consumeArithmeticRadixPrefix()
 		cmd := p.parseExpression(LOWEST)
 		p.inArithmetic = prevInArithmetic
 
@@ -828,11 +885,29 @@ func (p *Parser) parseCallArguments() []ast.Expression {
 
 func (p *Parser) parseDoubleParenExpression() ast.Expression {
 	p.nextToken()
+	p.consumeArithmeticRadixPrefix()
 	exp := p.parseExpression(LOWEST)
 	if !p.expectPeek(token.DoubleRparen) {
 		return nil
 	}
 	return exp
+}
+
+// consumeArithmeticRadixPrefix drains an optional Zsh arithmetic radix
+// prefix `[#]`, `[#N]`, or `[##N]` that prints the result in a non-
+// decimal base (`(([#16] 0xff))`). Only valid at the start of an
+// arithmetic expression. Caller must have already advanced curToken
+// onto the first body token.
+func (p *Parser) consumeArithmeticRadixPrefix() {
+	if !p.curTokenIs(token.LBRACKET) || !p.peekTokenIs(token.HASH) {
+		return
+	}
+	for !p.curTokenIs(token.RBRACKET) && !p.curTokenIs(token.EOF) {
+		p.nextToken()
+	}
+	if p.curTokenIs(token.RBRACKET) {
+		p.nextToken()
+	}
 }
 
 func (p *Parser) parseRedirection(left ast.Expression) ast.Expression {

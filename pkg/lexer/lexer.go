@@ -807,10 +807,56 @@ func (l *Lexer) readIdentifier() string {
 
 func (l *Lexer) readNumber() string {
 	position := l.position
+	if l.tryReadBaseLiteral() {
+		return l.input[position:l.position]
+	}
 	for isDigit(l.ch) {
 		l.readChar()
 	}
+	if l.ch == '#' && isDigit(l.peekChar()) {
+		// `BASE#NUM` — Zsh custom-base literal, e.g. `16#ff`.
+		l.readChar() // #
+		for isDigit(l.ch) || isHexDigit(l.ch) {
+			l.readChar()
+		}
+	}
 	return l.input[position:l.position]
+}
+
+// tryReadBaseLiteral consumes a Zsh `0x…` / `0b…` / `0o…` integer
+// literal when the prefix is followed by at least one digit. Returns
+// true iff bytes were consumed. `0x${var}` (Zsh string concat with a
+// parameter expansion) must NOT consume the prefix — the parser
+// recovers via INT(0) + IDENT(x) + DollarLbrace concatenation.
+func (l *Lexer) tryReadBaseLiteral() bool {
+	if l.ch != '0' {
+		return false
+	}
+	if !isBasePrefix(l.peekChar()) {
+		return false
+	}
+	third := l.peekAt(2)
+	if !isDigit(third) && !isHexDigit(third) {
+		return false
+	}
+	l.readChar() // 0
+	l.readChar() // base prefix letter
+	for isDigit(l.ch) || isHexDigit(l.ch) {
+		l.readChar()
+	}
+	return true
+}
+
+func isBasePrefix(ch byte) bool {
+	switch ch {
+	case 'x', 'X', 'b', 'B', 'o', 'O':
+		return true
+	}
+	return false
+}
+
+func isHexDigit(ch byte) bool {
+	return (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
 }
 
 func (l *Lexer) readString(quote byte) string {

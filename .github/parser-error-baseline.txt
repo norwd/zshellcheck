@@ -12,4 +12,4 @@ zinit/zinit-install.zsh	35
 zinit/zinit-side.zsh	2
 zinit/zinit.zsh	30
 zsh-utils/utility/utility.plugin.zsh	1
-zsh-vi-mode/zsh-vi-mode.zsh	37
+zsh-vi-mode/zsh-vi-mode.zsh	7
