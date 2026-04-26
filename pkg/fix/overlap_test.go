@@ -31,3 +31,32 @@ func TestOverlapDifferentLines(t *testing.T) {
 		t.Errorf("edits on different lines reported as overlapping")
 	}
 }
+
+func TestDiff_NoChange(t *testing.T) {
+	out, err := Diff("file.zsh", "echo hi\n", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out != "" {
+		t.Errorf("expected empty diff for no edits, got %q", out)
+	}
+}
+
+func TestDiff_SingleEdit(t *testing.T) {
+	src := "echo hi\n"
+	edits := []katas.FixEdit{{Line: 1, Column: 1, Length: 4, Replace: "print"}}
+	out, err := Diff("file.zsh", src, edits)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out == "" {
+		t.Errorf("expected non-empty diff")
+	}
+}
+
+func TestDiff_PropagatesApplyError(t *testing.T) {
+	edits := []katas.FixEdit{{Line: 99, Column: 1, Length: 1, Replace: ""}}
+	if _, err := Diff("file.zsh", "echo hi\n", edits); err == nil {
+		t.Errorf("expected error for out-of-range edit")
+	}
+}
