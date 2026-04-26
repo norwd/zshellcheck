@@ -56,3 +56,5 @@ ignore:
   - "tests"
   - "pkg/parser/parser_test_helpers.go"
   - "pkg/parser/parser_test_minimal.go"
+  - "internal/tools/**"        # build-time generators, not shipped — invoked manually by `go run`
+  - "scripts/**"               # ad-hoc maintenance scripts
