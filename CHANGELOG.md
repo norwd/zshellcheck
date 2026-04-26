@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- OpenSSF Best Practices badge promoted from silver to **gold**. Project ID 12657. Self-attestation reflects 90.0% project-wide statement coverage and an unassociated significant-contributor count above the gold floor.
+- `pkg/katas/` and `pkg/katas/katatests/` source layout consolidated into hundred-bucket files (`zc1000s.go`, `zc1000s_test.go`, …) so GitHub's 1,000-entry directory cap stops truncating the source view. Helpers live in `scripts/consolidate-katas-source.py` and `scripts/consolidate-katatests.py`.
+- CI gold-tier companion gates: gocyclo regression baseline (`.github/gocyclo-baseline`), SPDX + copyright header check on every tracked `.go` file, project-wide coverage floor at 90.0%, `pkg/katas/` directory-cap check, libraries.io stale-dependency surfacing.
+
+### Changed
+- `golang.org/x/sys` bumped from 0.26.0 to 0.43.0; `go` directive raised to 1.25.0; release pipeline pin updated to match.
+
 ## [1.0.16] - 2026-04-26
 
 ### Added
