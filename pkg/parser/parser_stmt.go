@@ -814,12 +814,10 @@ func (p *Parser) parseCaseStatement() *ast.CaseStatement {
 	stmt := &ast.CaseStatement{Token: p.curToken}
 	p.nextToken()
 	stmt.Value = p.parseExpression(LOWEST)
-
 	if !p.expectPeek(token.IN) {
 		return nil
 	}
 	p.nextToken()
-
 	for !p.curTokenIs(token.ESAC) && !p.curTokenIs(token.EOF) {
 		for p.curTokenIs(token.SEMICOLON) {
 			p.nextToken()
@@ -827,47 +825,10 @@ func (p *Parser) parseCaseStatement() *ast.CaseStatement {
 		if p.curTokenIs(token.ESAC) {
 			break
 		}
-		clause := &ast.CaseClause{Token: p.curToken}
-		// Leading `(` is the optional case-label opener
-		// (`( pat )`) UNLESS the rest of the line carries another
-		// `)` after the matching close — in which case it's a
-		// glob alternation pattern (`(darwin|freebsd)*)` where
-		// the `*)` carries the actual label terminator). The
-		// look-ahead is impractical without rewinding the lexer,
-		// so use a lighter heuristic: consume the `(` only when
-		// the next-next non-pipe token is `)` (classic single-
-		// pattern form). For glob-alternation patterns leave the
-		// `(` for parseCommandWord to absorb via parseGroupedExpression.
-		if p.curTokenIs(token.LPAREN) && p.lookaheadCaseLabelOpener() {
-			p.nextToken()
+		clause := p.parseCaseClause()
+		if clause == nil {
+			return nil
 		}
-		for {
-			pat := p.parseCommandWord()
-			clause.Patterns = append(clause.Patterns, pat)
-			if p.peekTokenIs(token.PIPE) {
-				p.nextToken()
-				p.nextToken()
-			} else {
-				break
-			}
-		}
-		// curToken may already be on `)` when parseCommandWord
-		// absorbed an inline glob group like `(a|b)*` whose close
-		// IS the label terminator. When the absorbed `)` is just
-		// the glob close and the actual label terminator is the
-		// NEXT `)` — e.g. `plugin::(disable|enable|load))` —
-		// advance once so we land on the label's own `)`. Otherwise
-		// expectPeek(RPAREN) to reach the label close from any
-		// other tail token.
-		if p.curTokenIs(token.RPAREN) && p.peekTokenIs(token.RPAREN) {
-			p.nextToken()
-		} else if !p.curTokenIs(token.RPAREN) {
-			if !p.expectPeek(token.RPAREN) {
-				return nil
-			}
-		}
-		p.nextToken()
-		clause.Body = p.parseBlockStatement(token.DSEMI, token.ESAC)
 		stmt.Clauses = append(stmt.Clauses, clause)
 		if p.curTokenIs(token.DSEMI) {
 			p.nextToken()
@@ -894,6 +855,46 @@ func (p *Parser) parseCaseStatement() *ast.CaseStatement {
 
 func (p *Parser) parseShebangStatement() *ast.Shebang {
 	return &ast.Shebang{Token: p.curToken, Path: p.curToken.Literal}
+}
+
+func (p *Parser) parseCaseClause() *ast.CaseClause {
+	clause := &ast.CaseClause{Token: p.curToken}
+	if p.curTokenIs(token.LPAREN) && p.lookaheadCaseLabelOpener() {
+		p.nextToken()
+	}
+	clause.Patterns = p.parseCaseClausePatterns()
+	if !p.alignToCaseClauseClose() {
+		return nil
+	}
+	p.nextToken()
+	clause.Body = p.parseBlockStatement(token.DSEMI, token.ESAC)
+	return clause
+}
+
+func (p *Parser) parseCaseClausePatterns() []ast.Expression {
+	var patterns []ast.Expression
+	for {
+		patterns = append(patterns, p.parseCommandWord())
+		if !p.peekTokenIs(token.PIPE) {
+			return patterns
+		}
+		p.nextToken()
+		p.nextToken()
+	}
+}
+
+// alignToCaseClauseClose advances curToken to the `)` that closes the
+// label, handling the inline-glob-group case where parseCommandWord
+// already consumed an inner `)`.
+func (p *Parser) alignToCaseClauseClose() bool {
+	if p.curTokenIs(token.RPAREN) && p.peekTokenIs(token.RPAREN) {
+		p.nextToken()
+		return true
+	}
+	if p.curTokenIs(token.RPAREN) {
+		return true
+	}
+	return p.expectPeek(token.RPAREN)
 }
 
 func (p *Parser) parseForLoopStatement() *ast.ForLoopStatement {

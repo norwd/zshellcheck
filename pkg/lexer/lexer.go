@@ -830,13 +830,7 @@ func (l *Lexer) readString(quote byte) string {
 // backslash, and the only way to embed `'` is to close and reopen
 // the quotation.
 func (l *Lexer) readStringFlavour(quote byte, honourEscapes bool) string {
-	position := l.position // include opening quote
-	// braceDepth tracks `${ … }` parameter expansions embedded in a
-	// double-quoted string. Zsh suspends outer-quote termination
-	// while inside `${…}`, so nested quotes like
-	// `"${var="default"}"` must not split the string at the inner
-	// `"`. Single quotes and ANSI-C strings never embed expansions,
-	// so braceDepth only grows when honourEscapes is true.
+	position := l.position
 	braceDepth := 0
 	for {
 		l.readChar()
@@ -846,27 +840,50 @@ func (l *Lexer) readStringFlavour(quote byte, honourEscapes bool) string {
 		if l.ch == quote && braceDepth == 0 {
 			break
 		}
-		if honourEscapes && l.ch == '\\' {
-			l.readChar() // skip escaped char
+		if l.absorbStringEscape(honourEscapes) {
 			if l.ch == 0 {
 				break
 			}
 			continue
 		}
-		if honourEscapes && l.ch == '$' && l.peekChar() == '{' {
-			l.readChar() // consume `$`
-			braceDepth++
+		if l.absorbDollarBraceOpen(honourEscapes, &braceDepth) {
 			continue
 		}
-		if braceDepth > 0 {
-			switch l.ch {
-			case '{':
-				braceDepth++
-			case '}':
-				braceDepth--
-			}
-		}
+		l.trackBraceDepth(&braceDepth)
 	}
+	return l.sliceClosedString(position)
+}
+
+func (l *Lexer) absorbStringEscape(honourEscapes bool) bool {
+	if !honourEscapes || l.ch != '\\' {
+		return false
+	}
+	l.readChar()
+	return true
+}
+
+func (l *Lexer) absorbDollarBraceOpen(honourEscapes bool, braceDepth *int) bool {
+	if !honourEscapes || l.ch != '$' || l.peekChar() != '{' {
+		return false
+	}
+	l.readChar()
+	*braceDepth++
+	return true
+}
+
+func (l *Lexer) trackBraceDepth(braceDepth *int) {
+	if *braceDepth == 0 {
+		return
+	}
+	switch l.ch {
+	case '{':
+		*braceDepth++
+	case '}':
+		*braceDepth--
+	}
+}
+
+func (l *Lexer) sliceClosedString(position int) string {
 	if l.ch == 0 {
 		end := l.position
 		if end > len(l.input) {
@@ -878,7 +895,7 @@ func (l *Lexer) readStringFlavour(quote byte, honourEscapes bool) string {
 	if end > len(l.input) {
 		end = len(l.input)
 	}
-	return l.input[position:end] // include closing quote
+	return l.input[position:end]
 }
 
 func (l *Lexer) skipWhitespace() bool {
