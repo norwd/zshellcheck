@@ -1,6 +1,6 @@
 module github.com/afadesigns/zshellcheck
 
-go 1.25.0
+go 1.25.9
 
 require (
 	github.com/adrg/xdg v0.5.3
