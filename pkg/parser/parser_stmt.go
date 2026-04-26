@@ -491,96 +491,84 @@ func (p *Parser) parseSingleCommand() ast.Expression {
 	return cmd
 }
 
+// commandWordLiteralTokens is the set of token types that appear inside
+// a command-argument word but should be emitted as StringLiterals,
+// not parsed as expressions. Reserved words (do/done/then/etc.) live
+// in the same set because they routinely show up as literal arguments
+// (`print -l function`, `arr=(do done)`).
+var commandWordLiteralTokens = map[token.Type]struct{}{
+	token.ASTERISK: {}, token.QUESTION: {}, token.PLUS: {},
+	token.MINUS: {}, token.CARET: {}, token.TILDE: {}, token.DOT: {},
+	token.GT: {}, token.LT: {}, token.AMPERSAND: {}, token.LBRACKET: {},
+	token.COMMA: {}, token.COLON: {}, token.GTGT: {}, token.LTLT: {},
+	token.GTAMP: {}, token.LTAMP: {},
+	token.DEC: {}, token.INC: {},
+	token.ASSIGN: {}, token.PLUSEQ: {},
+	token.FUNCTION: {}, token.SELECT: {}, token.COPROC: {},
+	token.DO: {}, token.DONE: {}, token.ESAC: {},
+	token.THEN: {}, token.ELSE: {}, token.ELIF: {}, token.Fi: {},
+	token.If: {}, token.FOR: {}, token.WHILE: {}, token.CASE: {},
+	token.IN: {}, token.LET: {}, token.RETURN: {},
+	token.TYPESET: {}, token.DECLARE: {},
+}
+
+func (p *Parser) commandWordIsExpression(t token.Type) bool {
+	if _, hit := commandWordLiteralTokens[t]; hit {
+		return false
+	}
+	return p.prefixParseFns[t] != nil
+}
+
 func (p *Parser) parseCommandWord() ast.Expression {
 	firstToken := p.curToken
-	parts := []ast.Expression{}
-
-	// Helper to determine if we should parse as expression
-	isExpression := func(t token.Type) bool {
-		// Treat these as literals in command args, even if they have prefix fns
-		if t == token.ASTERISK || t == token.QUESTION || t == token.PLUS ||
-			t == token.MINUS || t == token.CARET || t == token.TILDE || t == token.DOT ||
-			t == token.GT || t == token.LT || t == token.AMPERSAND || t == token.LBRACKET ||
-			t == token.COMMA || t == token.COLON || t == token.GTGT || t == token.LTLT ||
-			t == token.GTAMP || t == token.LTAMP ||
-			// DEC / INC in command-arg position are POSIX end-of-
-			// options (`cmd --`) or long-flag openers (`cmd --foo`),
-			// never prefix-decrement / pre-increment. Prefix DEC is
-			// reached inside arithmetic `((…))` where parseCommandWord
-			// is not in play.
-			t == token.DEC || t == token.INC ||
-			// `=` is an assignment operator in expression context but a
-			// literal in command arguments (e.g. `alias -- -='cd -'`,
-			// or `env FOO=bar cmd`). Treat it as a literal word part
-			// when it appears mid-command. The declaration parser has
-			// its own dedicated handling for the IDENT=VALUE form.
-			t == token.ASSIGN || t == token.PLUSEQ ||
-			// Reserved-word tokens (FUNCTION/SELECT/COPROC/etc.) are
-			// keywords in statement position but routinely appear as
-			// literal arguments — `reserved_words=( do done … function
-			// repeat select … )`, `print -l function`. Treat them as
-			// literal strings in command-arg / array-element contexts.
-			t == token.FUNCTION || t == token.SELECT || t == token.COPROC ||
-			t == token.DO || t == token.DONE || t == token.ESAC ||
-			t == token.THEN || t == token.ELSE || t == token.ELIF || t == token.Fi ||
-			t == token.If || t == token.FOR || t == token.WHILE || t == token.CASE ||
-			t == token.IN || t == token.LET || t == token.RETURN ||
-			t == token.TYPESET || t == token.DECLARE {
-			return false
-		}
-		return p.prefixParseFns[t] != nil
-	}
-
-	// Track LBRACE depth opened MID-WORD so a matching `}` isn't
-	// mistaken for a delimiter. Zsh git refspecs like
-	// `@{upstream}` appear bare on command lines; without this the
-	// RBRACE closed the arg at `{upstream` and the outer `$(` lost
-	// its closing `)`. When the word STARTS with `{` we leave
-	// braceDepth at zero so brace expansions `{1..10}` still
-	// terminate at `}` (tests like ZC1083 expect `{1..10}$var`
-	// to parse as two concatenated words: `{1..10}` then `$var`).
+	parts := []ast.Expression{p.parseCommandWordPart()}
 	braceDepth := 0
-
-	// Parse the first part
-	if !isExpression(p.curToken.Type) {
-		parts = append(parts, &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal})
-	} else {
-		parts = append(parts, p.parseExpression(CALL))
-	}
-
-	// Continue parsing while the next token is adjacent (no preceding space)
-	for !p.peekToken.HasPrecedingSpace && p.peekOnSameLogicalLine() {
-		if braceDepth == 0 && p.isCommandDelimiter(p.peekToken) {
-			break
-		}
-		if braceDepth > 0 && p.peekTokenIs(token.EOF) {
-			break
-		}
+	for p.commandWordContinues(braceDepth) {
 		p.nextToken()
-		switch p.curToken.Type {
-		case token.LBRACE:
-			braceDepth++
-		case token.RBRACE:
-			if braceDepth > 0 {
-				braceDepth--
-			}
-		}
-		if !isExpression(p.curToken.Type) {
-			// Treat as literal string part
-			parts = append(parts, &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal})
-		} else {
-			parts = append(parts, p.parseExpression(CALL))
-		}
+		braceDepth = updateCommandWordBraceDepth(braceDepth, p.curToken.Type)
+		parts = append(parts, p.parseCommandWordPart())
 	}
-
 	if len(parts) == 1 {
 		return parts[0]
 	}
+	return &ast.ConcatenatedExpression{Token: firstToken, Parts: parts}
+}
 
-	return &ast.ConcatenatedExpression{
-		Token: firstToken,
-		Parts: parts,
+// parseCommandWordPart consumes the current token as either a literal
+// string part or a sub-expression, depending on commandWordIsExpression.
+func (p *Parser) parseCommandWordPart() ast.Expression {
+	if !p.commandWordIsExpression(p.curToken.Type) {
+		return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
 	}
+	return p.parseExpression(CALL)
+}
+
+// commandWordContinues reports whether the next token belongs to the
+// current word. The brace-depth context lets `@{upstream}` and similar
+// mid-word brace runs survive without splitting at the inner `}`.
+func (p *Parser) commandWordContinues(braceDepth int) bool {
+	if p.peekToken.HasPrecedingSpace || !p.peekOnSameLogicalLine() {
+		return false
+	}
+	if braceDepth == 0 && p.isCommandDelimiter(p.peekToken) {
+		return false
+	}
+	if braceDepth > 0 && p.peekTokenIs(token.EOF) {
+		return false
+	}
+	return true
+}
+
+func updateCommandWordBraceDepth(depth int, t token.Type) int {
+	switch t {
+	case token.LBRACE:
+		return depth + 1
+	case token.RBRACE:
+		if depth > 0 {
+			return depth - 1
+		}
+	}
+	return depth
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
