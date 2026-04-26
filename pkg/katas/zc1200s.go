@@ -4952,39 +4952,30 @@ func init() {
 	})
 }
 
+var zc1285ComplexSortFlags = map[string]struct{}{
+	"-t": {}, "-k": {}, "-n": {}, "-r": {},
+	"-u": {}, "-h": {}, "-V": {}, "-g": {},
+	"-c": {}, "-m": {}, "-s": {},
+}
+
 func checkZC1285(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "sort" || len(cmd.Arguments) != 1 {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok || ident.Value != "sort" {
+	if _, hit := zc1285ComplexSortFlags[cmd.Arguments[0].String()]; hit {
 		return nil
 	}
-
-	// sort with complex flags has legitimate uses beyond simple array sorting
-	for _, arg := range cmd.Arguments {
-		val := arg.String()
-		if val == "-t" || val == "-k" || val == "-n" || val == "-r" ||
-			val == "-u" || val == "-h" || val == "-V" || val == "-g" ||
-			val == "-c" || val == "-m" || val == "-s" {
-			return nil
-		}
+	if cmd.Arguments[0].String() == "" || cmd.Arguments[0].String()[0] == '-' {
+		return nil
 	}
-
-	// sort with only a filename — suggest Zsh native sorting
-	if len(cmd.Arguments) == 1 {
-		return []Violation{{
-			KataID:  "ZC1285",
-			Message: "Use Zsh `${(o)array}` for sorting instead of piping to `sort`. The `(o)` flag sorts in-shell.",
-			Line:    cmd.Token.Line,
-			Column:  cmd.Token.Column,
-			Level:   SeverityStyle,
-		}}
-	}
-
-	return nil
+	return []Violation{{
+		KataID:  "ZC1285",
+		Message: "Use Zsh `${(o)array}` for sorting instead of piping to `sort`. The `(o)` flag sorts in-shell.",
+		Line:    cmd.Token.Line,
+		Column:  cmd.Token.Column,
+		Level:   SeverityStyle,
+	}}
 }
 
 func init() {

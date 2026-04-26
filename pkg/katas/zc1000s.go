@@ -2432,75 +2432,80 @@ func fixZC1043(_ ast.Node, v Violation, source []byte) []FixEdit {
 	}}
 }
 
+var zc1043LocalDecls = map[string]struct{}{
+	"local": {}, "typeset": {}, "declare": {},
+	"integer": {}, "float": {}, "readonly": {},
+}
+
 func checkZC1043(node ast.Node) []Violation {
 	funcDef, ok := node.(*ast.FunctionDefinition)
 	if !ok {
 		return nil
 	}
-
 	violations := []Violation{}
 	locals := make(map[string]bool)
-
 	ast.Walk(funcDef.Body, func(n ast.Node) bool {
-		// Stop walking into nested function definitions
 		if _, ok := n.(*ast.FunctionDefinition); ok && n != funcDef {
 			return false
 		}
-
-		// Track local declarations
-		if cmd, ok := n.(*ast.SimpleCommand); ok {
-			nameStr := cmd.Name.String()
-			if nameStr == "local" || nameStr == "typeset" || nameStr == "declare" ||
-				nameStr == "integer" || nameStr == "float" || nameStr == "readonly" {
-				for _, arg := range cmd.Arguments {
-					// Arg can be "x" or "x=1" or "-r"
-					argStr := arg.String()
-					if len(argStr) > 0 && argStr[0] == '-' {
-						continue // Skip options
-					}
-					// Extract name before '='
-					varName := argStr
-					for i, c := range argStr {
-						if c == '=' {
-							varName = argStr[:i]
-							break
-						}
-					}
-					locals[varName] = true
-				}
-			}
+		zc1043HarvestLocals(n, locals)
+		if v, ok := zc1043UnscopedAssign(n, locals); ok {
+			violations = append(violations, v)
 		}
-
-		// Check assignments
-		if exprStmt, ok := n.(*ast.ExpressionStatement); ok {
-			if assign, ok := exprStmt.Expression.(*ast.InfixExpression); ok && assign.Operator == "=" {
-				if ident, ok := assign.Left.(*ast.Identifier); ok {
-					if !locals[ident.Value] {
-						// Empty RHS (`VAR=` at end of line) is valid Zsh
-						// and the parser records it with Right == nil.
-						// Fall back to an empty string so the message
-						// builder doesn't deref nil.
-						rhs := ""
-						if assign.Right != nil {
-							rhs = assign.Right.String()
-						}
-						violations = append(violations, Violation{
-							KataID: "ZC1043",
-							Message: "Variable '" + ident.Value + "' is assigned without 'local'. It will be global. " +
-								"Use `local " + ident.Value + "=" + rhs + "`.",
-							Line:   ident.Token.Line,
-							Column: ident.Token.Column,
-							Level:  SeverityStyle,
-						})
-					}
-				}
-			}
-		}
-
 		return true
 	})
-
 	return violations
+}
+
+func zc1043HarvestLocals(n ast.Node, locals map[string]bool) {
+	cmd, ok := n.(*ast.SimpleCommand)
+	if !ok {
+		return
+	}
+	if _, hit := zc1043LocalDecls[cmd.Name.String()]; !hit {
+		return
+	}
+	for _, arg := range cmd.Arguments {
+		argStr := arg.String()
+		if argStr == "" || argStr[0] == '-' {
+			continue
+		}
+		name := argStr
+		for i, c := range argStr {
+			if c == '=' {
+				name = argStr[:i]
+				break
+			}
+		}
+		locals[name] = true
+	}
+}
+
+func zc1043UnscopedAssign(n ast.Node, locals map[string]bool) (Violation, bool) {
+	exprStmt, ok := n.(*ast.ExpressionStatement)
+	if !ok {
+		return Violation{}, false
+	}
+	assign, ok := exprStmt.Expression.(*ast.InfixExpression)
+	if !ok || assign.Operator != "=" {
+		return Violation{}, false
+	}
+	ident, ok := assign.Left.(*ast.Identifier)
+	if !ok || locals[ident.Value] {
+		return Violation{}, false
+	}
+	rhs := ""
+	if assign.Right != nil {
+		rhs = assign.Right.String()
+	}
+	return Violation{
+		KataID: "ZC1043",
+		Message: "Variable '" + ident.Value + "' is assigned without 'local'. It will be global. " +
+			"Use `local " + ident.Value + "=" + rhs + "`.",
+		Line:   ident.Token.Line,
+		Column: ident.Token.Column,
+		Level:  SeverityStyle,
+	}, true
 }
 
 func init() {
