@@ -2509,63 +2509,72 @@ func init() {
 	})
 }
 
+var (
+	zc1450ZypperInstallVerbs = map[string]struct{}{"install": {}, "in": {}, "update": {}, "up": {}}
+	zc1450ZypperNonInteract  = map[string]struct{}{"-n": {}, "--non-interactive": {}}
+)
+
 func checkZC1450(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-
-	switch ident.Value {
+	switch CommandIdentifier(cmd) {
 	case "pacman":
-		hasInstall := false
-		hasNoConfirm := false
-		for _, arg := range cmd.Arguments {
-			v := arg.String()
-			if strings.HasPrefix(v, "-S") && !strings.HasPrefix(v, "-Ss") && !strings.HasPrefix(v, "-Si") {
-				hasInstall = true
-			}
-			if v == "--noconfirm" {
-				hasNoConfirm = true
-			}
-		}
-		if hasInstall && !hasNoConfirm {
-			return []Violation{{
-				KataID:  "ZC1450",
-				Message: "`pacman -S` without `--noconfirm` hangs in scripts.",
-				Line:    cmd.Token.Line,
-				Column:  cmd.Token.Column,
-				Level:   SeverityWarning,
-			}}
+		if zc1450PacmanNoConfirmMissing(cmd) {
+			return zc1450Hit(cmd, "`pacman -S` without `--noconfirm` hangs in scripts.")
 		}
 	case "zypper":
-		hasInstall := false
-		hasN := false
-		for _, arg := range cmd.Arguments {
-			v := arg.String()
-			if v == "install" || v == "in" || v == "update" || v == "up" {
-				hasInstall = true
-			}
-			if v == "-n" || v == "--non-interactive" {
-				hasN = true
-			}
-		}
-		if hasInstall && !hasN {
-			return []Violation{{
-				KataID:  "ZC1450",
-				Message: "`zypper install` without `--non-interactive` (`-n`) hangs in scripts.",
-				Line:    cmd.Token.Line,
-				Column:  cmd.Token.Column,
-				Level:   SeverityWarning,
-			}}
+		if zc1450ZypperNonInteractiveMissing(cmd) {
+			return zc1450Hit(cmd, "`zypper install` without `--non-interactive` (`-n`) hangs in scripts.")
 		}
 	}
-
 	return nil
+}
+
+func zc1450PacmanNoConfirmMissing(cmd *ast.SimpleCommand) bool {
+	hasInstall, hasNoConfirm := false, false
+	for _, arg := range cmd.Arguments {
+		v := arg.String()
+		if zc1450PacmanInstallFlag(v) {
+			hasInstall = true
+		}
+		if v == "--noconfirm" {
+			hasNoConfirm = true
+		}
+	}
+	return hasInstall && !hasNoConfirm
+}
+
+func zc1450PacmanInstallFlag(v string) bool {
+	if !strings.HasPrefix(v, "-S") {
+		return false
+	}
+	return !strings.HasPrefix(v, "-Ss") && !strings.HasPrefix(v, "-Si")
+}
+
+func zc1450ZypperNonInteractiveMissing(cmd *ast.SimpleCommand) bool {
+	hasInstall, hasN := false, false
+	for _, arg := range cmd.Arguments {
+		v := arg.String()
+		if _, hit := zc1450ZypperInstallVerbs[v]; hit {
+			hasInstall = true
+		}
+		if _, hit := zc1450ZypperNonInteract[v]; hit {
+			hasN = true
+		}
+	}
+	return hasInstall && !hasN
+}
+
+func zc1450Hit(cmd *ast.SimpleCommand, msg string) []Violation {
+	return []Violation{{
+		KataID:  "ZC1450",
+		Message: msg,
+		Line:    cmd.Token.Line,
+		Column:  cmd.Token.Column,
+		Level:   SeverityWarning,
+	}}
 }
 
 func init() {
@@ -3655,53 +3664,50 @@ func init() {
 
 func checkZC1470(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "git" {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
+	args := zc1464StringArgs(cmd)
+	if zc1470GitConfigFalse(args) || zc1470GitMinusCFalse(args) {
+		return zc1470Violation(cmd)
 	}
-	if ident.Value != "git" {
-		return nil
-	}
-
-	args := make([]string, 0, len(cmd.Arguments))
-	for _, a := range cmd.Arguments {
-		args = append(args, a.String())
-	}
-
-	// Form A: `git config [--global|--local|--system] http.sslVerify false`
-	for i := 0; i < len(args); i++ {
-		if args[i] == "config" {
-			// Walk following args, skip scope flag if present.
-			j := i + 1
-			for j < len(args) && strings.HasPrefix(args[j], "--") && args[j] != "--" {
-				j++
-			}
-			if j+1 < len(args) && strings.EqualFold(args[j], "http.sslVerify") {
-				if strings.EqualFold(args[j+1], "false") || args[j+1] == "0" {
-					return zc1470Violation(cmd)
-				}
-			}
-		}
-	}
-
-	// Form B: `git -c http.sslVerify=false ...`
-	for i := 0; i < len(args); i++ {
-		if args[i] == "-c" && i+1 < len(args) {
-			kv := args[i+1]
-			if k, v, ok := strings.Cut(kv, "="); ok {
-				if strings.EqualFold(k, "http.sslVerify") &&
-					(strings.EqualFold(v, "false") || v == "0") {
-					return zc1470Violation(cmd)
-				}
-			}
-		}
-	}
-
 	return nil
+}
+
+// zc1470GitConfigFalse spots `git config [--scope] http.sslVerify false`.
+func zc1470GitConfigFalse(args []string) bool {
+	for i, a := range args {
+		if a != "config" {
+			continue
+		}
+		j := i + 1
+		for j < len(args) && strings.HasPrefix(args[j], "--") && args[j] != "--" {
+			j++
+		}
+		if j+1 < len(args) && zc1470IsSslVerifyFalsePair(args[j], args[j+1]) {
+			return true
+		}
+	}
+	return false
+}
+
+// zc1470GitMinusCFalse spots `git -c http.sslVerify=false …`.
+func zc1470GitMinusCFalse(args []string) bool {
+	for i, a := range args {
+		if a != "-c" || i+1 >= len(args) {
+			continue
+		}
+		k, v, ok := strings.Cut(args[i+1], "=")
+		if ok && zc1470IsSslVerifyFalsePair(k, v) {
+			return true
+		}
+	}
+	return false
+}
+
+func zc1470IsSslVerifyFalsePair(k, v string) bool {
+	return strings.EqualFold(k, "http.sslVerify") &&
+		(strings.EqualFold(v, "false") || v == "0")
 }
 
 func zc1470Violation(cmd *ast.SimpleCommand) []Violation {
@@ -4458,57 +4464,66 @@ func init() {
 	})
 }
 
+var (
+	zc1484NodePms     = map[string]struct{}{"npm": {}, "yarn": {}, "pnpm": {}, "bun": {}}
+	zc1484FalseValues = map[string]struct{}{"false": {}, "0": {}, "no": {}}
+)
+
 func checkZC1484(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	if _, hit := zc1484NodePms[CommandIdentifier(cmd)]; !hit {
 		return nil
 	}
-	if ident.Value != "npm" && ident.Value != "yarn" && ident.Value != "pnpm" &&
-		ident.Value != "bun" {
-		return nil
-	}
-
-	args := make([]string, 0, len(cmd.Arguments))
-	for _, a := range cmd.Arguments {
-		args = append(args, a.String())
-	}
-
-	// Form A: `npm config set strict-ssl false`
-	for i := 0; i+2 < len(args); i++ {
-		if args[i] == "config" && args[i+1] == "set" {
-			j := i + 2
-			// Skip optional scope flags like `--global` / `-g`.
-			for j < len(args) && strings.HasPrefix(args[j], "-") {
-				j++
-			}
-			if j+1 < len(args) && args[j] == "strict-ssl" {
-				val := strings.ToLower(args[j+1])
-				if val == "false" || val == "0" || val == "no" {
-					return zc1484Violation(cmd)
-				}
-			}
-			if j < len(args) && strings.HasPrefix(strings.ToLower(args[j]), "strict-ssl=") {
-				val := strings.ToLower(strings.TrimPrefix(args[j], "strict-ssl="))
-				if val == "false" || val == "0" || val == "no" {
-					return zc1484Violation(cmd)
-				}
-			}
-		}
-	}
-
-	// Form B: `npm install --strict-ssl=false` (one-shot)
-	for _, v := range args {
-		if strings.EqualFold(v, "--strict-ssl=false") ||
-			strings.EqualFold(v, "--no-strict-ssl") {
-			return zc1484Violation(cmd)
-		}
+	args := zc1464StringArgs(cmd)
+	if zc1484ConfigSetStrictSslFalse(args) || zc1484OneShotStrictSslFalse(args) {
+		return zc1484Violation(cmd)
 	}
 	return nil
+}
+
+// zc1484ConfigSetStrictSslFalse spots `npm config set [--scope] strict-ssl false|0|no`
+// and the `strict-ssl=false` joined form.
+func zc1484ConfigSetStrictSslFalse(args []string) bool {
+	for i := 0; i+2 < len(args); i++ {
+		if args[i] != "config" || args[i+1] != "set" {
+			continue
+		}
+		j := i + 2
+		for j < len(args) && strings.HasPrefix(args[j], "-") {
+			j++
+		}
+		if zc1484KeyValueFalse(args, j) {
+			return true
+		}
+	}
+	return false
+}
+
+func zc1484KeyValueFalse(args []string, j int) bool {
+	if j+1 < len(args) && args[j] == "strict-ssl" {
+		if _, hit := zc1484FalseValues[strings.ToLower(args[j+1])]; hit {
+			return true
+		}
+	}
+	if j < len(args) && strings.HasPrefix(strings.ToLower(args[j]), "strict-ssl=") {
+		val := strings.ToLower(strings.TrimPrefix(args[j], "strict-ssl="))
+		if _, hit := zc1484FalseValues[val]; hit {
+			return true
+		}
+	}
+	return false
+}
+
+func zc1484OneShotStrictSslFalse(args []string) bool {
+	for _, v := range args {
+		if strings.EqualFold(v, "--strict-ssl=false") || strings.EqualFold(v, "--no-strict-ssl") {
+			return true
+		}
+	}
+	return false
 }
 
 func zc1484Violation(cmd *ast.SimpleCommand) []Violation {
