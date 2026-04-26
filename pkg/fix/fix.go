@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright the ZShellCheck contributors.
+//
 // Package fix applies FixEdit sets produced by kata Fix functions to
 // source files. It handles offset math (1-based Line/Column to absolute
 // byte offsets), sorts edits bottom-up so earlier offsets stay valid,
