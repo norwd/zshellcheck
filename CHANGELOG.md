@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.16] - 2026-04-26
+
 ### Added
 - **Auto-fix coverage now at 137/1000 katas.** New rewrites since 1.0.15, every one deterministic and idempotent on a re-run:
   - `ZC1015` backticks → `$(...)`.
