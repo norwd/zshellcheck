@@ -6093,70 +6093,64 @@ func getFlagName(node ast.Node) string {
 }
 
 func isUnquotedGlob(node ast.Expression) bool {
-	// Check for SimpleCommand (e.g. [a-z])
-	if sc, ok := node.(*ast.SimpleCommand); ok {
-		if sc.Name.String() == "[" {
-			return true
-		}
-	}
-
-	// Check for IndexExpression (e.g. file[a-z])
-	if _, ok := node.(*ast.IndexExpression); ok {
+	switch n := node.(type) {
+	case *ast.SimpleCommand:
+		return n.Name.String() == "["
+	case *ast.IndexExpression:
 		return true
+	case *ast.StringLiteral:
+		return isUnquotedGlobString(n)
+	case *ast.ConcatenatedExpression:
+		return isUnquotedGlobConcat(n)
+	case *ast.PrefixExpression:
+		return n.Operator == "*" || n.Operator == "?"
 	}
+	return false
+}
 
-	// Check for StringLiteral with glob tokens
-	if str, ok := node.(*ast.StringLiteral); ok {
-		tok := str.TokenLiteralNode()
-		if tok.Type == token.STRING {
-			return false
-		}
-		return isGlobToken(tok)
+func isUnquotedGlobString(s *ast.StringLiteral) bool {
+	tok := s.TokenLiteralNode()
+	if tok.Type == token.STRING {
+		return false
 	}
+	return isGlobToken(tok)
+}
 
-	// Check ConcatenatedExpression
-	if concat, ok := node.(*ast.ConcatenatedExpression); ok {
-		escaped := false
-		for _, part := range concat.Parts {
-			if str, ok := part.(*ast.StringLiteral); ok {
-				tok := str.TokenLiteralNode()
-				if escaped {
-					escaped = false
-					continue
-				}
-				if tok.Literal == "\\" { // Backslash
-					escaped = true
-					continue
-				}
-				if isGlobToken(tok) {
-					return true
-				}
-			} else if sc, ok := part.(*ast.SimpleCommand); ok {
-				if sc.Name.String() == "[" {
-					return true
-				}
-			} else if prefix, ok := part.(*ast.PrefixExpression); ok {
-				if escaped {
-					escaped = false
-					continue
-				}
-				if prefix.Operator == "*" || prefix.Operator == "?" {
-					return true
-				}
-			} else {
-				escaped = false
-			}
-		}
-	}
-
-	// Check PrefixExpression (e.g. *.txt, ?foo)
-	if prefix, ok := node.(*ast.PrefixExpression); ok {
-		if prefix.Operator == "*" || prefix.Operator == "?" {
+func isUnquotedGlobConcat(concat *ast.ConcatenatedExpression) bool {
+	escaped := false
+	for _, part := range concat.Parts {
+		hit, nextEscaped := isUnquotedGlobConcatPart(part, escaped)
+		if hit {
 			return true
 		}
+		escaped = nextEscaped
 	}
-
 	return false
+}
+
+// isUnquotedGlobConcatPart returns (matched, escapedNext). matched signals
+// the concat overall is an unquoted glob; escapedNext propagates the
+// backslash-escape state to the next part.
+func isUnquotedGlobConcatPart(part ast.Expression, escaped bool) (bool, bool) {
+	switch n := part.(type) {
+	case *ast.StringLiteral:
+		tok := n.TokenLiteralNode()
+		if escaped {
+			return false, false
+		}
+		if tok.Literal == "\\" {
+			return false, true
+		}
+		return isGlobToken(tok), false
+	case *ast.SimpleCommand:
+		return n.Name.String() == "[", false
+	case *ast.PrefixExpression:
+		if escaped {
+			return false, false
+		}
+		return n.Operator == "*" || n.Operator == "?", false
+	}
+	return false, false
 }
 
 func isGlobToken(tok token.Token) bool {

@@ -806,49 +806,14 @@ func init() {
 
 func checkZC1812(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "aws" {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok || ident.Value != "aws" {
+	if !zc1812IsSsmPutParameter(cmd) {
 		return nil
 	}
-	if len(cmd.Arguments) < 2 {
-		return nil
-	}
-	if cmd.Arguments[0].String() != "ssm" {
-		return nil
-	}
-	if cmd.Arguments[1].String() != "put-parameter" {
-		return nil
-	}
-
-	hasSecureString := false
-	hasInlineValue := false
-	for i, arg := range cmd.Arguments[2:] {
-		v := arg.String()
-		switch {
-		case v == "--type":
-			if 2+i+1 < len(cmd.Arguments) && cmd.Arguments[2+i+1].String() == "SecureString" {
-				hasSecureString = true
-			}
-		case v == "--type=SecureString":
-			hasSecureString = true
-		case v == "--value":
-			if 2+i+1 < len(cmd.Arguments) {
-				next := cmd.Arguments[2+i+1].String()
-				if next != "" && !strings.HasPrefix(next, "file://") && !strings.HasPrefix(next, "-") {
-					hasInlineValue = true
-				}
-			}
-		case strings.HasPrefix(v, "--value="):
-			val := strings.TrimPrefix(v, "--value=")
-			if val != "" && !strings.HasPrefix(val, "file://") {
-				hasInlineValue = true
-			}
-		}
-	}
-	if !hasSecureString || !hasInlineValue {
+	hasSecure, hasInline := zc1812ScanPutFlags(cmd.Arguments[2:])
+	if !hasSecure || !hasInline {
 		return nil
 	}
 	return []Violation{{
@@ -861,6 +826,39 @@ func checkZC1812(node ast.Node) []Violation {
 		Column: cmd.Token.Column,
 		Level:  SeverityError,
 	}}
+}
+
+func zc1812IsSsmPutParameter(cmd *ast.SimpleCommand) bool {
+	return len(cmd.Arguments) >= 2 &&
+		cmd.Arguments[0].String() == "ssm" &&
+		cmd.Arguments[1].String() == "put-parameter"
+}
+
+func zc1812ScanPutFlags(args []ast.Expression) (hasSecure, hasInline bool) {
+	for i, arg := range args {
+		v := arg.String()
+		switch {
+		case v == "--type":
+			if i+1 < len(args) && args[i+1].String() == "SecureString" {
+				hasSecure = true
+			}
+		case v == "--type=SecureString":
+			hasSecure = true
+		case v == "--value":
+			if i+1 < len(args) && zc1812IsInlinePlaintext(args[i+1].String()) {
+				hasInline = true
+			}
+		case strings.HasPrefix(v, "--value="):
+			if zc1812IsInlinePlaintext(strings.TrimPrefix(v, "--value=")) {
+				hasInline = true
+			}
+		}
+	}
+	return
+}
+
+func zc1812IsInlinePlaintext(v string) bool {
+	return v != "" && !strings.HasPrefix(v, "file://") && !strings.HasPrefix(v, "-")
 }
 
 func init() {
@@ -1159,58 +1157,22 @@ func init() {
 	})
 }
 
+var zc1818MangledNames = map[string]struct{}{
+	"delete": {}, "del": {},
+	"delete-before": {}, "delete-during": {}, "delete-delay": {},
+	"delete-after": {}, "delete-excluded": {}, "delete-missing-args": {},
+}
+
 func checkZC1818(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	if !zc1818IsRsyncDelete(cmd) {
 		return nil
 	}
-
-	// Parser caveat: `rsync --delete SRC DST` mangles name to `delete` or similar.
-	mangled := false
-	switch ident.Value {
-	case "delete", "del", "delete-before", "delete-during", "delete-delay",
-		"delete-after", "delete-excluded", "delete-missing-args":
-		mangled = true
-	}
-
-	if !mangled {
-		if ident.Value != "rsync" {
-			return nil
-		}
-		hasDelete := false
-		for _, arg := range cmd.Arguments {
-			v := arg.String()
-			for _, flag := range zc1818DeleteFlags {
-				if v == flag || strings.HasPrefix(v, flag+"=") {
-					hasDelete = true
-					break
-				}
-			}
-			if hasDelete {
-				break
-			}
-		}
-		if !hasDelete {
-			return nil
-		}
-	}
-
-	for _, arg := range cmd.Arguments {
-		v := arg.String()
-		if v == "--dry-run" || v == "-n" || v == "--itemize-changes" {
-			return nil
-		}
-		if strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && len(v) > 1 {
-			for _, c := range v[1:] {
-				if c == 'n' {
-					return nil
-				}
-			}
-		}
+	if zc1818HasDryRunFlag(cmd) {
+		return nil
 	}
 	return []Violation{{
 		KataID: "ZC1818",
@@ -1221,6 +1183,54 @@ func checkZC1818(node ast.Node) []Violation {
 		Column: cmd.Token.Column,
 		Level:  SeverityWarning,
 	}}
+}
+
+// zc1818IsRsyncDelete reports whether cmd is rsync (or a parser-mangled
+// alias for an rsync invocation that began with --delete) carrying a
+// delete flag.
+func zc1818IsRsyncDelete(cmd *ast.SimpleCommand) bool {
+	name := CommandIdentifier(cmd)
+	if _, hit := zc1818MangledNames[name]; hit {
+		return true
+	}
+	if name != "rsync" {
+		return false
+	}
+	for _, arg := range cmd.Arguments {
+		v := arg.String()
+		for _, flag := range zc1818DeleteFlags {
+			if v == flag || strings.HasPrefix(v, flag+"=") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func zc1818HasDryRunFlag(cmd *ast.SimpleCommand) bool {
+	for _, arg := range cmd.Arguments {
+		v := arg.String()
+		switch v {
+		case "--dry-run", "-n", "--itemize-changes":
+			return true
+		}
+		if zc1818BundleHasN(v) {
+			return true
+		}
+	}
+	return false
+}
+
+func zc1818BundleHasN(v string) bool {
+	if !strings.HasPrefix(v, "-") || strings.HasPrefix(v, "--") || len(v) <= 1 {
+		return false
+	}
+	for _, c := range v[1:] {
+		if c == 'n' {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {

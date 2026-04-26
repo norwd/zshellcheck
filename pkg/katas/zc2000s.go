@@ -159,36 +159,21 @@ func init() {
 	})
 }
 
+var (
+	zc2002AllFlags   = map[string]struct{}{"-a": {}, "--all": {}, "-af": {}, "-fa": {}}
+	zc2002ForceFlags = map[string]struct{}{"-f": {}, "--force": {}, "-af": {}, "-fa": {}}
+)
+
 func checkZC2002(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
-		return nil
-	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-	if ident.Value != "crictl" {
-		return nil
-	}
-	if len(cmd.Arguments) == 0 {
+	if !ok || CommandIdentifier(cmd) != "crictl" || len(cmd.Arguments) == 0 {
 		return nil
 	}
 	sub := cmd.Arguments[0].String()
 	if sub != "rmi" && sub != "rm" {
 		return nil
 	}
-	hasAll := false
-	hasForce := false
-	for _, arg := range cmd.Arguments[1:] {
-		v := arg.String()
-		if v == "-a" || v == "--all" || v == "-af" || v == "-fa" {
-			hasAll = true
-		}
-		if v == "-f" || v == "--force" || v == "-af" || v == "-fa" {
-			hasForce = true
-		}
-	}
+	hasAll, hasForce := zc2002ScanFlags(cmd.Arguments[1:])
 	if sub == "rmi" && hasAll {
 		return zc2002Hit(cmd, "crictl rmi -a")
 	}
@@ -196,6 +181,19 @@ func checkZC2002(node ast.Node) []Violation {
 		return zc2002Hit(cmd, "crictl rm -af")
 	}
 	return nil
+}
+
+func zc2002ScanFlags(args []ast.Expression) (hasAll, hasForce bool) {
+	for _, arg := range args {
+		v := arg.String()
+		if _, hit := zc2002AllFlags[v]; hit {
+			hasAll = true
+		}
+		if _, hit := zc2002ForceFlags[v]; hit {
+			hasForce = true
+		}
+	}
+	return
 }
 
 func zc2002Hit(cmd *ast.SimpleCommand, form string) []Violation {
