@@ -19,3 +19,20 @@ func TestIdNum(t *testing.T) {
 		}
 	}
 }
+
+func TestIdNumEdge(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int
+	}{
+		{"", 0},
+		{"ZC", 0},
+		{"X", 0},
+		{"ZCabc", 0},
+	}
+	for _, tc := range cases {
+		if got := idNum(tc.in); got != tc.want {
+			t.Errorf("idNum(%q) = %d, want %d", tc.in, got, tc.want)
+		}
+	}
+}
