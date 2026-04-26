@@ -12,7 +12,6 @@ builds:
       - -s -w -X main.version={{.Version}}
     flags:
       - -trimpath
-      - -pgo=pgo/default.pgo
 
 
 archives:
