@@ -186,7 +186,7 @@ func (l *Lexer) dispatchEarlyReturn(hasSpace bool) (token.Token, bool) {
 			return tok, true
 		}
 		return token.Token{}, false
-	case isAsciiLetterOrUnderscore(l.ch):
+	case l.isIdentLeadByte(l.ch):
 		return l.readIdentifierToken(hasSpace), true
 	case isDigit(l.ch):
 		return l.readNumberToken(hasSpace), true
@@ -204,11 +204,17 @@ func (l *Lexer) dispatchEarlyReturn(hasSpace bool) (token.Token, bool) {
 // (`~`, `:`, `.`). It includes `/` and `@` because the original
 // switch had no explicit arm for them — they only ever entered the
 // identifier path via the wide isLetter check.
-func isAsciiLetterOrUnderscore(ch byte) bool {
+func (l *Lexer) isIdentLeadByte(ch byte) bool {
 	if ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || ch == '_' {
 		return true
 	}
-	return ch == '/' || ch == '@'
+	if ch == '@' {
+		return true
+	}
+	// `/` triggers an identifier read only outside arithmetic. Inside
+	// `((…))` / `$((…))` `/` is the division operator and must lex as
+	// SLASH; the parenStack 'D' marker tracks the arithmetic frame.
+	return ch == '/' && !l.inArithmetic()
 }
 
 // dispatchSimpleByte handles the per-byte switch where the handler
@@ -269,6 +275,12 @@ func (l *Lexer) dispatchBracketsAndOps(hasSpace bool) token.Token {
 		return newToken(token.CARET, l.ch, l.line, l.column)
 	case '%':
 		return l.readArithCompoundOr(token.PERCENT)
+	case '/':
+		// Inside arithmetic `/` is the division operator. Outside,
+		// `/` is reached only via the identifier path; if it falls
+		// through here it lexes as SLASH so the parser's prefix
+		// registration (`echo /etc/hostname`) handles it.
+		return newToken(token.SLASH, l.ch, l.line, l.column)
 	case '.':
 		return newToken(token.DOT, l.ch, l.line, l.column)
 	case '"', '\'':
@@ -317,7 +329,7 @@ func (l *Lexer) readSemicolonLead() token.Token {
 
 func (l *Lexer) readOpenParen() token.Token {
 	defer func() { l.suppressLparenFusion = false }()
-	if l.peekChar() == '(' && !l.suppressLparenFusion {
+	if l.peekChar() == '(' && !l.suppressLparenFusion && !l.inArithmetic() {
 		tok := l.readFusedToken(token.DoubleLparen)
 		l.parenStack = append(l.parenStack, 'D')
 		return tok
@@ -818,7 +830,14 @@ func (l *Lexer) readDollarToken(hasSpace bool) (token.Token, bool) {
 
 func (l *Lexer) readIdentifier() string {
 	position := l.position
+	inArith := l.inArithmetic()
 	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '-' {
+		// Inside arithmetic `/` is the division operator, never part
+		// of an identifier. Outside arithmetic `/` extends an
+		// identifier so `/usr/bin/foo` survives as a single word.
+		if inArith && l.ch == '/' {
+			break
+		}
 		l.readChar()
 	}
 	return l.input[position:l.position]
