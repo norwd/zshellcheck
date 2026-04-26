@@ -237,3 +237,10 @@ func TestLexerEscapedBacktickInBraceExpansion(t *testing.T) {
 func TestLexerEscapedBacktickAsArg(t *testing.T) {
 	drainTokens("echo \\`\n")
 }
+
+// `/` inside `((…))` lexes as the division operator. Outside it
+// extends an identifier so `/usr/bin/foo` survives as a single word.
+func TestLexerSlashInArithmetic(t *testing.T)      { drainTokens("(( 1/2 ))\n") }
+func TestLexerSlashInArithmeticIdent(t *testing.T) { drainTokens("(( a/b ))\n") }
+func TestLexerSlashOutsideArithmetic(t *testing.T) { drainTokens("echo /usr/bin/foo\n") }
+func TestLexerNestedParensInArith(t *testing.T)    { drainTokens("(( (((b - 1)/14) % 10) + 1 ))\n") }

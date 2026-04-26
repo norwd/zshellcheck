@@ -186,7 +186,7 @@ func (l *Lexer) dispatchEarlyReturn(hasSpace bool) (token.Token, bool) {
 			return tok, true
 		}
 		return token.Token{}, false
-	case isAsciiLetterOrUnderscore(l.ch):
+	case l.isIdentLeadByte(l.ch):
 		return l.readIdentifierToken(hasSpace), true
 	case isDigit(l.ch):
 		return l.readNumberToken(hasSpace), true
@@ -204,11 +204,17 @@ func (l *Lexer) dispatchEarlyReturn(hasSpace bool) (token.Token, bool) {
 // (`~`, `:`, `.`). It includes `/` and `@` because the original
 // switch had no explicit arm for them — they only ever entered the
 // identifier path via the wide isLetter check.
-func isAsciiLetterOrUnderscore(ch byte) bool {
+func (l *Lexer) isIdentLeadByte(ch byte) bool {
 	if ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || ch == '_' {
 		return true
 	}
-	return ch == '/' || ch == '@'
+	if ch == '@' {
+		return true
+	}
+	// `/` triggers an identifier read only outside arithmetic. Inside
+	// `((…))` / `$((…))` `/` is the division operator and must lex as
+	// SLASH; the parenStack 'D' marker tracks the arithmetic frame.
+	return ch == '/' && !l.inArithmetic()
 }
 
 // dispatchSimpleByte handles the per-byte switch where the handler
@@ -247,12 +253,20 @@ func (l *Lexer) dispatchSimpleByte(hasSpace bool) token.Token {
 	return l.dispatchBracketsAndOps(hasSpace)
 }
 
+// simpleBracketTokens maps single-byte tokens whose lex result has no
+// state side-effect — they just become the matching token type.
+var simpleBracketTokens = map[byte]token.Type{
+	'{': token.LBRACE, '}': token.RBRACE,
+	'`': token.BACKTICK, '~': token.TILDE,
+	'^': token.CARET, '/': token.SLASH,
+	'.': token.DOT, '$': token.DOLLAR,
+}
+
 func (l *Lexer) dispatchBracketsAndOps(hasSpace bool) token.Token {
+	if t, ok := simpleBracketTokens[l.ch]; ok {
+		return newToken(t, l.ch, l.line, l.column)
+	}
 	switch l.ch {
-	case '{':
-		return newToken(token.LBRACE, l.ch, l.line, l.column)
-	case '}':
-		return newToken(token.RBRACE, l.ch, l.line, l.column)
 	case '[':
 		return l.readOpenBracket()
 	case ']':
@@ -261,23 +275,10 @@ func (l *Lexer) dispatchBracketsAndOps(hasSpace bool) token.Token {
 		return l.readAmpersandLead()
 	case '|':
 		return l.readPipeLead()
-	case '`':
-		return newToken(token.BACKTICK, l.ch, l.line, l.column)
-	case '~':
-		return newToken(token.TILDE, l.ch, l.line, l.column)
-	case '^':
-		return newToken(token.CARET, l.ch, l.line, l.column)
 	case '%':
 		return l.readArithCompoundOr(token.PERCENT)
-	case '.':
-		return newToken(token.DOT, l.ch, l.line, l.column)
 	case '"', '\'':
 		return l.readQuotedString(l.ch)
-	case '$':
-		// readDollarToken claimed `$` early when it recognised one of
-		// the specialised forms; falling through here means the
-		// generic DOLLAR token is the right answer.
-		return newToken(token.DOLLAR, l.ch, l.line, l.column)
 	case 0:
 		return token.Token{Type: token.EOF, Line: l.line, Column: l.column}
 	}
@@ -317,7 +318,7 @@ func (l *Lexer) readSemicolonLead() token.Token {
 
 func (l *Lexer) readOpenParen() token.Token {
 	defer func() { l.suppressLparenFusion = false }()
-	if l.peekChar() == '(' && !l.suppressLparenFusion {
+	if l.peekChar() == '(' && !l.suppressLparenFusion && !l.inArithmetic() {
 		tok := l.readFusedToken(token.DoubleLparen)
 		l.parenStack = append(l.parenStack, 'D')
 		return tok
@@ -818,7 +819,14 @@ func (l *Lexer) readDollarToken(hasSpace bool) (token.Token, bool) {
 
 func (l *Lexer) readIdentifier() string {
 	position := l.position
+	inArith := l.inArithmetic()
 	for isLetter(l.ch) || isDigit(l.ch) || l.ch == '-' {
+		// Inside arithmetic `/` is the division operator, never part
+		// of an identifier. Outside arithmetic `/` extends an
+		// identifier so `/usr/bin/foo` survives as a single word.
+		if inArith && l.ch == '/' {
+			break
+		}
 		l.readChar()
 	}
 	return l.input[position:l.position]
