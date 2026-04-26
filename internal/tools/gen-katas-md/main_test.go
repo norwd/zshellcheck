@@ -20,6 +20,23 @@ func TestIdNum(t *testing.T) {
 	}
 }
 
+func TestEscapeTitle(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"plain", "plain"},
+		{"a [b] c", "a \\[b\\] c"},
+		{"x | y", "x \\| y"},
+		{"[both] | sides", "\\[both\\] \\| sides"},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := escapeTitle(tc.in); got != tc.want {
+			t.Errorf("escapeTitle(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestIdNumEdge(t *testing.T) {
 	cases := []struct {
 		in   string
