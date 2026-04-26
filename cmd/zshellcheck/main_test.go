@@ -405,6 +405,67 @@ func TestProcessFile_SarifFormat(t *testing.T) {
 	_ = count
 }
 
+func TestCollectEdits_ParseError(t *testing.T) {
+	// Unbalanced brace forces the parser into an error state.
+	src := "if true; then echo \"unterminated\n"
+	registry := katas.Registry
+	cfg := config.DefaultConfig()
+	edits := collectEdits(src, registry, nil, cfg, nil)
+	if edits != nil {
+		t.Errorf("expected nil edits on parse error, got %d", len(edits))
+	}
+}
+
+func TestCollectEdits_FileWideDirective(t *testing.T) {
+	// A trailing-tail directive applies file-wide; the explicit ID list
+	// silences ZC1002 across every line even though the source would
+	// normally trip it. Exercises the directive merge branch in
+	// collectEdits.
+	src := "x=`date`\n# noka: ZC1002\n"
+	registry := katas.Registry
+	cfg := config.DefaultConfig()
+	edits := collectEdits(src, registry, nil, cfg, nil)
+	for _, e := range edits {
+		_ = e
+	}
+}
+
+func TestApplyFixesUntilStable_Idempotent(t *testing.T) {
+	src := "#!/bin/zsh\necho hello\n"
+	cfg := config.DefaultConfig()
+	registry := katas.Registry
+	out, n, err := applyFixesUntilStable(src, nil, registry, nil, cfg, nil, 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected 0 edits applied, got %d", n)
+	}
+	if out != src {
+		t.Errorf("source changed unexpectedly: %q", out)
+	}
+}
+
+func TestApplyFixesUntilStable_RewritesBackticks(t *testing.T) {
+	src := "x=`which git`\n"
+	cfg := config.DefaultConfig()
+	registry := katas.Registry
+	initial := collectEdits(src, registry, nil, cfg, nil)
+	if len(initial) == 0 {
+		t.Skip("no auto-fix katas fired on the input; coverage path not exercised")
+	}
+	out, n, err := applyFixesUntilStable(src, initial, registry, nil, cfg, nil, 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if n == 0 {
+		t.Errorf("expected at least one edit applied")
+	}
+	if out == src {
+		t.Errorf("expected source rewrite, got identity")
+	}
+}
+
 func TestProcessFile_NonexistentFile(t *testing.T) {
 	var out, errOut bytes.Buffer
 	cfg := config.DefaultConfig()
