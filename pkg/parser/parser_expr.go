@@ -138,7 +138,7 @@ func (p *Parser) parseKeywordAsCommand() ast.Expression {
 
 func (p *Parser) parseIntegerLiteral() ast.Expression {
 	lit := &ast.IntegerLiteral{Token: p.curToken}
-	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	value, err := parseZshIntLiteral(p.curToken.Literal)
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
 		p.errors = append(p.errors, msg)
@@ -166,6 +166,20 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 		p.absorbArithmeticNumberTail()
 	}
 	return lit
+}
+
+// parseZshIntLiteral converts a Zsh integer literal to int64. Handles
+// the standard 0x / 0b / 0o / decimal forms via strconv plus the
+// custom-base `BASE#NUM` form (e.g. `16#ff`).
+func parseZshIntLiteral(s string) (int64, error) {
+	if hash := strings.IndexByte(s, '#'); hash > 0 {
+		base, err := strconv.Atoi(s[:hash])
+		if err != nil {
+			return 0, err
+		}
+		return strconv.ParseInt(s[hash+1:], base, 64)
+	}
+	return strconv.ParseInt(s, 0, 64)
 }
 
 // absorbArithmeticNumberTail walks the no-preceding-space tail after

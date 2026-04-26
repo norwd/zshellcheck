@@ -2,7 +2,11 @@
 // Copyright the ZShellCheck contributors.
 package parser
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/afadesigns/zshellcheck/pkg/lexer"
+)
 
 func TestParseBareDollarBeforeSemicolon(t *testing.T) {
 	parseSourceClean(t, "echo $;\n")
@@ -103,4 +107,42 @@ func TestParseArithBinaryLiteral(t *testing.T) {
 
 func TestParseArithCustomBaseLiteral(t *testing.T) {
 	parseSourceClean(t, "(( x = 16#ff ))\n")
+}
+
+// Drive every absorbArithmeticNumberTail branch.
+func TestParseArithNumTailVariableConcat(t *testing.T) {
+	parseSourceClean(t, "(( a == 0x$h ))\n")
+}
+
+func TestParseArithNumTailIntConcat(t *testing.T) {
+	parseSourceClean(t, "(( a == 16#1234 ))\n")
+}
+
+func TestParseArithNumTailBraceVar(t *testing.T) {
+	parseSourceClean(t, "(( a == 0b${(l:8::0:)bits} ))\n")
+}
+
+// Drive every consumeArithmeticRadixPrefix branch.
+func TestParseArithNoRadixIdentStart(t *testing.T) {
+	parseSourceClean(t, "(( x + 1 ))\n")
+}
+
+func TestParseArithRadixUnclosed(t *testing.T) {
+	// Recovery path: malformed radix prefix without `]` exits at EOF.
+	src := "(( [#16\n"
+	p := New(lexer.New(src))
+	_ = p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected parser errors for unclosed radix; got none")
+	}
+}
+
+// Drive every peekIsHashLengthOperand branch.
+func TestParseDollarHashHash(t *testing.T) {
+	parseSourceClean(t, "echo $##\n")
+}
+
+func TestParseDollarHashWithSpace(t *testing.T) {
+	// Space after $# means it's not a length op — falls through.
+	parseSourceClean(t, "echo $# arg\n")
 }
