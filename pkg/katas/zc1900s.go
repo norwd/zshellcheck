@@ -2419,58 +2419,22 @@ func init() {
 	})
 }
 
+var zc1935PkgTools = map[string]struct{}{
+	"apt": {}, "apt-get": {}, "dnf": {}, "yum": {}, "zypper": {},
+}
+
 func checkZC1935(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	tool := CommandIdentifier(cmd)
+	if _, hit := zc1935PkgTools[tool]; !hit {
 		return nil
 	}
-
-	var tool string
-	switch ident.Value {
-	case "apt", "apt-get":
-		tool = ident.Value
-	case "dnf", "yum":
-		tool = ident.Value
-	case "zypper":
-		tool = "zypper"
-	default:
+	if !zc1935AutoremovePurges(cmd, tool) {
 		return nil
 	}
-
-	hasAutoremove := false
-	hasPurge := false
-	hasCleanDeps := false
-	for _, arg := range cmd.Arguments {
-		v := arg.String()
-		switch v {
-		case "autoremove":
-			hasAutoremove = true
-		case "--purge", "--purge-unused":
-			hasPurge = true
-		case "--clean-deps":
-			hasCleanDeps = true
-		}
-		if v == "rm" && tool == "zypper" {
-			hasAutoremove = true
-		}
-	}
-	if !hasAutoremove {
-		return nil
-	}
-
-	// apt/apt-get autoremove --purge, or dnf/yum autoremove (always purges
-	// configs on RPM distros), or zypper rm --clean-deps.
-	if (tool == "apt" || tool == "apt-get") && !hasPurge {
-		return nil
-	}
-	if tool == "zypper" && !hasCleanDeps {
-		return nil
-	}
-
 	return []Violation{{
 		KataID: "ZC1935",
 		Message: "`" + tool + " autoremove` strips packages the resolver thinks are " +
@@ -2480,6 +2444,34 @@ func checkZC1935(node ast.Node) []Violation {
 		Column: cmd.Token.Column,
 		Level:  SeverityWarning,
 	}}
+}
+
+func zc1935AutoremovePurges(cmd *ast.SimpleCommand, tool string) bool {
+	hasAutoremove, hasPurge, hasCleanDeps := false, false, false
+	for _, arg := range cmd.Arguments {
+		switch arg.String() {
+		case "autoremove":
+			hasAutoremove = true
+		case "rm":
+			if tool == "zypper" {
+				hasAutoremove = true
+			}
+		case "--purge", "--purge-unused":
+			hasPurge = true
+		case "--clean-deps":
+			hasCleanDeps = true
+		}
+	}
+	if !hasAutoremove {
+		return false
+	}
+	switch tool {
+	case "apt", "apt-get":
+		return hasPurge
+	case "zypper":
+		return hasCleanDeps
+	}
+	return true
 }
 
 func init() {
@@ -4189,55 +4181,17 @@ func checkZC1963(node ast.Node) []Violation {
 	if !ok {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
+	form, pkgs, ok := zc1963Form(cmd)
 	if !ok {
 		return nil
 	}
-
-	var form string
-	var pkgs []ast.Expression
-	switch ident.Value {
-	case "npx":
-		form = "npx"
-		pkgs = cmd.Arguments
-	case "bunx":
-		form = "bunx"
-		pkgs = cmd.Arguments
-	case "pnpm", "bun":
-		if len(cmd.Arguments) < 2 {
-			return nil
-		}
-		sub := cmd.Arguments[0].String()
-		if ident.Value == "pnpm" && sub != "dlx" {
-			return nil
-		}
-		if ident.Value == "bun" && sub != "x" {
-			return nil
-		}
-		form = ident.Value + " " + sub
-		pkgs = cmd.Arguments[1:]
-	default:
-		return nil
-	}
-
 	for _, arg := range pkgs {
 		v := arg.String()
-		if strings.HasPrefix(v, "-") {
-			continue
-		}
-		if strings.Contains(v, "@") && !strings.HasPrefix(v, "@") {
-			// pkg@version — pinned.
-			return nil
-		}
-		if strings.HasPrefix(v, "@") {
-			// scoped name like @scope/pkg — check for second @ (version).
-			rest := v[1:]
-			if strings.Contains(rest, "@") {
+		if zc1963IsPinnedOrSkippable(v) {
+			if zc1963IsPinned(v) {
 				return nil
 			}
-		}
-		if strings.HasPrefix(v, "$") {
-			return nil
+			continue
 		}
 		return []Violation{{
 			KataID: "ZC1963",
@@ -4250,6 +4204,34 @@ func checkZC1963(node ast.Node) []Violation {
 		}}
 	}
 	return nil
+}
+
+func zc1963Form(cmd *ast.SimpleCommand) (form string, pkgs []ast.Expression, ok bool) {
+	name := CommandIdentifier(cmd)
+	switch name {
+	case "npx", "bunx":
+		return name, cmd.Arguments, true
+	case "pnpm":
+		if len(cmd.Arguments) >= 2 && cmd.Arguments[0].String() == "dlx" {
+			return "pnpm dlx", cmd.Arguments[1:], true
+		}
+	case "bun":
+		if len(cmd.Arguments) >= 2 && cmd.Arguments[0].String() == "x" {
+			return "bun x", cmd.Arguments[1:], true
+		}
+	}
+	return "", nil, false
+}
+
+func zc1963IsPinnedOrSkippable(v string) bool {
+	return strings.HasPrefix(v, "-") || zc1963IsPinned(v) || strings.HasPrefix(v, "$")
+}
+
+func zc1963IsPinned(v string) bool {
+	if strings.HasPrefix(v, "@") {
+		return strings.Contains(v[1:], "@")
+	}
+	return strings.Contains(v, "@")
 }
 
 func init() {

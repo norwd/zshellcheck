@@ -3033,44 +3033,54 @@ func unquotedArgLen(source []byte, offset int) int {
 	if offset < 0 || offset >= len(source) {
 		return 0
 	}
-	n := 0
-	braceDepth := 0
-	parenDepth := 0
-	bracketDepth := 0
-	for offset+n < len(source) {
+	st := unquotedArgScan{}
+	for n := 0; offset+n < len(source); n++ {
 		c := source[offset+n]
-		if braceDepth == 0 && parenDepth == 0 && bracketDepth == 0 {
-			switch c {
-			case ' ', '\t', '\n', ';', '|', '&', '>', '<':
-				return n
-			}
-			if c == ')' {
-				return n
-			}
+		if st.atTopLevel() && unquotedArgIsTerminator(c) {
+			return n
 		}
-		switch c {
-		case '{':
-			braceDepth++
-		case '}':
-			if braceDepth > 0 {
-				braceDepth--
-			}
-		case '(':
-			parenDepth++
-		case ')':
-			if parenDepth > 0 {
-				parenDepth--
-			}
-		case '[':
-			bracketDepth++
-		case ']':
-			if bracketDepth > 0 {
-				bracketDepth--
-			}
-		}
-		n++
+		st.advance(c)
 	}
-	return n
+	return len(source) - offset
+}
+
+type unquotedArgScan struct {
+	braceDepth, parenDepth, bracketDepth int
+}
+
+func (s *unquotedArgScan) atTopLevel() bool {
+	return s.braceDepth == 0 && s.parenDepth == 0 && s.bracketDepth == 0
+}
+
+func (s *unquotedArgScan) advance(c byte) {
+	switch c {
+	case '{':
+		s.braceDepth++
+	case '}':
+		if s.braceDepth > 0 {
+			s.braceDepth--
+		}
+	case '(':
+		s.parenDepth++
+	case ')':
+		if s.parenDepth > 0 {
+			s.parenDepth--
+		}
+	case '[':
+		s.bracketDepth++
+	case ']':
+		if s.bracketDepth > 0 {
+			s.bracketDepth--
+		}
+	}
+}
+
+func unquotedArgIsTerminator(c byte) bool {
+	switch c {
+	case ' ', '\t', '\n', ';', '|', '&', '>', '<', ')':
+		return true
+	}
+	return false
 }
 
 func offsetLineColZC1051(source []byte, offset int) (int, int) {
@@ -5551,73 +5561,53 @@ func offsetLineColZC1079(source []byte, offset int) (int, int) {
 	return line, col
 }
 
+var zc1079EqualityOps = map[string]struct{}{"==": {}, "=": {}, "!=": {}}
+
 func checkZC1079(node ast.Node) []Violation {
 	dbe, ok := node.(*ast.DoubleBracketExpression)
 	if !ok {
 		return nil
 	}
-
 	violations := []Violation{}
-
 	for _, expr := range dbe.Elements {
 		infix, ok := expr.(*ast.InfixExpression)
 		if !ok {
 			continue
 		}
-
-		// Check for equality/inequality operators
-		if infix.Operator != "==" && infix.Operator != "=" && infix.Operator != "!=" {
+		if _, hit := zc1079EqualityOps[infix.Operator]; !hit {
 			continue
 		}
-
-		// Check Right side
-		// If it is an Identifier (variable), ArrayAccess, or Concatenated containing variable,
-		// AND it is NOT quoted (not StringLiteral).
-
-		// Note: Parser handles quoted strings as StringLiteral.
-		// Unquoted $var is Identifier.
-
-		isSuspicious := false
-		var tokenNode ast.Node
-
-		switch r := infix.Right.(type) {
-		case *ast.Identifier:
-			if len(r.Value) > 0 && r.Value[0] == '$' {
-				isSuspicious = true
-				tokenNode = r
-			}
-		case *ast.ArrayAccess:
-			isSuspicious = true // ${arr[i]}
-			tokenNode = r
-		case *ast.InvalidArrayAccess:
-			// ZC1001 covers syntax, but it's also unquoted.
-			isSuspicious = true
-			tokenNode = r
-		case *ast.ConcatenatedExpression:
-			// Check if any part is an unquoted variable
-			for _, part := range r.Parts {
-				if ident, ok := part.(*ast.Identifier); ok {
-					if len(ident.Value) > 0 && ident.Value[0] == '$' {
-						isSuspicious = true
-						tokenNode = ident
-						break
-					}
-				}
-			}
-		}
-
-		if isSuspicious {
+		if tok := zc1079UnquotedVar(infix.Right); tok != nil {
 			violations = append(violations, Violation{
 				KataID:  "ZC1079",
 				Message: "Unquoted RHS matches as pattern. Quote to force string comparison: `\"$var\"`.",
-				Line:    tokenNode.TokenLiteralNode().Line,
-				Column:  tokenNode.TokenLiteralNode().Column,
+				Line:    tok.TokenLiteralNode().Line,
+				Column:  tok.TokenLiteralNode().Column,
 				Level:   SeverityWarning,
 			})
 		}
 	}
-
 	return violations
+}
+
+// zc1079UnquotedVar returns the token-bearing node when expr resolves
+// to an unquoted variable / array reference; nil otherwise.
+func zc1079UnquotedVar(expr ast.Expression) ast.Node {
+	switch r := expr.(type) {
+	case *ast.Identifier:
+		if len(r.Value) > 0 && r.Value[0] == '$' {
+			return r
+		}
+	case *ast.ArrayAccess, *ast.InvalidArrayAccess:
+		return r.(ast.Node)
+	case *ast.ConcatenatedExpression:
+		for _, part := range r.Parts {
+			if ident, ok := part.(*ast.Identifier); ok && len(ident.Value) > 0 && ident.Value[0] == '$' {
+				return ident
+			}
+		}
+	}
+	return nil
 }
 
 func init() {

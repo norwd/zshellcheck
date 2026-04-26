@@ -2139,52 +2139,64 @@ func init() {
 	})
 }
 
+var (
+	zc1834QdiscActions = map[string]struct{}{"add": {}, "replace": {}, "change": {}}
+	zc1834NetemModes   = map[string]struct{}{"loss": {}, "corrupt": {}, "duplicate": {}}
+	zc1834Saturating   = map[string]struct{}{"100%": {}, "100": {}}
+)
+
 func checkZC1834(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
+	if !ok || CommandIdentifier(cmd) != "tc" {
+		return nil
+	}
+	action, ok := zc1834QdiscAction(cmd.Arguments)
 	if !ok {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok || ident.Value != "tc" {
+	mode := zc1834SaturatingNetem(cmd.Arguments)
+	if mode == "" {
 		return nil
 	}
-	args := cmd.Arguments
-	if len(args) < 3 {
-		return nil
-	}
-	if args[0].String() != "qdisc" {
-		return nil
+	return []Violation{{
+		KataID: "ZC1834",
+		Message: "`tc qdisc " + action + " … netem " + mode + " 100%` " +
+			"black-holes every packet on the target interface — remote SSH " +
+			"dies instantly. Stage on a secondary dev or wrap in a timed " +
+			"recovery (`at now + N minutes … tc qdisc del …`).",
+		Line:   cmd.Token.Line,
+		Column: cmd.Token.Column,
+		Level:  SeverityError,
+	}}
+}
+
+func zc1834QdiscAction(args []ast.Expression) (string, bool) {
+	if len(args) < 3 || args[0].String() != "qdisc" {
+		return "", false
 	}
 	action := args[1].String()
-	if action != "add" && action != "replace" && action != "change" {
-		return nil
+	if _, hit := zc1834QdiscActions[action]; !hit {
+		return "", false
 	}
-	// Walk remaining args looking for `netem <mode> 100%`.
+	return action, true
+}
+
+func zc1834SaturatingNetem(args []ast.Expression) string {
 	for i := 2; i+2 < len(args); i++ {
 		if args[i].String() != "netem" {
 			continue
 		}
 		for j := i + 1; j+1 < len(args); j++ {
 			mode := args[j].String()
-			if mode != "loss" && mode != "corrupt" && mode != "duplicate" {
+			if _, ok := zc1834NetemModes[mode]; !ok {
 				continue
 			}
-			val := args[j+1].String()
-			if val == "100%" || val == "100" {
-				return []Violation{{
-					KataID: "ZC1834",
-					Message: "`tc qdisc " + action + " … netem " + mode + " 100%` " +
-						"black-holes every packet on the target interface — remote SSH " +
-						"dies instantly. Stage on a secondary dev or wrap in a timed " +
-						"recovery (`at now + N minutes … tc qdisc del …`).",
-					Line:   cmd.Token.Line,
-					Column: cmd.Token.Column,
-					Level:  SeverityError,
-				}}
+			if _, ok := zc1834Saturating[args[j+1].String()]; ok {
+				return mode
 			}
 		}
 	}
-	return nil
+	return ""
 }
 
 func init() {
@@ -3479,41 +3491,50 @@ func checkZC1854(node ast.Node) []Violation {
 	if !ok {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-
-	switch ident.Value {
+	switch CommandIdentifier(cmd) {
 	case "yum-config-manager":
-		for _, arg := range cmd.Arguments {
-			if zc1854IsHTTPURL(arg.String()) {
-				return zc1854Hit(cmd, "yum-config-manager --add-repo "+arg.String())
-			}
+		if url := zc1854FirstHTTPArg(cmd.Arguments); url != "" {
+			return zc1854Hit(cmd, "yum-config-manager --add-repo "+url)
 		}
 	case "dnf":
-		if len(cmd.Arguments) >= 3 &&
-			cmd.Arguments[0].String() == "config-manager" &&
-			cmd.Arguments[1].String() == "--add-repo" {
-			for _, arg := range cmd.Arguments[2:] {
-				if zc1854IsHTTPURL(arg.String()) {
-					return zc1854Hit(cmd, "dnf config-manager --add-repo "+arg.String())
-				}
-			}
+		if url := zc1854DnfAddRepo(cmd); url != "" {
+			return zc1854Hit(cmd, "dnf config-manager --add-repo "+url)
 		}
 	case "zypper":
-		if len(cmd.Arguments) >= 2 {
-			sub := cmd.Arguments[0].String()
-			if sub == "addrepo" || sub == "ar" {
-				for _, arg := range cmd.Arguments[1:] {
-					if zc1854IsHTTPURL(arg.String()) {
-						return zc1854Hit(cmd, "zypper addrepo "+arg.String())
-					}
-				}
-			}
+		if url := zc1854ZypperAddRepo(cmd); url != "" {
+			return zc1854Hit(cmd, "zypper addrepo "+url)
 		}
 	}
 	return nil
+}
+
+func zc1854FirstHTTPArg(args []ast.Expression) string {
+	for _, arg := range args {
+		if v := arg.String(); zc1854IsHTTPURL(v) {
+			return v
+		}
+	}
+	return ""
+}
+
+func zc1854DnfAddRepo(cmd *ast.SimpleCommand) string {
+	if len(cmd.Arguments) < 3 ||
+		cmd.Arguments[0].String() != "config-manager" ||
+		cmd.Arguments[1].String() != "--add-repo" {
+		return ""
+	}
+	return zc1854FirstHTTPArg(cmd.Arguments[2:])
+}
+
+func zc1854ZypperAddRepo(cmd *ast.SimpleCommand) string {
+	if len(cmd.Arguments) < 2 {
+		return ""
+	}
+	sub := cmd.Arguments[0].String()
+	if sub != "addrepo" && sub != "ar" {
+		return ""
+	}
+	return zc1854FirstHTTPArg(cmd.Arguments[1:])
 }
 
 func zc1854IsHTTPURL(v string) bool {
