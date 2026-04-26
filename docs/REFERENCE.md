@@ -35,9 +35,28 @@ Breaking changes and major features require a design-discussion issue before imp
 ### Review requirements
 
 - Every PR to `main` needs one approving review from the CODEOWNERS set.
-- Commits must be GPG-signed.
+- Commits must be GPG-signed and carry a [Developer Certificate of Origin](https://developercertificate.org/) sign-off.
 - Required status checks — `test`, `security`, `sbom` — must pass.
 - No force-push, no branch deletion, no unsigned merges.
+
+### Continuity and bus factor
+
+The project has two committers with push access to `main`: **@afadesigns** (admin) and **@redteamx** (write).
+Both are documented in [.github/CODEOWNERS](../.github/CODEOWNERS) and listed as collaborators on the repository.
+Either committer can independently:
+
+- Open, triage, and close issues.
+- Accept, label, and merge PRs against `main`.
+- Cut a release by tagging a signed `vX.Y.Z` and pushing the tag to fire the release workflow.
+- Respond to vulnerability reports through the GitHub Private Vulnerability Reporting channel.
+
+The release workflow is keyless (cosign OIDC); there is no long-lived signing key to inherit.
+The GPG key `B5690EEEBB952194` used for commit and tag signing is held by the lead maintainer; the secondary committer uses their own GPG key, both accepted by branch protection.
+
+If the lead maintainer becomes unable to continue, the secondary committer retains write access and the project continues without interruption.
+Account recovery for the lead maintainer's GitHub account follows GitHub's standard procedures and is documented in the maintainer's personal records.
+
+Bus factor: 2.
 
 ---
 

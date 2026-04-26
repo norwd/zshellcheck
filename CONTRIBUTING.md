@@ -38,6 +38,10 @@ See [developer guide → getting started](docs/DEVELOPER.md#getting-started) for
 
    Commits must be GPG-signed.
    Set `commit.gpgsign=true` or pass `-S`.
+
+   Commits must also carry a [Developer Certificate of Origin](https://developercertificate.org/) sign-off line.
+   Pass `-s` (or set `format.signOff = true` in your git config) so each commit ends with `Signed-off-by: Your Name <you@example.com>`.
+   The sign-off certifies that you wrote the patch or otherwise have the right to submit it under the project's MIT license.
 5. Push and open the PR.
    ```bash
    git push -u origin <branch>
@@ -100,6 +104,18 @@ Short form:
   Grep existing katas before writing a new one.
 - **Backtick-quote shell syntax** in titles, descriptions, and messages.
   End sentences with a period.
+
+### Coding standards
+
+Go code follows [Effective Go](https://go.dev/doc/effective_go) and the [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments).
+Compliance is enforced automatically by [.golangci.yml](.golangci.yml), which runs gofumpt, govet, errcheck, staticcheck, gosec, ineffassign, unparam, gocyclo, dupl, revive, thelper, unconvert, and prealloc on every push and PR.
+
+### Test policy
+
+Formal policy: every PR that adds or modifies non-trivial functionality must add or update tests in the same change.
+For new katas, this is enforced structurally by the kata-test pairing rule above.
+For non-kata code, the `test` required check fails when coverage drops; reviewers reject PRs that ship behaviour without a regression test.
+Bug fixes ship a regression test that fails before the fix and passes after.
 
 ### Adding an auto-fix
 
