@@ -1,14 +1,16 @@
-# User Guide
+# User guide
 
-This guide covers the configuration, usage, and troubleshooting of ZShellCheck.
+This guide covers configuration, usage, and troubleshooting for ZShellCheck.
 
-ZShellCheck currently implements **1000 Katas** (checks) covering syntax errors, security issues, performance improvements, and Zsh best practices.
+ZShellCheck implements 1000 katas — checks that cover syntax errors, security issues, performance pitfalls, and Zsh idioms.
+The full list lives in [KATAS.md](../KATAS.md).
 
-## Table of Contents
+## Contents
 
-- [CLI Reference](#cli-reference)
-- [Severity Levels](#severity-levels)
+- [CLI reference](#cli-reference)
+- [Severity levels](#severity-levels)
 - [Configuration](#configuration)
+- [Inline `noka` directives](#inline-noka-directives)
 - [Integrations](#integrations)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
@@ -16,42 +18,43 @@ ZShellCheck currently implements **1000 Katas** (checks) covering syntax errors,
 
 ---
 
-## CLI Reference
+## CLI reference
 
 ```
 zshellcheck [flags] <path> [<path> ...]
 ```
 
 Paths may be files or directories.
-Directories are walked recursively; `.go`, `.md`, `.json`, `.yml`, `.yaml`, `.txt`, and hidden directories (anything starting with `.`) are skipped.
+Directories are walked recursively.
+Files with `.go`, `.md`, `.json`, `.yml`, `.yaml`, or `.txt` extensions are skipped, as are hidden directories.
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
-| `-format <text\|json\|sarif>` | `text` | Output format. `sarif` is for GitHub Security / Code Scanning ingestion. |
+| `-format <text\|json\|sarif>` | `text` | Output format. `sarif` is for GitHub Code Scanning ingestion. |
 | `-severity <level[,level...]>` | (all) | Comma-separated filter. Accepts `error`, `warning`, `info`, `style`. |
 | `-verbose` | off | Emit full kata descriptions in text output. |
-| `-no-color` | off | Disable ANSI colours. Also implied when stdout is not a TTY. |
-| `-cpuprofile <path>` | — | Write a Go `pprof` CPU profile to `<path>` for benchmarking. |
-| `-fix` | off | Apply auto-fixes in place for katas that declare one. Safe, deterministic rewrites only. |
+| `-no-color` | off | Disable ANSI colours. Implied when stdout is not a TTY. |
+| `-cpuprofile <path>` | — | Write a Go pprof CPU profile to `<path>` for benchmarking. |
+| `-fix` | off | Apply auto-fixes in place for katas that declare one. Deterministic rewrites only. |
 | `-diff` | off | Preview the fixes as a unified diff instead of writing them. Implies dry-run. |
 | `-dry-run` | off | With `-fix`, report what would change without modifying files. |
 | `-version` | — | Print the version and exit. |
-| `-h` / `--help` | — | Print usage and exit. |
+| `-h`, `--help` | — | Print usage and exit. |
 
-### Exit Codes
+### Exit codes
 
 | Code | Meaning |
-| --- | --- |
+| ---: | --- |
 | `0` | No violations. |
-| `1` | One or more violations found, or a parse error, or a usage error. |
+| `1` | One or more violations, a parse error, or a usage error. |
 
 ### Examples
 
 ```bash
-# Lint a single script, text output
+# Lint a single script with text output
 zshellcheck ./install.sh
 
-# Lint a tree, silence style-level findings
+# Lint a tree, suppress style-level findings
 zshellcheck -severity error,warning,info ./scripts
 
 # Emit SARIF for CI upload
@@ -67,110 +70,116 @@ zshellcheck -fix ./scripts
 ### Auto-fixes
 
 Katas with a deterministic, reversible rewrite ship a `Fix` implementation.
-Run `zshellcheck -fix <path>` to apply them in place, or `zshellcheck -diff <path>` to preview the result.
-The fixer only rewrites the exact span the kata points at — arguments, quoting, and surrounding whitespace are preserved byte-for-byte.
+Run `zshellcheck -fix <path>` to apply rewrites in place, or `zshellcheck -diff <path>` to preview the unified diff.
+The fixer rewrites only the exact span the kata points at — arguments, quoting, and surrounding whitespace are preserved byte-for-byte.
 
 Silenced violations (via `.zshellcheckrc` or inline `# noka` directives) keep their fixes silenced too.
 
-The fixer runs multi-pass (default cap of five).
-Nested rewrites — for example `` result=`which git` `` collapsing to `result=$(whence git)` — converge in a single `zshellcheck -fix` call.
+The fixer runs multi-pass with a default cap of five iterations.
+Nested rewrites — for example `` result=`which git` `` collapsing to `result=$(whence git)` — converge in a single invocation.
 
 Combine flags freely:
 
 | Combination | Effect |
 | --- | --- |
 | `-fix` | Apply rewrites to disk. |
-| `-diff` | Print a unified diff of the rewrites. Source unchanged. |
+| `-diff` | Print a unified diff. Source unchanged. |
 | `-fix -dry-run` | Report which files would change without writing. |
-| `-fix -severity warning` | Apply every available rewrite; suppress style-level violations from the human-facing report. |
+| `-fix -severity warning` | Apply every available rewrite; suppress style-level findings from the human-facing report. |
 | `-no-banner -fix` | Apply rewrites without the startup banner — useful in CI. |
 
-[`KATAS.md`](../KATAS.md) lists every kata with an explicit `Auto-fix: yes/no` line, and the summary table reports the current count.
+[KATAS.md](../KATAS.md) lists every kata with an explicit `Auto-fix: yes/no` line, and the summary table reports the current count.
 
 ---
 
-## Severity Levels
+## Severity levels
 
 Every kata declares a severity.
-Canonical rubric:
+The canonical rubric:
 
-| Level | Go constant | When to use | Example kata |
+| Level | Go constant | When to use | Example |
 | --- | --- | --- | --- |
-| `error` | `SeverityError` | Code is broken or will crash under Zsh. Output is wrong. | `ZC2000` — `kubectl taint nodes …:NoExecute` |
-| `warning` | `SeverityWarning` | Dangerous behaviour; data loss, security risk, or silent subtle bug. | `ZC1136` — `rm -rf $var` without guard |
+| `error` | `SeverityError` | Code is broken or crashes under Zsh; output is wrong. | `ZC2000` — `kubectl taint nodes …:NoExecute` |
+| `warning` | `SeverityWarning` | Dangerous behaviour: data loss, security risk, or silent subtle bug. | `ZC1136` — `rm -rf $var` without guard |
 | `info` | `SeverityInfo` | Works, but brittle or non-portable. Heads-up, not a must-fix. | `ZC1075` — implicit word-splitting reliance |
-| `style` | `SeverityStyle` | Convention / idiomatic Zsh. Cosmetic. | `ZC1030` — `echo` vs `print -r --` |
+| `style` | `SeverityStyle` | Convention or idiomatic Zsh. Cosmetic. | `ZC1030` — `echo` vs `print -r --` |
 
-### Filtering by Severity
+### Filter by severity
 
 ```bash
-# Show only errors
-zshellcheck --severity error my_script.zsh
+# Errors only
+zshellcheck -severity error my_script.zsh
 
-# Show errors and warnings
-zshellcheck --severity warning my_script.zsh
+# Errors and warnings
+zshellcheck -severity warning my_script.zsh
 
-# Show everything (default)
-zshellcheck --severity style my_script.zsh
+# Everything
+zshellcheck -severity style my_script.zsh
 ```
 
-### Output Formats
+### Output formats
 
-- **Text (default)**: Human-readable with ANSI colors and source context.
-  Use `--no-color` to disable colors.
-- **JSON**: `zshellcheck -format json file.zsh`
-- **SARIF**: `zshellcheck -format sarif file.zsh` (GitHub Security integration)
+- **Text** (default).
+  Human-readable, ANSI-coloured, with source context.
+  `-no-color` disables colour.
+- **JSON.**
+  `zshellcheck -format json file.zsh` for tooling and editor integrations.
+- **SARIF.**
+  `zshellcheck -format sarif file.zsh` for GitHub Code Scanning.
 
 ---
 
 ## Configuration
 
-ZShellCheck looks for a file named `.zshellcheckrc` in the current working directory.
-The file uses **YAML** syntax.
+ZShellCheck reads `.zshellcheckrc` from the working directory.
+The file is YAML.
+Global settings live at `~/.config/zshellcheck/config.yml` or `${XDG_CONFIG_HOME}/zshellcheck/config.yml`.
 
-Global settings can be placed in `~/.config/zshellcheck/config.yml` or `${XDG_CONFIG_HOME}/zshellcheck/config.yml`.
+### Disabling katas
 
-### Disabling Katas
-
-To suppress specific checks (Katas), use the `disabled_katas` list:
+Use the `disabled_katas` list to suppress specific checks:
 
 ```yaml
 # .zshellcheckrc
 disabled_katas:
-  - ZC1005 # We prefer 'which' over 'whence'
-  - ZC1042 # Ignore specific rule
+  - ZC1005  # Prefer 'which' over 'whence' in this codebase
+  - ZC1042  # Internal exception
 ```
 
-Refer to `KATAS.md` for the list of IDs.
+Refer to [KATAS.md](../KATAS.md) for the full kata list.
 
-### Inline `noka` directives
+---
 
-Silence katas directly inside a script with a `# noka` comment — no `.zshellcheckrc` edit required.
-The bare keyword silences every kata in scope; the colon-prefixed form narrows to a list:
+## Inline `noka` directives
+
+Silence katas inside a script with a `# noka` comment.
+No `.zshellcheckrc` edit required.
+The bare keyword silences every kata in scope.
+The colon-prefixed form narrows to a list:
 
 ```zsh
-# Trailing — silence specific katas on this line:
+# Trailing — silence specific katas on this line
 rm -rf /tmp/noise  # noka: ZC1136, ZC1075
 
-# Trailing — silence every kata on this line:
+# Trailing — silence every kata on this line
 rm -rf /tmp/noise  # noka
 
-# Preceding — applies to the next non-blank code line:
+# Preceding — applies to the next non-blank code line
 # noka: ZC1030
 echo "ok"
 
-# File-tail — a directive with no code after it goes file-wide:
+# File-tail — a directive with no code after it goes file-wide
 # noka: ZC1092
 ```
 
 Multiple IDs may be separated by commas or whitespace.
-IDs disabled inline are merged with any `disabled_katas` from `.zshellcheckrc`.
+Inline IDs are merged with `disabled_katas` from `.zshellcheckrc`.
 
 ---
 
 ## Integrations
 
-ZShellCheck can be integrated into editors and workflows.
+ZShellCheck plugs into editors and CI workflows.
 
 ### VS Code (Run on Save)
 
@@ -190,7 +199,7 @@ Install the **Run on Save** extension and add to `settings.json`:
 ### Neovim (nvim-lint)
 
 `null-ls` is archived; use [mfussenegger/nvim-lint](https://github.com/mfussenegger/nvim-lint) instead.
-It knows how to parse ZShellCheck's JSON output natively via a small parser:
+It parses ZShellCheck's JSON output natively:
 
 ```lua
 require("lint").linters.zshellcheck = {
@@ -200,7 +209,6 @@ require("lint").linters.zshellcheck = {
     stream = "stdout",
     ignore_exitcode = true,
     parser = require("lint.parser").from_errorformat(
-        -- fallback to regex on stderr if JSON isn't available
         "%f:%l:%c: %t%m",
         { source = "zshellcheck" }
     ),
@@ -214,36 +222,37 @@ vim.api.nvim_create_autocmd({ "BufWritePost", "BufReadPost" }, {
 })
 ```
 
-### Neovim (conform.nvim + LSP — future)
+### LSP
 
-An official LSP is on the roadmap but not yet shipped.
-Track [ROADMAP.md](../ROADMAP.md) for status.
+An official LSP is on the [roadmap](../ROADMAP.md) but has not shipped.
 
-### Pre-commit Hook
-
-Add to `.pre-commit-config.yaml`:
+### pre-commit hook
 
 ```yaml
+# .pre-commit-config.yaml
 -   repo: https://github.com/afadesigns/zshellcheck
-    rev: v1.0.16
+    rev: latest
     hooks:
-    -   id: zshellcheck
+      - id: zshellcheck
 ```
+
+Pin `rev` to an exact release tag for reproducible CI.
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
+**`command not found`.**
+Ensure `zshellcheck` is on `$PATH`.
+A user install lives at `$HOME/.local/bin`; a root install lives at `/usr/local/bin`.
+Re-running `install.sh` offers to repair `$PATH`.
 
-1.  **"command not found"**: 
-    - Ensure `zshellcheck` is in your `$PATH`. 
-    - If you installed as a user, add `$HOME/.local/bin`.
-    - If you installed as root, it should be in `/usr/local/bin`.
-    - **Fix:** Run `./install.sh` again; it will offer to automatically fix your `$PATH`.
-2. **Parser Errors**: Use `zsh -n` to verify syntax first.
-   Open an issue if valid code fails.
-3.  **False Positives**: Disable the Kata via `.zshellcheckrc`.
+**Parser errors.**
+Run `zsh -n file.zsh` to verify the syntax independently.
+Open an issue when valid Zsh code is rejected.
+
+**False positives.**
+Silence the kata inline with `# noka: ZCxxxx`, or add it to `disabled_katas` in `.zshellcheckrc`.
 
 ---
 
@@ -251,40 +260,41 @@ Add to `.pre-commit-config.yaml`:
 
 ### Why does ZShellCheck error on `${var:-default}`?
 
-The parser doesn't yet handle Zsh / POSIX parameter-expansion modifiers (`:-`, `:=`, `:+`, `:?`, `##`, `%%`, `/pat/rep`, `:offset:length`).
+The parser does not yet handle Zsh and POSIX parameter-expansion modifiers (`:-`, `:=`, `:+`, `:?`, `##`, `%%`, `/pat/rep`, `:offset:length`).
 Tracked in [#129](https://github.com/afadesigns/zshellcheck/issues/129).
-Until that lands, wrap the expansion in a guard block or refactor to a temporary variable.
+Until the parser lands the modifier set, wrap the expansion in a guard block or refactor to a temporary variable.
 
 ### Should I use ZShellCheck or ShellCheck?
 
 Both.
-Run ShellCheck for anything targeting `sh` / `bash` portability.
-Run ZShellCheck for anything using Zsh-only features: parameter-expansion flags (`${(U)x}`, `${(f)x}`), glob qualifiers (`*.zsh(.)`), `[[`, `(( ))`, `print -r --`, modifiers (`:t`, `:h`, `:r`), associative arrays, `setopt` flags, hook functions.
-See [REFERENCE.md#comparison-vs-shellcheck](REFERENCE.md#comparison-vs-shellcheck).
+ShellCheck targets `sh` and `bash` portability.
+ZShellCheck targets Zsh-specific features: parameter-expansion flags (`${(U)x}`, `${(f)x}`), glob qualifiers (`*.zsh(.)`), `[[`, `(( ))`, `print -r --`, modifiers (`:t`, `:h`, `:r`), associative arrays, `setopt` flags, and hook functions.
+See [REFERENCE.md → comparison vs ShellCheck](REFERENCE.md#comparison-vs-shellcheck).
 
 ### How do I exempt one line without editing the whole file?
 
 Add a trailing `# noka` comment: `some-command  # noka: ZC1234`.
-The bare `# noka` form silences every kata on the line.
+Bare `# noka` silences every kata on the line.
 See [Inline `noka` directives](#inline-noka-directives) above.
 
-### Is there an auto-fixer (`-fix`)?
+### Is there an auto-fixer?
 
 Yes.
-Run `zshellcheck -fix path/to/script.zsh` to apply every available rewrite, or `zshellcheck -diff path/to/script.zsh` to preview the unified diff without writing. 67 katas ship deterministic rewrites today; coverage grows each release.
-The set of fixable katas is listed in [`KATAS.md`](../KATAS.md) — each entry carries an explicit `Auto-fix: yes/no` line.
+Run `zshellcheck -fix path/to/script.zsh` to apply every available rewrite.
+Use `-diff` to preview the unified diff without writing.
+The set of fixable katas is listed in [KATAS.md](../KATAS.md) — every entry carries an explicit `Auto-fix: yes/no` line, and the summary table reports the count for the current release.
 
-`-fix` runs multi-pass (up to five) so nested rewrites resolve in a single invocation.
+`-fix` runs multi-pass (up to five iterations) so nested rewrites resolve in a single invocation.
 Pair `-fix` with `-dry-run` to report what would change without writing.
 
 ### The SARIF output is empty after a parse error. Why?
 
-When the parser rejects a file, ZShellCheck exits before katas run — so there is nothing to emit.
-Fix the syntax first (`zsh -n file.zsh` is a fast sanity check) or open an issue if valid Zsh is being rejected.
+When the parser rejects a file, ZShellCheck exits before katas run; there is nothing to emit.
+Fix the syntax (`zsh -n file.zsh` is a fast sanity check), or open an issue when valid Zsh is being rejected.
 
 ### Where does ZShellCheck look for config?
 
-In order, merged with project-local winning:
+In order, with project-local winning:
 
 1. `$XDG_CONFIG_HOME/zshellcheck/config.yml` (or `.yaml`)
 2. `~/.config/zshellcheck/config.yml` (or `.yaml`)
@@ -295,6 +305,6 @@ In order, merged with project-local winning:
 
 ## Support
 
-- **Discussions**: https://github.com/afadesigns/zshellcheck/discussions — questions and ideas.
-- **Issues**: https://github.com/afadesigns/zshellcheck/issues — bugs, feature requests.
-- **Security**: report vulnerabilities privately per [SECURITY.md](../SECURITY.md).
+- [Discussions](https://github.com/afadesigns/zshellcheck/discussions) — questions and ideas.
+- [Issues](https://github.com/afadesigns/zshellcheck/issues) — bugs and feature requests.
+- Vulnerabilities — disclose privately per [SECURITY.md](../SECURITY.md).

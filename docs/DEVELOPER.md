@@ -1,74 +1,78 @@
-# Developer Guide
+# Developer guide
 
-This document serves as the comprehensive manual for contributing to the ZShellCheck codebase, understanding its internal architecture, and managing the release lifecycle.
+This document covers the architecture, contribution workflow, and release lifecycle.
 
-## Table of Contents
+## Contents
 
-- [Getting Started](#getting-started)
-- [Development Workflow](#development-workflow)
-- [Architecture Overview](#architecture-overview)
-- [AST Reference](#ast-reference)
-- [Release Process](#release-process)
-- [Project Governance](#project-governance)
+- [Getting started](#getting-started)
+- [Development workflow](#development-workflow)
+- [Architecture overview](#architecture-overview)
+- [AST reference](#ast-reference)
+- [Release process](#release-process)
+- [Project governance](#project-governance)
 
 ---
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- **Go**: Version 1.25 or higher.
-- **Git**: For version control.
-- **Make** (Optional): For running build scripts if available.
+- **Go** 1.25 or higher.
+- **Git** for version control.
+- **Make** (optional) for running build scripts.
 
 ### Setup
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/afadesigns/zshellcheck.git
-    cd zshellcheck
-    ```
+1. Clone the repository.
+   ```bash
+   git clone https://github.com/afadesigns/zshellcheck.git
+   cd zshellcheck
+   ```
 
-2.  **Install dependencies:**
-    ```bash
-    go mod download
-    ```
+2. Install dependencies.
+   ```bash
+   go mod download
+   ```
 
-## Development Workflow
+## Development workflow
 
 ### Building
 
-**Recommended:** Use the installer script to build and install locally (auto-detects source repo):
+Recommended — use the installer script to build and install locally; it auto-detects the source repo:
+
 ```bash
 ./install.sh
 ```
 
-**Manual Build:**
+Manual build:
+
 ```bash
 go build ./cmd/zshellcheck
 ```
 
-### Running Tests
+### Running tests
 
-We use the standard Go testing framework.
+The project uses the standard Go testing framework.
 
-- **Run all tests:**
-  ```bash
-  go test ./...
-  ```
+Run every test:
 
-- **Run specific tests:**
-  ```bash
-  go test -v pkg/parser/parser_test.go
-  ```
+```bash
+go test ./...
+```
 
-- **Integration Tests:**
-  Run against real Zsh scripts.
-  ```bash
-  ./tests/integration_test.zsh
-  ```
+Run a specific test file:
 
-### Creating a New Kata
+```bash
+go test -v pkg/parser/parser_test.go
+```
+
+Run the integration test against real Zsh scripts:
+
+```bash
+./tests/integration_test.zsh
+```
+
+### Creating a new kata
 
 1.  **Identify the anti-pattern.** It must be **Zsh-specific** — generic POSIX-sh issues belong in ShellCheck, not here.
 2.  **Determine the AST node.** See the [AST Reference](#ast-reference) below.
@@ -118,7 +122,7 @@ We use the standard Go testing framework.
 
 6.  **Once committed, fix — don't remove.** Retire duplicates as no-op stubs (see `ZC1018`, `ZC1022` for the pattern).
 
-### Adding an Auto-Fix
+### Adding an auto-fix
 
 A kata becomes auto-fixable when its rewrite is **context-free, idempotent, and byte-exact**.
 The auto-fixer runs every kata's `Fix` function over the source; conflicting overlaps resolve outer-wins on the first pass, with the inner edit picked up on a subsequent pass.
@@ -160,16 +164,16 @@ Detection-only katas remain valuable.
 
 When a new kata introduces a rewrite shape that doesn't fit one of these, extend the table in the same PR so the catalog stays current.
 
-### Severity Levels
+### Severity levels
 
-Every kata must declare a severity via the Go constants `SeverityError`, `SeverityWarning`, `SeverityInfo`, `SeverityStyle` (defined in `pkg/katas/katas.go`).
-See the [Severity Levels reference](USER_GUIDE.md#severity-levels) for the rubric and when to pick each level.
+Every kata must declare a severity via the Go constants `SeverityError`, `SeverityWarning`, `SeverityInfo`, or `SeverityStyle` defined in `pkg/katas/katas.go`.
+See the [severity levels reference](USER_GUIDE.md#severity-levels) for the rubric and when to pick each level.
 
 ---
 
-## Architecture Overview
+## Architecture overview
 
-ZShellCheck follows a standard static analysis pipeline:
+ZShellCheck follows a standard static-analysis pipeline:
 
 ```mermaid
 graph TD
@@ -182,25 +186,30 @@ graph TD
     G -->|Text/JSON| H[Output]
 ```
 
-### Core Components
+### Core components
 
-1. **Lexer (`pkg/lexer`)**: Scans source code into a stream of **Tokens**.
+1. **Lexer (`pkg/lexer`).**
+   Scans source code into a stream of tokens.
    Handles Zsh-specific quoting and expansions.
-2. **Parser (`pkg/parser`)**: Consumes tokens to build an **Abstract Syntax Tree (AST)**.
-   Implements a recursive descent parser.
-3.  **AST (`pkg/ast`)**: Defines the tree structure (Nodes, Statements, Expressions).
-4. **Katas (`pkg/katas`)**: The check rules.
-   Each Kata registers to listen for specific AST Node types.
-5. **Reporter (`pkg/reporter`)**: Formats violations into Text, JSON, or SARIF output.
-   Supports `--severity` filtering and `--no-color` mode.
+2. **Parser (`pkg/parser`).**
+   Consumes tokens to build an abstract syntax tree.
+   Recursive-descent.
+3. **AST (`pkg/ast`).**
+   Defines the tree structure: nodes, statements, expressions.
+4. **Katas (`pkg/katas`).**
+   The check rules.
+   Each kata registers against one or more AST node types.
+5. **Reporter (`pkg/reporter`).**
+   Formats violations as text, JSON, or SARIF.
+   Honours `-severity` filtering and `-no-color`.
 
 ---
 
-## AST Reference
+## AST reference
 
-Understanding AST nodes is crucial for writing Katas.
+The kata API is built around AST nodes.
 
-### Common Node Types
+### Common node types
 
 **Statements**
 - **`SimpleCommandNode`** — basic command: `ls -la`.
@@ -237,7 +246,7 @@ Understanding AST nodes is crucial for writing Katas.
 Not every Zsh construct has its own node yet.
 Known gaps: parameter-expansion modifiers `${var:-default}` / `${var##glob}` (tracked in [#129](https://github.com/afadesigns/zshellcheck/issues/129)).
 
-### Visitor Pattern
+### Visitor pattern
 
 Use `ast.Walk` to traverse the tree:
 
@@ -252,10 +261,11 @@ ast.Walk(rootNode, func(node ast.Node) bool {
 
 ---
 
-## Release Process
+## Release process
 
-Since v1.0.10 ZShellCheck follows standard [semantic versioning](https://semver.org) and `pkg/version/version.go` is **hand-maintained** — the kata-count formula is retired.
-Tags are cut **manually** by the maintainer.
+ZShellCheck follows standard [semantic versioning](https://semver.org) since v1.0.10.
+`pkg/version/version.go` is hand-maintained; the legacy kata-count formula is retired.
+Tags are cut manually by the maintainer.
 
 In the steps below, substitute `vX.Y.Z` for the new release version (e.g. `v1.0.16`).
 
@@ -285,15 +295,16 @@ In the steps below, substitute `vX.Y.Z` for the new release version (e.g. `v1.0.
 
 ### Gotchas
 
-- Commit bodies must **not** contain the literal strings `#patch`, `#minor`, or `#major` — Release-Drafter matches these as version-bump keywords and will create ghost drafts.
-  Use `#none` as a safety directive when the phrasing risks a match.
-- Tags must be **signed** (`-s`).
+- Commit bodies must not contain the literal strings `#patch`, `#minor`, or `#major`.
+  Release Drafter matches these as version-bump keywords and creates ghost drafts.
+  Use `#none` as a safety directive when phrasing risks a match.
+- Tags must be signed with `-s`.
   The required GPG key is `B5690EEEBB952194`.
 - Never force-push `main`.
-  For behind feature branches use merge-forward, not rebase.
+  For feature branches that have fallen behind, merge-forward; do not rebase.
 
 ---
 
-## Project Governance
+## Project governance
 
-See [REFERENCE.md](REFERENCE.md) for details on roles and decision making.
+See [REFERENCE.md](REFERENCE.md) for roles and decision making.
