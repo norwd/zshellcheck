@@ -634,30 +634,43 @@ func (l *Lexer) fastForwardTo(target int) {
 // emit the pair as an IDENT word so parseCommandWord folds it into
 // the surrounding word. Anything else falls back to ILLEGAL to keep
 // token-aware contexts stable.
+// backslashEscapable lists the bytes that may follow `\` outside a
+// string context. Anything else falls through to the ILLEGAL token.
+var backslashEscapable = map[byte]struct{}{
+	'(': {}, ')': {}, '*': {}, '?': {}, '[': {}, ']': {},
+	'|': {}, '&': {}, ';': {}, '<': {}, '>': {}, '{': {}, '}': {},
+	'$': {}, '\\': {}, '/': {}, '.': {}, '!': {}, '~': {},
+	'^': {}, ' ': {}, '\t': {}, '#': {}, '"': {}, '\'': {},
+	'=': {}, '%': {}, ',': {}, ':': {}, '@': {}, '+': {}, '-': {},
+}
+
 func (l *Lexer) readBackslashEscape() token.Token {
 	next := l.peekChar()
-	isLetter := (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') ||
-		(next >= '0' && next <= '9')
-	allowed := isLetter || next == '(' || next == ')' || next == '*' ||
-		next == '?' || next == '[' || next == ']' || next == '|' ||
-		next == '&' || next == ';' || next == '<' || next == '>' ||
-		next == '{' || next == '}' || next == '$' || next == '\\' ||
-		next == '/' || next == '.' || next == '!' || next == '~' ||
-		next == '^' || next == ' ' || next == '\t' || next == '#' ||
-		next == '"' || next == '\'' || next == '=' || next == '%' ||
-		next == ',' || next == ':' || next == '@' || next == '+' ||
-		next == '-'
-	if !allowed {
+	if !isBackslashEscapable(next) {
 		return newToken(token.ILLEGAL, l.ch, l.line, l.column)
 	}
 	line, col := l.line, l.column
-	l.readChar() // consume '\'
+	l.readChar()
 	return token.Token{
 		Type:    token.IDENT,
 		Literal: "\\" + string(l.ch),
 		Line:    line,
 		Column:  col,
 	}
+}
+
+func isBackslashEscapable(ch byte) bool {
+	if isAlphaNumByte(ch) {
+		return true
+	}
+	_, hit := backslashEscapable[ch]
+	return hit
+}
+
+func isAlphaNumByte(ch byte) bool {
+	return ('a' <= ch && ch <= 'z') ||
+		('A' <= ch && ch <= 'Z') ||
+		('0' <= ch && ch <= '9')
 }
 
 // readCloseParen resolves a `)` to either DoubleRparen (fused `))`)

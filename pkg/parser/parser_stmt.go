@@ -1107,131 +1107,20 @@ func (p *Parser) parseDeclarationStatement() *ast.DeclarationStatement {
 	stmt := &ast.DeclarationStatement{Token: p.curToken, Command: p.curToken.Literal}
 	startLine := stmt.Token.Line
 	p.nextToken()
-
-	// Consume flags and assignments until the statement's line ends or a
-	// terminator fires. advanceOrStop is the key helper: it only moves
-	// past the current token when the next token is still part of this
-	// declaration (same line, not a terminator). When the next token is
-	// on a new line the declaration ends with curToken on its last real
-	// token so the outer block's unconditional nextToken() advances to
-	// the following statement's first token — without this guard, a
-	// declaration immediately followed by an `if` (or any statement) on
-	// the next line caused the parser to swallow the statement's leading
-	// token. Reported against oh-my-zsh / zsh-autosuggestions bodies.
-	advanceOrStop := func() bool {
-		if p.peekTokenIs(token.SEMICOLON) || p.peekTokenIs(token.EOF) {
-			return false
-		}
-		if p.peekToken.Line != startLine {
-			return false
-		}
-		p.nextToken()
-		return true
-	}
-
 	for !p.curTokenIs(token.SEMICOLON) && !p.curTokenIs(token.EOF) && p.curToken.Line == startLine {
-		// Flags (e.g. -g, -A, -r, --).
-		if p.curTokenIs(token.MINUS) || (p.curTokenIs(token.IDENT) && len(p.curToken.Literal) > 0 && p.curToken.Literal[0] == '-') {
-			stmt.Flags = append(stmt.Flags, p.curToken.Literal)
-			if !advanceOrStop() {
-				break
-			}
+		if p.declarationConsumeFlag(stmt, startLine) {
 			continue
 		}
-
-		// Identifier (optionally followed by = or += value).
-		// STRING / VARIABLE / DollarLbrace also lead here — Zsh
-		// accepts `typeset -g "$1"="$2"` where the name is the
-		// expansion of `$1`. The composite-name loop below stitches
-		// adjacent no-space parts together regardless of head kind.
-		if p.curTokenIs(token.IDENT) || p.curTokenIs(token.STRING) ||
-			p.curTokenIs(token.VARIABLE) || p.curTokenIs(token.DollarLbrace) {
-			assign := &ast.DeclarationAssignment{
-				Name: &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal},
-			}
-			// Non-trivial composite names: the parser should treat
-			// `X_{A,B}_Y`, `prefix"${1:-}"_suffix`, and
-			// `${arr[$i]}=value` as one logical name. Consume any
-			// sequence of adjacent (no preceding space) tokens that
-			// can participate in a shell-word: LBRACE expansions,
-			// STRING literals, DollarLbrace expansions, VARIABLE
-			// references, and plain IDENT suffixes.
-			for !p.peekToken.HasPrecedingSpace && p.peekToken.Line == startLine {
-				switch {
-				case p.peekTokenIs(token.LBRACE):
-					p.nextToken() // onto {
-					depth := 1
-					for depth > 0 && !p.peekTokenIs(token.EOF) {
-						p.nextToken()
-						switch {
-						case p.curTokenIs(token.LBRACE):
-							depth++
-						case p.curTokenIs(token.RBRACE):
-							depth--
-						}
-					}
-				case p.peekTokenIs(token.DollarLbrace):
-					p.nextToken() // onto ${
-					depth := 1
-					for depth > 0 && !p.peekTokenIs(token.EOF) {
-						p.nextToken()
-						switch {
-						case p.curTokenIs(token.DollarLbrace) || p.curTokenIs(token.LBRACE):
-							depth++
-						case p.curTokenIs(token.RBRACE):
-							depth--
-						}
-					}
-				case p.peekTokenIs(token.STRING):
-					p.nextToken()
-				case p.peekTokenIs(token.IDENT):
-					p.nextToken()
-				case p.peekTokenIs(token.VARIABLE):
-					p.nextToken()
-				default:
-					goto nameDone
-				}
-			}
-		nameDone:
-			// Peek the =/+= before consuming the name so we can decide
-			// whether to stay on the name token (bare declaration) or
-			// move onto the operator (value follows). An empty RHS
-			// (`typeset -g VAR=` at end-of-line) is valid Zsh and sets
-			// the variable to the empty string — do NOT try to parse
-			// the next-line token as the value, that over-consumes
-			// into the following statement exactly like the pre-
-			// declaration fix handled for bare declarations.
-			if p.peekTokenIs(token.PLUSEQ) {
-				p.nextToken() // onto +=
-				assign.IsAppend = true
-				if p.peekToken.Line == startLine && !p.peekTokenIs(token.SEMICOLON) && !p.peekTokenIs(token.EOF) {
-					p.nextToken() // onto value token
-					assign.Value = p.parseDeclarationValue()
-				}
-			} else if p.peekTokenIs(token.ASSIGN) {
-				p.nextToken() // onto =
-				if p.peekToken.Line == startLine && !p.peekTokenIs(token.SEMICOLON) && !p.peekTokenIs(token.EOF) {
-					p.nextToken() // onto value token
-					assign.Value = p.parseDeclarationValue()
-				}
-			}
-			stmt.Assignments = append(stmt.Assignments, assign)
-
-			if !advanceOrStop() {
-				break
-			}
+		if p.declarationConsumeAssignment(stmt, startLine) {
 			continue
 		}
-
 		// Unknown token inside a declaration — stop the loop so we do
 		// not skip tokens belonging to the next statement.
 		break
 	}
-
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
-
 	return stmt
 }
 
@@ -1248,6 +1137,120 @@ func (p *Parser) parseArithmeticCommand() *ast.ArithmeticCommand {
 		return nil
 	}
 	return cmd
+}
+
+// declarationAdvanceOrStop consumes one token within a declaration
+// statement. Returns false when the next token belongs to a following
+// statement (different line, terminator, or EOF) so the caller breaks
+// out of the loop without over-consuming.
+func (p *Parser) declarationAdvanceOrStop(startLine int) bool {
+	if p.peekTokenIs(token.SEMICOLON) || p.peekTokenIs(token.EOF) {
+		return false
+	}
+	if p.peekToken.Line != startLine {
+		return false
+	}
+	p.nextToken()
+	return true
+}
+
+func (p *Parser) declarationConsumeFlag(stmt *ast.DeclarationStatement, startLine int) bool {
+	if !p.declarationCurIsFlag() {
+		return false
+	}
+	stmt.Flags = append(stmt.Flags, p.curToken.Literal)
+	if !p.declarationAdvanceOrStop(startLine) {
+		return false
+	}
+	return true
+}
+
+func (p *Parser) declarationCurIsFlag() bool {
+	if p.curTokenIs(token.MINUS) {
+		return true
+	}
+	if !p.curTokenIs(token.IDENT) {
+		return false
+	}
+	return len(p.curToken.Literal) > 0 && p.curToken.Literal[0] == '-'
+}
+
+func (p *Parser) declarationConsumeAssignment(stmt *ast.DeclarationStatement, startLine int) bool {
+	if !p.declarationCurIsName() {
+		return false
+	}
+	assign := &ast.DeclarationAssignment{
+		Name: &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal},
+	}
+	p.consumeCompositeName(startLine)
+	p.consumeDeclarationValueTail(assign, startLine)
+	stmt.Assignments = append(stmt.Assignments, assign)
+	if !p.declarationAdvanceOrStop(startLine) {
+		return false
+	}
+	return true
+}
+
+func (p *Parser) declarationCurIsName() bool {
+	return p.curTokenIs(token.IDENT) || p.curTokenIs(token.STRING) ||
+		p.curTokenIs(token.VARIABLE) || p.curTokenIs(token.DollarLbrace)
+}
+
+// consumeCompositeName stitches adjacent (no preceding space) word
+// parts onto the declaration name so `prefix"${1:-}"_suffix` and
+// `${arr[$i]}` survive as one logical name.
+func (p *Parser) consumeCompositeName(startLine int) {
+	for !p.peekToken.HasPrecedingSpace && p.peekToken.Line == startLine {
+		switch {
+		case p.peekTokenIs(token.LBRACE):
+			p.nextToken()
+			p.consumeBraceTail(token.LBRACE, token.RBRACE)
+		case p.peekTokenIs(token.DollarLbrace):
+			p.nextToken()
+			p.consumeBraceTail(token.LBRACE, token.RBRACE)
+		case p.peekTokenIs(token.STRING),
+			p.peekTokenIs(token.IDENT),
+			p.peekTokenIs(token.VARIABLE):
+			p.nextToken()
+		default:
+			return
+		}
+	}
+}
+
+// consumeBraceTail walks past the matching close brace of a brace
+// or `${ … }` group, treating both forms as the same nesting kind.
+func (p *Parser) consumeBraceTail(_ token.Type, closeT token.Type) {
+	depth := 1
+	for depth > 0 && !p.peekTokenIs(token.EOF) {
+		p.nextToken()
+		switch {
+		case p.curTokenIs(token.DollarLbrace) || p.curTokenIs(token.LBRACE):
+			depth++
+		case p.curTokenIs(closeT):
+			depth--
+		}
+	}
+}
+
+func (p *Parser) consumeDeclarationValueTail(assign *ast.DeclarationAssignment, startLine int) {
+	switch {
+	case p.peekTokenIs(token.PLUSEQ):
+		p.nextToken()
+		assign.IsAppend = true
+		p.consumeAssignedValue(assign, startLine)
+	case p.peekTokenIs(token.ASSIGN):
+		p.nextToken()
+		p.consumeAssignedValue(assign, startLine)
+	}
+}
+
+func (p *Parser) consumeAssignedValue(assign *ast.DeclarationAssignment, startLine int) {
+	if p.peekToken.Line != startLine || p.peekTokenIs(token.SEMICOLON) || p.peekTokenIs(token.EOF) {
+		return
+	}
+	p.nextToken()
+	assign.Value = p.parseDeclarationValue()
 }
 
 func (p *Parser) parseDeclarationValue() ast.Expression {
