@@ -807,10 +807,48 @@ func (l *Lexer) readIdentifier() string {
 
 func (l *Lexer) readNumber() string {
 	position := l.position
+	// Zsh accepts `0x…` (hex), `0b…` (binary), `0o…` (octal), and
+	// `BASE#…` (custom-base) integer literals inside arithmetic. Read
+	// the leading prefix, then drain digits + base alphas. The parser
+	// uses strconv.ParseInt with base 0 which only recognises 0x/0b/0o,
+	// so the BASE# form rounds back to a string in the AST — but
+	// keeping the bytes as a single INT token is what the arithmetic
+	// expression layer needs to avoid mis-parsing `0x${var}` as
+	// `INT 0` + `IDENT x` + `${…}`.
+	if l.ch == '0' {
+		peek := l.peekChar()
+		if peek == 'x' || peek == 'X' || peek == 'b' || peek == 'B' || peek == 'o' || peek == 'O' {
+			// Only consume the base prefix when at least one digit
+			// follows. `0x${var}` (Zsh string concat with parameter
+			// expansion) must lex as INT(0) + IDENT(x) + DollarLbrace
+			// for the parser to recover; eating `0x` alone produced
+			// "could not parse \"0x\" as integer" downstream.
+			third := l.peekAt(2)
+			if isDigit(third) || isHexDigit(third) {
+				l.readChar() // 0
+				l.readChar() // base prefix letter
+				for isDigit(l.ch) || isHexDigit(l.ch) {
+					l.readChar()
+				}
+				return l.input[position:l.position]
+			}
+		}
+	}
 	for isDigit(l.ch) {
 		l.readChar()
 	}
+	if l.ch == '#' && isDigit(l.peekChar()) {
+		// `BASE#NUM` — Zsh custom-base literal, e.g. `16#ff`.
+		l.readChar() // #
+		for isDigit(l.ch) || isHexDigit(l.ch) {
+			l.readChar()
+		}
+	}
 	return l.input[position:l.position]
+}
+
+func isHexDigit(ch byte) bool {
+	return (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
 }
 
 func (l *Lexer) readString(quote byte) string {

@@ -1131,6 +1131,7 @@ func (p *Parser) parseArithmeticCommand() *ast.ArithmeticCommand {
 
 	prevInArithmetic := p.inArithmetic
 	p.inArithmetic = true
+	p.consumeArithmeticRadixPrefix()
 	cmd.Expression = p.parseExpression(LOWEST)
 	p.inArithmetic = prevInArithmetic
 
