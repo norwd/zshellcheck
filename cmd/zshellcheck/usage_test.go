@@ -49,6 +49,15 @@ func TestFlagValueType(t *testing.T) {
 	}
 }
 
+func TestPrintUsageBannerEmitted(t *testing.T) {
+	fs := flag.NewFlagSet("zshellcheck", flag.ContinueOnError)
+	var buf bytes.Buffer
+	printUsage(&buf, fs, true)
+	if !strings.Contains(buf.String(), "ZShellCheck") && !strings.Contains(buf.String(), "zshellcheck") {
+		t.Errorf("banner-on output missing project name: %q", buf.String())
+	}
+}
+
 func TestPrintUsageContainsCoreSections(t *testing.T) {
 	fs := flag.NewFlagSet("zshellcheck", flag.ContinueOnError)
 	fs.String("format", "text", "Output format")
