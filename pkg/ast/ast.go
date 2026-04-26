@@ -661,16 +661,21 @@ func Walk(node Node, f WalkFn) {
 	if v := reflect.ValueOf(node); v.Kind() == reflect.Ptr && v.IsNil() {
 		return
 	}
-
 	if !f(node) {
 		return
 	}
+	walkChildren(node, f)
+}
 
+// walkChildren dispatches by concrete node type and recurses into the
+// children of node. Split out from Walk so the per-type case lists
+// stay below the gocyclo > 15 threshold.
+func walkChildren(node Node, f WalkFn) {
 	switch n := node.(type) {
 	case *Program:
-		for _, stmt := range n.Statements {
-			Walk(stmt, f)
-		}
+		walkSlice(n.Statements, f)
+	case *BlockStatement:
+		walkSlice(n.Statements, f)
 	case *LetStatement:
 		Walk(n.Name, f)
 		Walk(n.Value, f)
@@ -678,88 +683,69 @@ func Walk(node Node, f WalkFn) {
 		Walk(n.ReturnValue, f)
 	case *ExpressionStatement:
 		Walk(n.Expression, f)
-	case *BlockStatement:
-		for _, stmt := range n.Statements {
-			Walk(stmt, f)
-		}
 	case *IfStatement:
 		Walk(n.Condition, f)
 		Walk(n.Consequence, f)
 		Walk(n.Alternative, f)
 	case *ForLoopStatement:
-		Walk(n.Init, f)
-		Walk(n.Condition, f)
-		Walk(n.Post, f)
-		for _, item := range n.Items {
-			Walk(item, f)
-		}
-		Walk(n.Body, f)
+		walkForLoop(n, f)
 	case *WhileLoopStatement:
 		Walk(n.Condition, f)
 		Walk(n.Body, f)
+	default:
+		walkOtherChildren(node, f)
+	}
+}
+
+func walkOtherChildren(node Node, f WalkFn) {
+	switch n := node.(type) {
 	case *FunctionLiteral:
-		Walk(n.Name, f)
-		for _, p := range n.Params {
-			Walk(p, f)
-		}
-		Walk(n.Body, f)
+		walkFunctionLiteral(n, f)
 	case *CallExpression:
 		Walk(n.Function, f)
-		for _, arg := range n.Arguments {
-			Walk(arg, f)
-		}
+		walkSlice(n.Arguments, f)
 	case *IndexExpression:
 		Walk(n.Left, f)
 		Walk(n.Index, f)
 	case *ArrayAccess:
 		Walk(n.Index, f)
 	case *BracketExpression:
-		for _, el := range n.Elements {
-			Walk(el, f)
-		}
+		walkSlice(n.Elements, f)
 	case *DoubleBracketExpression:
-		for _, el := range n.Elements {
-			Walk(el, f)
-		}
+		walkSlice(n.Elements, f)
 	case *CommandSubstitution:
 		Walk(n.Command, f)
-	case *Shebang:
-		// No nested AST nodes for Shebang
 	case *DollarParenExpression:
 		Walk(n.Command, f)
 	case *ProcessSubstitution:
 		Walk(n.Command, f)
 	case *Subshell:
 		Walk(n.Command, f)
-	case *SimpleCommand:
-		Walk(n.Name, f)
-		for _, arg := range n.Arguments {
-			Walk(arg, f)
-		}
-	case *SelectStatement:
-		Walk(n.Name, f)
-		for _, item := range n.Items {
-			Walk(item, f)
-		}
-		Walk(n.Body, f)
 	case *CoprocStatement:
 		Walk(n.Command, f)
-	case *DeclarationStatement:
-		for _, assign := range n.Assignments {
-			Walk(assign.Name, f)
-			if assign.Value != nil {
-				Walk(assign.Value, f)
-			}
-		}
 	case *ArithmeticCommand:
 		Walk(n.Expression, f)
+	default:
+		walkRemainingChildren(node, f)
+	}
+}
+
+func walkRemainingChildren(node Node, f WalkFn) {
+	switch n := node.(type) {
+	case *SimpleCommand:
+		Walk(n.Name, f)
+		walkSlice(n.Arguments, f)
+	case *SelectStatement:
+		Walk(n.Name, f)
+		walkSlice(n.Items, f)
+		Walk(n.Body, f)
+	case *DeclarationStatement:
+		walkDeclaration(n, f)
 	case *Redirection:
 		Walk(n.Left, f)
 		Walk(n.Right, f)
 	case *ConcatenatedExpression:
-		for _, part := range n.Parts {
-			Walk(part, f)
-		}
+		walkSlice(n.Parts, f)
 	case *CaseStatement:
 		Walk(n.Value, f)
 		for _, clause := range n.Clauses {
@@ -767,12 +753,6 @@ func Walk(node Node, f WalkFn) {
 		}
 	case *CaseClause:
 		Walk(n.Body, f)
-	case *Identifier:
-		// No nested AST nodes for Identifier
-	case *IntegerLiteral:
-		// No nested AST nodes for IntegerLiteral
-	case *Boolean:
-		// No nested AST nodes for Boolean
 	case *PrefixExpression:
 		Walk(n.Right, f)
 	case *PostfixExpression:
@@ -780,11 +760,40 @@ func Walk(node Node, f WalkFn) {
 	case *InfixExpression:
 		Walk(n.Left, f)
 		Walk(n.Right, f)
-	case *InvalidArrayAccess:
-		// No nested AST nodes for InvalidArrayAccess
 	case *ArrayLiteral:
-		for _, el := range n.Elements {
-			Walk(el, f)
+		walkSlice(n.Elements, f)
+	}
+	// Leaf node types (Shebang, Identifier, IntegerLiteral, Boolean,
+	// InvalidArrayAccess) have no children and fall through.
+}
+
+func walkSlice[T Node](items []T, f WalkFn) {
+	for _, item := range items {
+		Walk(item, f)
+	}
+}
+
+func walkForLoop(n *ForLoopStatement, f WalkFn) {
+	Walk(n.Init, f)
+	Walk(n.Condition, f)
+	Walk(n.Post, f)
+	walkSlice(n.Items, f)
+	Walk(n.Body, f)
+}
+
+func walkFunctionLiteral(n *FunctionLiteral, f WalkFn) {
+	Walk(n.Name, f)
+	for _, p := range n.Params {
+		Walk(p, f)
+	}
+	Walk(n.Body, f)
+}
+
+func walkDeclaration(n *DeclarationStatement, f WalkFn) {
+	for _, assign := range n.Assignments {
+		Walk(assign.Name, f)
+		if assign.Value != nil {
+			Walk(assign.Value, f)
 		}
 	}
 }

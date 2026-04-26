@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright the ZShellCheck contributors.
+//
 // Command gen-katas-md regenerates KATAS.md from the live kata registry.
 //
 //	go run ./internal/tools/gen-katas-md

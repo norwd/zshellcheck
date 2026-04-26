@@ -12,162 +12,190 @@ func (p *Parser) parseStatement() ast.Statement {
 		p.nextToken()
 		return nil
 	}
+	if stmt, ok := p.parseSimpleStatement(); ok {
+		return stmt
+	}
+	if stmt, ok := p.parsePipelineHeadStatement(); ok {
+		return stmt
+	}
+	return p.parseStatementBranch()
+}
+
+// parseSimpleStatement covers the cases whose dispatch is just a token
+// match plus a single helper call.
+func (p *Parser) parseSimpleStatement() (ast.Statement, bool) {
 	switch p.curToken.Type {
 	case token.RETURN:
-		return p.parseReturnStatement()
+		return p.parseReturnStatement(), true
 	case token.LET:
-		return p.parseLetStatement()
+		return p.parseLetStatement(), true
+	case token.SHEBANG:
+		return p.parseShebangStatement(), true
+	case token.HASH:
+		return nil, true
+	case token.COPROC:
+		return p.parseCoprocStatement(), true
+	case token.TYPESET, token.DECLARE:
+		return p.parseDeclarationStatement(), true
+	case token.LPAREN:
+		return p.parseSubshellStatement(), true
+	}
+	return nil, false
+}
+
+// parsePipelineHeadStatement covers block-shaped statements that may
+// head a trailing pipeline tail.
+func (p *Parser) parsePipelineHeadStatement() (ast.Statement, bool) {
+	switch p.curToken.Type {
 	case token.If:
 		stmt := p.parseIfStatement()
 		p.consumePipelineTail()
-		return stmt
-	case token.SHEBANG:
-		return p.parseShebangStatement()
-	case token.HASH:
-		// Skip comments for now
-		return nil
+		return stmt, true
 	case token.FOR:
 		stmt := p.parseForLoopStatement()
 		p.consumePipelineTail()
-		return stmt
+		return stmt, true
 	case token.WHILE:
 		stmt := p.parseWhileLoopStatement()
 		p.consumePipelineTail()
-		return stmt
+		return stmt, true
 	case token.SELECT:
 		stmt := p.parseSelectStatement()
 		p.consumePipelineTail()
-		return stmt
-	case token.COPROC:
-		return p.parseCoprocStatement()
-	case token.TYPESET, token.DECLARE:
-		return p.parseDeclarationStatement()
-	case token.LBRACE:
-		tok := p.curToken
-		p.nextToken()
-		block := p.parseBlockStatement(token.RBRACE)
-		block.Token = tok
-		// A brace group can head a pipeline or logical chain:
-		// `{ cmd1; cmd2 } | sort`, `{ a || b } | awk`. Consume any
-		// trailing pipeline / logical continuations opaquely so
-		// parseStatement doesn't choke on the leading `|` / `&&`
-		// / `||` as an unknown prefix. The AST keeps the block as
-		// the statement; detection katas that care about the full
-		// pipeline can walk source.
-		for p.peekTokenIs(token.PIPE) || p.peekTokenIs(token.AND) || p.peekTokenIs(token.OR) {
-			p.nextToken() // onto op
-			p.nextToken() // onto RHS head
-			_ = p.parseCommandPipeline()
-		}
-		if p.peekTokenIs(token.SEMICOLON) {
-			p.nextToken()
-		}
-		return block
-	case token.LPAREN:
-		return p.parseSubshellStatement()
-	case token.DoubleLparen:
-		cmd := p.parseArithmeticCommand()
-		if cmd == nil {
-			return nil
-		}
-		if chained := p.chainLogical(cmd, cmd.Token); chained != nil {
-			return chained
-		}
-		return cmd
-	case token.LDBRACKET:
-		// `[[ … ]]` is a prefix expression by default. As a statement
-		// we need to capture the bracketed expression AND the `&&` /
-		// `||` continuations without letting the generic
-		// parseExpression loop pick OR/AND up as internal infix
-		// operators — that swallows the continuation's right-hand
-		// command (e.g. `|| return 0`) into a single expression
-		// whose RHS starts at `return`, which has no prefix parse
-		// entry and errors out.
-		//
-		// Call the prefix function directly so the expression stops
-		// exactly at `]]`, then route post-`]]` logical chains
-		// through chainLogical, which uses parseCommandPipeline for
-		// the RHS — the command-aware path that knows how to handle
-		// `return`, builtins, simple commands, and so on.
-		startTok := p.curToken
-		expr := p.parseDoubleBracketExpression()
-		if expr == nil {
-			return nil
-		}
-		if chained := p.chainLogical(expr, startTok); chained != nil {
-			return chained
-		}
-		stmt := &ast.ExpressionStatement{Token: startTok, Expression: expr}
-		if p.peekTokenIs(token.SEMICOLON) {
-			p.nextToken()
-		}
-		return stmt
-	case token.COLON, token.DOT, token.LBRACKET,
-		token.GT, token.LT, token.GTGT, token.LTLT, token.GTAMP, token.LTAMP, token.AMPERSAND, token.SLASH:
-		return p.parseSimpleCommandStatement()
-	case token.BANG:
-		// Shell `!` negates the exit status of the following
-		// pipeline: `! cmd 2>/dev/null | grep`. Route through the
-		// command-pipeline path so redirects and pipes on the
-		// right chain correctly. Keep the expression-level prefix
-		// behaviour for C-style inputs like `!5` / `!true` by
-		// checking peek: IDENT / LPAREN / LBRACKET / LDBRACKET /
-		// DoubleLparen / VARIABLE / DollarLbrace / BACKTICK /
-		// DOLLAR_LPAREN are command starts; anything else falls
-		// back to the expression parser.
-		if p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.LPAREN) ||
-			p.peekTokenIs(token.LBRACKET) || p.peekTokenIs(token.LDBRACKET) ||
-			p.peekTokenIs(token.DoubleLparen) || p.peekTokenIs(token.VARIABLE) ||
-			p.peekTokenIs(token.DollarLbrace) || p.peekTokenIs(token.BACKTICK) ||
-			p.peekTokenIs(token.DOLLAR_LPAREN) {
-			return p.parseSimpleCommandStatement()
-		}
-		return p.parseExpressionOrFunctionDefinition()
-	case token.BACKTICK, token.DOLLAR_LPAREN, token.VARIABLE, token.DollarLbrace:
-		// A command-producing expression (`cmd`, $(cmd), $name,
-		// ${name}) can stand on its own as a statement, but can
-		// also head a pipeline or a logical chain:
-		// `` `_cmd` | sed … ``, `$(date) && ...`, `$VAR | awk`.
-		// Parse the expression via the normal prefix path, then
-		// fold any pipeline / AND / OR continuations into an infix
-		// tree so the trailing `|` / `&&` / `||` do not leak back
-		// into parseStatement's next-iteration dispatch.
-		return p.parsePipelineStartingWithExpression()
+		return stmt, true
 	case token.CASE:
 		stmt := p.parseCaseStatement()
 		p.consumePipelineTail()
-		return stmt
+		return stmt, true
+	}
+	return nil, false
+}
+
+func (p *Parser) parseStatementBranch() ast.Statement {
+	switch p.curToken.Type {
+	case token.LBRACE:
+		return p.parseBraceGroupStatement()
+	case token.DoubleLparen:
+		return p.parseDoubleLparenStatement()
+	case token.LDBRACKET:
+		return p.parseLDBracketStatement()
+	case token.COLON, token.DOT, token.LBRACKET,
+		token.GT, token.LT, token.GTGT, token.LTLT,
+		token.GTAMP, token.LTAMP, token.AMPERSAND, token.SLASH:
+		return p.parseSimpleCommandStatement()
+	case token.BANG:
+		return p.parseBangStatement()
+	case token.BACKTICK, token.DOLLAR_LPAREN, token.VARIABLE, token.DollarLbrace:
+		return p.parsePipelineStartingWithExpression()
 	case token.IDENT:
-		if p.curToken.Literal == "test" {
-			return p.parseSimpleCommandStatement()
-		}
-		if p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.STRING) || p.peekTokenIs(token.INT) ||
-			p.peekTokenIs(token.MINUS) || p.peekTokenIs(token.DOT) || p.peekTokenIs(token.VARIABLE) ||
-			p.peekTokenIs(token.DOLLAR) || p.peekTokenIs(token.DollarLbrace) ||
-			p.peekTokenIs(token.DOLLAR_LPAREN) || p.peekTokenIs(token.SLASH) ||
-			p.peekTokenIs(token.TILDE) || p.peekTokenIs(token.ASTERISK) ||
-			p.peekTokenIs(token.BANG) || p.peekTokenIs(token.LBRACE) ||
-			// `cmd --flag arg` / `cmd ++foo`. DEC / INC are long-
-			// option prefixes here. Without this routing the
-			// expression-level postfix path turned `cmd--` into a
-			// PostfixExpression and the rest of the line leaked
-			// into sibling statements. Each kata that walked the
-			// mangled SimpleCommand.Name-as-flag shape now sees
-			// the correct cmd-name + flag-arg pair.
-			p.peekTokenIs(token.DEC) || p.peekTokenIs(token.INC) ||
-			// Zero-arg commands followed by a pipe / logical chain
-			// must route through parseSimpleCommandStatement so the
-			// pipeline / AND / OR chain is parsed at the command
-			// layer. Without this `cmd1 |\n cmd2` left `cmd1` as a
-			// bare Identifier expression, and the block loop then
-			// tried to start a new statement at `|`.
-			p.peekTokenIs(token.PIPE) || p.peekTokenIs(token.AND) || p.peekTokenIs(token.OR) {
-			return p.parseSimpleCommandStatement()
-		}
-		return p.parseExpressionOrFunctionDefinition()
+		return p.parseIdentStatement()
 	default:
 		return p.parseExpressionOrFunctionDefinition()
 	}
+}
+
+func (p *Parser) parseBraceGroupStatement() ast.Statement {
+	tok := p.curToken
+	p.nextToken()
+	block := p.parseBlockStatement(token.RBRACE)
+	block.Token = tok
+	for p.peekTokenIs(token.PIPE) || p.peekTokenIs(token.AND) || p.peekTokenIs(token.OR) {
+		p.nextToken()
+		p.nextToken()
+		_ = p.parseCommandPipeline()
+	}
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+	return block
+}
+
+func (p *Parser) parseDoubleLparenStatement() ast.Statement {
+	cmd := p.parseArithmeticCommand()
+	if cmd == nil {
+		return nil
+	}
+	if chained := p.chainLogical(cmd, cmd.Token); chained != nil {
+		return chained
+	}
+	return cmd
+}
+
+func (p *Parser) parseLDBracketStatement() ast.Statement {
+	startTok := p.curToken
+	expr := p.parseDoubleBracketExpression()
+	if expr == nil {
+		return nil
+	}
+	if chained := p.chainLogical(expr, startTok); chained != nil {
+		return chained
+	}
+	stmt := &ast.ExpressionStatement{Token: startTok, Expression: expr}
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+	return stmt
+}
+
+func (p *Parser) parseBangStatement() ast.Statement {
+	if p.peekStartsCommand() {
+		return p.parseSimpleCommandStatement()
+	}
+	return p.parseExpressionOrFunctionDefinition()
+}
+
+func (p *Parser) peekStartsCommand() bool {
+	switch {
+	case p.peekTokenIs(token.IDENT), p.peekTokenIs(token.LPAREN):
+		return true
+	case p.peekTokenIs(token.LBRACKET), p.peekTokenIs(token.LDBRACKET):
+		return true
+	case p.peekTokenIs(token.DoubleLparen), p.peekTokenIs(token.VARIABLE):
+		return true
+	case p.peekTokenIs(token.DollarLbrace), p.peekTokenIs(token.BACKTICK):
+		return true
+	case p.peekTokenIs(token.DOLLAR_LPAREN):
+		return true
+	}
+	return false
+}
+
+func (p *Parser) parseIdentStatement() ast.Statement {
+	if p.curToken.Literal == "test" {
+		return p.parseSimpleCommandStatement()
+	}
+	if p.peekStartsSimpleCommand() {
+		return p.parseSimpleCommandStatement()
+	}
+	return p.parseExpressionOrFunctionDefinition()
+}
+
+func (p *Parser) peekStartsSimpleCommand() bool {
+	if p.peekStartsArgPrefix() {
+		return true
+	}
+	if p.peekTokenIs(token.DEC) || p.peekTokenIs(token.INC) {
+		return true
+	}
+	return p.peekTokenIs(token.PIPE) || p.peekTokenIs(token.AND) || p.peekTokenIs(token.OR)
+}
+
+func (p *Parser) peekStartsArgPrefix() bool {
+	switch {
+	case p.peekTokenIs(token.IDENT), p.peekTokenIs(token.STRING), p.peekTokenIs(token.INT):
+		return true
+	case p.peekTokenIs(token.MINUS), p.peekTokenIs(token.DOT), p.peekTokenIs(token.VARIABLE):
+		return true
+	case p.peekTokenIs(token.DOLLAR), p.peekTokenIs(token.DollarLbrace):
+		return true
+	case p.peekTokenIs(token.DOLLAR_LPAREN), p.peekTokenIs(token.SLASH):
+		return true
+	case p.peekTokenIs(token.TILDE), p.peekTokenIs(token.ASTERISK):
+		return true
+	case p.peekTokenIs(token.BANG), p.peekTokenIs(token.LBRACE):
+		return true
+	}
+	return false
 }
 
 // chainLogical threads `&&` / `||` continuations onto an arbitrary
@@ -463,96 +491,84 @@ func (p *Parser) parseSingleCommand() ast.Expression {
 	return cmd
 }
 
+// commandWordLiteralTokens is the set of token types that appear inside
+// a command-argument word but should be emitted as StringLiterals,
+// not parsed as expressions. Reserved words (do/done/then/etc.) live
+// in the same set because they routinely show up as literal arguments
+// (`print -l function`, `arr=(do done)`).
+var commandWordLiteralTokens = map[token.Type]struct{}{
+	token.ASTERISK: {}, token.QUESTION: {}, token.PLUS: {},
+	token.MINUS: {}, token.CARET: {}, token.TILDE: {}, token.DOT: {},
+	token.GT: {}, token.LT: {}, token.AMPERSAND: {}, token.LBRACKET: {},
+	token.COMMA: {}, token.COLON: {}, token.GTGT: {}, token.LTLT: {},
+	token.GTAMP: {}, token.LTAMP: {},
+	token.DEC: {}, token.INC: {},
+	token.ASSIGN: {}, token.PLUSEQ: {},
+	token.FUNCTION: {}, token.SELECT: {}, token.COPROC: {},
+	token.DO: {}, token.DONE: {}, token.ESAC: {},
+	token.THEN: {}, token.ELSE: {}, token.ELIF: {}, token.Fi: {},
+	token.If: {}, token.FOR: {}, token.WHILE: {}, token.CASE: {},
+	token.IN: {}, token.LET: {}, token.RETURN: {},
+	token.TYPESET: {}, token.DECLARE: {},
+}
+
+func (p *Parser) commandWordIsExpression(t token.Type) bool {
+	if _, hit := commandWordLiteralTokens[t]; hit {
+		return false
+	}
+	return p.prefixParseFns[t] != nil
+}
+
 func (p *Parser) parseCommandWord() ast.Expression {
 	firstToken := p.curToken
-	parts := []ast.Expression{}
-
-	// Helper to determine if we should parse as expression
-	isExpression := func(t token.Type) bool {
-		// Treat these as literals in command args, even if they have prefix fns
-		if t == token.ASTERISK || t == token.QUESTION || t == token.PLUS ||
-			t == token.MINUS || t == token.CARET || t == token.TILDE || t == token.DOT ||
-			t == token.GT || t == token.LT || t == token.AMPERSAND || t == token.LBRACKET ||
-			t == token.COMMA || t == token.COLON || t == token.GTGT || t == token.LTLT ||
-			t == token.GTAMP || t == token.LTAMP ||
-			// DEC / INC in command-arg position are POSIX end-of-
-			// options (`cmd --`) or long-flag openers (`cmd --foo`),
-			// never prefix-decrement / pre-increment. Prefix DEC is
-			// reached inside arithmetic `((…))` where parseCommandWord
-			// is not in play.
-			t == token.DEC || t == token.INC ||
-			// `=` is an assignment operator in expression context but a
-			// literal in command arguments (e.g. `alias -- -='cd -'`,
-			// or `env FOO=bar cmd`). Treat it as a literal word part
-			// when it appears mid-command. The declaration parser has
-			// its own dedicated handling for the IDENT=VALUE form.
-			t == token.ASSIGN || t == token.PLUSEQ ||
-			// Reserved-word tokens (FUNCTION/SELECT/COPROC/etc.) are
-			// keywords in statement position but routinely appear as
-			// literal arguments — `reserved_words=( do done … function
-			// repeat select … )`, `print -l function`. Treat them as
-			// literal strings in command-arg / array-element contexts.
-			t == token.FUNCTION || t == token.SELECT || t == token.COPROC ||
-			t == token.DO || t == token.DONE || t == token.ESAC ||
-			t == token.THEN || t == token.ELSE || t == token.ELIF || t == token.Fi ||
-			t == token.If || t == token.FOR || t == token.WHILE || t == token.CASE ||
-			t == token.IN || t == token.LET || t == token.RETURN ||
-			t == token.TYPESET || t == token.DECLARE {
-			return false
-		}
-		return p.prefixParseFns[t] != nil
-	}
-
-	// Track LBRACE depth opened MID-WORD so a matching `}` isn't
-	// mistaken for a delimiter. Zsh git refspecs like
-	// `@{upstream}` appear bare on command lines; without this the
-	// RBRACE closed the arg at `{upstream` and the outer `$(` lost
-	// its closing `)`. When the word STARTS with `{` we leave
-	// braceDepth at zero so brace expansions `{1..10}` still
-	// terminate at `}` (tests like ZC1083 expect `{1..10}$var`
-	// to parse as two concatenated words: `{1..10}` then `$var`).
+	parts := []ast.Expression{p.parseCommandWordPart()}
 	braceDepth := 0
-
-	// Parse the first part
-	if !isExpression(p.curToken.Type) {
-		parts = append(parts, &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal})
-	} else {
-		parts = append(parts, p.parseExpression(CALL))
-	}
-
-	// Continue parsing while the next token is adjacent (no preceding space)
-	for !p.peekToken.HasPrecedingSpace && p.peekOnSameLogicalLine() {
-		if braceDepth == 0 && p.isCommandDelimiter(p.peekToken) {
-			break
-		}
-		if braceDepth > 0 && p.peekTokenIs(token.EOF) {
-			break
-		}
+	for p.commandWordContinues(braceDepth) {
 		p.nextToken()
-		switch p.curToken.Type {
-		case token.LBRACE:
-			braceDepth++
-		case token.RBRACE:
-			if braceDepth > 0 {
-				braceDepth--
-			}
-		}
-		if !isExpression(p.curToken.Type) {
-			// Treat as literal string part
-			parts = append(parts, &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal})
-		} else {
-			parts = append(parts, p.parseExpression(CALL))
-		}
+		braceDepth = updateCommandWordBraceDepth(braceDepth, p.curToken.Type)
+		parts = append(parts, p.parseCommandWordPart())
 	}
-
 	if len(parts) == 1 {
 		return parts[0]
 	}
+	return &ast.ConcatenatedExpression{Token: firstToken, Parts: parts}
+}
 
-	return &ast.ConcatenatedExpression{
-		Token: firstToken,
-		Parts: parts,
+// parseCommandWordPart consumes the current token as either a literal
+// string part or a sub-expression, depending on commandWordIsExpression.
+func (p *Parser) parseCommandWordPart() ast.Expression {
+	if !p.commandWordIsExpression(p.curToken.Type) {
+		return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
 	}
+	return p.parseExpression(CALL)
+}
+
+// commandWordContinues reports whether the next token belongs to the
+// current word. The brace-depth context lets `@{upstream}` and similar
+// mid-word brace runs survive without splitting at the inner `}`.
+func (p *Parser) commandWordContinues(braceDepth int) bool {
+	if p.peekToken.HasPrecedingSpace || !p.peekOnSameLogicalLine() {
+		return false
+	}
+	if braceDepth == 0 && p.isCommandDelimiter(p.peekToken) {
+		return false
+	}
+	if braceDepth > 0 && p.peekTokenIs(token.EOF) {
+		return false
+	}
+	return true
+}
+
+func updateCommandWordBraceDepth(depth int, t token.Type) int {
+	switch t {
+	case token.LBRACE:
+		return depth + 1
+	case token.RBRACE:
+		if depth > 0 {
+			return depth - 1
+		}
+	}
+	return depth
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
@@ -798,12 +814,10 @@ func (p *Parser) parseCaseStatement() *ast.CaseStatement {
 	stmt := &ast.CaseStatement{Token: p.curToken}
 	p.nextToken()
 	stmt.Value = p.parseExpression(LOWEST)
-
 	if !p.expectPeek(token.IN) {
 		return nil
 	}
 	p.nextToken()
-
 	for !p.curTokenIs(token.ESAC) && !p.curTokenIs(token.EOF) {
 		for p.curTokenIs(token.SEMICOLON) {
 			p.nextToken()
@@ -811,47 +825,10 @@ func (p *Parser) parseCaseStatement() *ast.CaseStatement {
 		if p.curTokenIs(token.ESAC) {
 			break
 		}
-		clause := &ast.CaseClause{Token: p.curToken}
-		// Leading `(` is the optional case-label opener
-		// (`( pat )`) UNLESS the rest of the line carries another
-		// `)` after the matching close — in which case it's a
-		// glob alternation pattern (`(darwin|freebsd)*)` where
-		// the `*)` carries the actual label terminator). The
-		// look-ahead is impractical without rewinding the lexer,
-		// so use a lighter heuristic: consume the `(` only when
-		// the next-next non-pipe token is `)` (classic single-
-		// pattern form). For glob-alternation patterns leave the
-		// `(` for parseCommandWord to absorb via parseGroupedExpression.
-		if p.curTokenIs(token.LPAREN) && p.lookaheadCaseLabelOpener() {
-			p.nextToken()
+		clause := p.parseCaseClause()
+		if clause == nil {
+			return nil
 		}
-		for {
-			pat := p.parseCommandWord()
-			clause.Patterns = append(clause.Patterns, pat)
-			if p.peekTokenIs(token.PIPE) {
-				p.nextToken()
-				p.nextToken()
-			} else {
-				break
-			}
-		}
-		// curToken may already be on `)` when parseCommandWord
-		// absorbed an inline glob group like `(a|b)*` whose close
-		// IS the label terminator. When the absorbed `)` is just
-		// the glob close and the actual label terminator is the
-		// NEXT `)` — e.g. `plugin::(disable|enable|load))` —
-		// advance once so we land on the label's own `)`. Otherwise
-		// expectPeek(RPAREN) to reach the label close from any
-		// other tail token.
-		if p.curTokenIs(token.RPAREN) && p.peekTokenIs(token.RPAREN) {
-			p.nextToken()
-		} else if !p.curTokenIs(token.RPAREN) {
-			if !p.expectPeek(token.RPAREN) {
-				return nil
-			}
-		}
-		p.nextToken()
-		clause.Body = p.parseBlockStatement(token.DSEMI, token.ESAC)
 		stmt.Clauses = append(stmt.Clauses, clause)
 		if p.curTokenIs(token.DSEMI) {
 			p.nextToken()
@@ -880,191 +857,192 @@ func (p *Parser) parseShebangStatement() *ast.Shebang {
 	return &ast.Shebang{Token: p.curToken, Path: p.curToken.Literal}
 }
 
-func (p *Parser) parseForLoopStatement() *ast.ForLoopStatement {
-	stmt := &ast.ForLoopStatement{Token: p.curToken}
-
-	if p.peekTokenIs(token.DoubleLparen) {
-		// Arithmetic for loop: for (( init; cond; post ))
-		p.nextToken() // consume ((
-
-		// Init (optional)
-		if !p.peekTokenIs(token.SEMICOLON) {
-			p.nextToken()
-			if p.prefixParseFns[p.curToken.Type] != nil {
-				stmt.Init = p.parseExpression(LOWEST)
-			} else {
-				p.noPrefixParseFnError(p.curToken.Type)
-				return nil
-			}
-		}
-		if !p.expectPeek(token.SEMICOLON) {
-			return nil
-		}
-
-		// Condition (optional)
-		if !p.peekTokenIs(token.SEMICOLON) {
-			p.nextToken()
-			if p.prefixParseFns[p.curToken.Type] != nil {
-				stmt.Condition = p.parseExpression(LOWEST)
-			} else {
-				p.noPrefixParseFnError(p.curToken.Type)
-				return nil
-			}
-		}
-		if !p.expectPeek(token.SEMICOLON) {
-			return nil
-		}
-
-		// Post (optional)
-		if !p.peekTokenIs(token.DoubleRparen) {
-			p.nextToken()
-			if p.prefixParseFns[p.curToken.Type] != nil {
-				stmt.Post = p.parseExpression(LOWEST)
-			} else {
-				p.noPrefixParseFnError(p.curToken.Type)
-				return nil
-			}
-		}
-
-		if !p.expectPeek(token.DoubleRparen) {
-			return nil
-		}
-
-		// Optional semicolon before DO
-		if p.peekTokenIs(token.SEMICOLON) {
-			p.nextToken()
-		}
-
-		if !p.expectPeek(token.DO) {
-			return nil
-		}
-		p.nextToken() // consume DO
-		stmt.Body = p.parseBlockStatement(token.DONE)
-		return stmt
-	}
-
-	// For-each loop: for name [in words]; do
-	// Zsh accepts numeric positional names like `for 1 in "$@"; do`
-	// (shorthand to iterate over positionals). Allow INT as the
-	// binding name alongside IDENT.
-	if p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.INT) {
+func (p *Parser) parseCaseClause() *ast.CaseClause {
+	clause := &ast.CaseClause{Token: p.curToken}
+	if p.curTokenIs(token.LPAREN) && p.lookaheadCaseLabelOpener() {
 		p.nextToken()
-	} else {
-		p.peekError(token.IDENT)
+	}
+	clause.Patterns = p.parseCaseClausePatterns()
+	if !p.alignToCaseClauseClose() {
 		return nil
 	}
-	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	p.nextToken()
+	clause.Body = p.parseBlockStatement(token.DSEMI, token.ESAC)
+	return clause
+}
 
-	// Zsh multi-variable for loop: `for k v in …` / `for a b c in …`
-	// pairs each element of the item list against the declared
-	// variables in turn. The implicit-list form `for k v w; do …`
-	// (no `in` — iterates over `$@`) allows numeric positional
-	// names as well, e.g. `for 1 2 3; do …` in
-	// zsh-syntax-highlighting. Accept IDENT and INT alike; the AST
-	// only models a single Name, so extras are skipped. Detection
-	// katas that need the full name list can read source directly.
-	for p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.INT) {
+func (p *Parser) parseCaseClausePatterns() []ast.Expression {
+	var patterns []ast.Expression
+	for {
+		patterns = append(patterns, p.parseCommandWord())
+		if !p.peekTokenIs(token.PIPE) {
+			return patterns
+		}
+		p.nextToken()
 		p.nextToken()
 	}
+}
 
-	// Zsh short form: `for NAME ( items ) body`. The item list is
-	// wrapped in parentheses and the body is a single command (or
-	// block) with no `do`/`done`. Real-world example in prezto
-	// init.zsh: `for zmodule ("$zmodules[@]") zmodload "zsh/…"`.
+// alignToCaseClauseClose advances curToken to the `)` that closes the
+// label, handling the inline-glob-group case where parseCommandWord
+// already consumed an inner `)`.
+func (p *Parser) alignToCaseClauseClose() bool {
+	if p.curTokenIs(token.RPAREN) && p.peekTokenIs(token.RPAREN) {
+		p.nextToken()
+		return true
+	}
+	if p.curTokenIs(token.RPAREN) {
+		return true
+	}
+	return p.expectPeek(token.RPAREN)
+}
+
+func (p *Parser) parseForLoopStatement() *ast.ForLoopStatement {
+	stmt := &ast.ForLoopStatement{Token: p.curToken}
+	if p.peekTokenIs(token.DoubleLparen) {
+		return p.parseArithmeticForLoop(stmt)
+	}
+	if !p.consumeForLoopName(stmt) {
+		return nil
+	}
 	if p.peekTokenIs(token.LPAREN) {
-		p.nextToken() // consume (
-		stmt.Items = []ast.Expression{}
-		for !p.peekTokenIs(token.RPAREN) && !p.peekTokenIs(token.EOF) {
-			p.nextToken()
-			if p.curTokenIs(token.RPAREN) {
-				break
-			}
-			arg := p.parseCommandWord()
-			stmt.Items = append(stmt.Items, arg)
-		}
-		if !p.expectPeek(token.RPAREN) {
-			return nil
-		}
-
-		// Body form varies. Some Zsh code uses the pure short form
-		// (`for x (items) body`); other code mixes short-form items
-		// with a classic `do/done` body (`for x (items); do … done`).
-		// A leading `;` and `do` indicates the latter.
-		if p.peekTokenIs(token.SEMICOLON) {
-			p.nextToken()
-		}
-		if p.peekTokenIs(token.DO) {
-			p.nextToken() // onto DO
-			p.nextToken() // into body
-			stmt.Body = p.parseBlockStatement(token.DONE)
-			return stmt
-		}
-
-		// Body is a single statement on the same line (usually a
-		// command) or a braced block. Wrap non-block statements in
-		// a BlockStatement so the Body field stays homogeneous.
-		p.nextToken()
-		body := p.parseStatement()
-		if block, ok := body.(*ast.BlockStatement); ok {
-			stmt.Body = block
-		} else if body != nil {
-			stmt.Body = &ast.BlockStatement{
-				Token:      stmt.Token,
-				Statements: []ast.Statement{body},
-			}
-		}
-		return stmt
+		return p.parseShortFormForLoop(stmt)
 	}
-
 	if p.peekTokenIs(token.IN) {
-		p.nextToken()
-		stmt.Items = []ast.Expression{}
-		for !p.peekTokenIs(token.SEMICOLON) && !p.peekTokenIs(token.DO) && !p.peekTokenIs(token.EOF) &&
-			p.peekOnSameLogicalLine() {
-			p.nextToken()
-			arg := p.parseCommandWord()
-			stmt.Items = append(stmt.Items, arg)
-		}
+		p.consumeForLoopInItems(stmt)
 	}
-
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
+	return p.consumeForLoopBody(stmt)
+}
 
-	// Zsh short body form: `for x in items; { body }` replaces
-	// `do … done` with a brace block. Accept LBRACE here alongside
-	// the classic DO keyword.
-	if p.peekTokenIs(token.LBRACE) {
-		p.nextToken() // onto {
-		p.nextToken() // into body
-		stmt.Body = p.parseBlockStatement(token.RBRACE)
-		return stmt
+func (p *Parser) parseArithmeticForLoop(stmt *ast.ForLoopStatement) *ast.ForLoopStatement {
+	p.nextToken() // consume ((
+	if !p.parseArithSlot(&stmt.Init, token.SEMICOLON) {
+		return nil
 	}
-
-	// Zsh shortest body form: `for x in items <NL> body` where
-	// the body is a single statement on the next line, no `do` /
-	// `done`. Detected by peek being on a different line and not
-	// being DO / SEMICOLON / EOF.
-	if !p.peekTokenIs(token.DO) && !p.peekTokenIs(token.EOF) && !p.peekOnSameLogicalLine() {
-		p.nextToken() // onto body head
-		body := p.parseStatement()
-		if body != nil {
-			if block, ok := body.(*ast.BlockStatement); ok {
-				stmt.Body = block
-			} else {
-				stmt.Body = &ast.BlockStatement{Token: stmt.Token, Statements: []ast.Statement{body}}
-			}
-		}
-		return stmt
+	if !p.expectPeek(token.SEMICOLON) {
+		return nil
 	}
-
+	if !p.parseArithSlot(&stmt.Condition, token.SEMICOLON) {
+		return nil
+	}
+	if !p.expectPeek(token.SEMICOLON) {
+		return nil
+	}
+	if !p.parseArithSlot(&stmt.Post, token.DoubleRparen) {
+		return nil
+	}
+	if !p.expectPeek(token.DoubleRparen) {
+		return nil
+	}
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
 	if !p.expectPeek(token.DO) {
 		return nil
 	}
-
 	p.nextToken()
 	stmt.Body = p.parseBlockStatement(token.DONE)
 	return stmt
+}
+
+// parseArithSlot fills the optional init / cond / post slot of an
+// arithmetic for loop. Empty slot = peek already at terminator.
+func (p *Parser) parseArithSlot(target *ast.Expression, terminator token.Type) bool {
+	if p.peekTokenIs(terminator) {
+		return true
+	}
+	p.nextToken()
+	if p.prefixParseFns[p.curToken.Type] == nil {
+		p.noPrefixParseFnError(p.curToken.Type)
+		return false
+	}
+	*target = p.parseExpression(LOWEST)
+	return true
+}
+
+func (p *Parser) consumeForLoopName(stmt *ast.ForLoopStatement) bool {
+	if !p.peekTokenIs(token.IDENT) && !p.peekTokenIs(token.INT) {
+		p.peekError(token.IDENT)
+		return false
+	}
+	p.nextToken()
+	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	for p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.INT) {
+		p.nextToken()
+	}
+	return true
+}
+
+func (p *Parser) parseShortFormForLoop(stmt *ast.ForLoopStatement) *ast.ForLoopStatement {
+	p.nextToken() // consume (
+	stmt.Items = []ast.Expression{}
+	for !p.peekTokenIs(token.RPAREN) && !p.peekTokenIs(token.EOF) {
+		p.nextToken()
+		if p.curTokenIs(token.RPAREN) {
+			break
+		}
+		stmt.Items = append(stmt.Items, p.parseCommandWord())
+	}
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+	if p.peekTokenIs(token.DO) {
+		p.nextToken()
+		p.nextToken()
+		stmt.Body = p.parseBlockStatement(token.DONE)
+		return stmt
+	}
+	p.nextToken()
+	stmt.Body = wrapForLoopBody(stmt.Token, p.parseStatement())
+	return stmt
+}
+
+func (p *Parser) consumeForLoopInItems(stmt *ast.ForLoopStatement) {
+	p.nextToken()
+	stmt.Items = []ast.Expression{}
+	for !p.peekTokenIs(token.SEMICOLON) && !p.peekTokenIs(token.DO) &&
+		!p.peekTokenIs(token.EOF) && p.peekOnSameLogicalLine() {
+		p.nextToken()
+		stmt.Items = append(stmt.Items, p.parseCommandWord())
+	}
+}
+
+func (p *Parser) consumeForLoopBody(stmt *ast.ForLoopStatement) *ast.ForLoopStatement {
+	if p.peekTokenIs(token.LBRACE) {
+		p.nextToken()
+		p.nextToken()
+		stmt.Body = p.parseBlockStatement(token.RBRACE)
+		return stmt
+	}
+	if !p.peekTokenIs(token.DO) && !p.peekTokenIs(token.EOF) && !p.peekOnSameLogicalLine() {
+		p.nextToken()
+		stmt.Body = wrapForLoopBody(stmt.Token, p.parseStatement())
+		return stmt
+	}
+	if !p.expectPeek(token.DO) {
+		return nil
+	}
+	p.nextToken()
+	stmt.Body = p.parseBlockStatement(token.DONE)
+	return stmt
+}
+
+// wrapForLoopBody normalises a single-statement body into a
+// BlockStatement so ForLoopStatement.Body stays homogeneous.
+func wrapForLoopBody(tok token.Token, body ast.Statement) *ast.BlockStatement {
+	if body == nil {
+		return nil
+	}
+	if block, ok := body.(*ast.BlockStatement); ok {
+		return block
+	}
+	return &ast.BlockStatement{Token: tok, Statements: []ast.Statement{body}}
 }
 
 func (p *Parser) parseWhileLoopStatement() *ast.WhileLoopStatement {
@@ -1130,131 +1108,20 @@ func (p *Parser) parseDeclarationStatement() *ast.DeclarationStatement {
 	stmt := &ast.DeclarationStatement{Token: p.curToken, Command: p.curToken.Literal}
 	startLine := stmt.Token.Line
 	p.nextToken()
-
-	// Consume flags and assignments until the statement's line ends or a
-	// terminator fires. advanceOrStop is the key helper: it only moves
-	// past the current token when the next token is still part of this
-	// declaration (same line, not a terminator). When the next token is
-	// on a new line the declaration ends with curToken on its last real
-	// token so the outer block's unconditional nextToken() advances to
-	// the following statement's first token — without this guard, a
-	// declaration immediately followed by an `if` (or any statement) on
-	// the next line caused the parser to swallow the statement's leading
-	// token. Reported against oh-my-zsh / zsh-autosuggestions bodies.
-	advanceOrStop := func() bool {
-		if p.peekTokenIs(token.SEMICOLON) || p.peekTokenIs(token.EOF) {
-			return false
-		}
-		if p.peekToken.Line != startLine {
-			return false
-		}
-		p.nextToken()
-		return true
-	}
-
 	for !p.curTokenIs(token.SEMICOLON) && !p.curTokenIs(token.EOF) && p.curToken.Line == startLine {
-		// Flags (e.g. -g, -A, -r, --).
-		if p.curTokenIs(token.MINUS) || (p.curTokenIs(token.IDENT) && len(p.curToken.Literal) > 0 && p.curToken.Literal[0] == '-') {
-			stmt.Flags = append(stmt.Flags, p.curToken.Literal)
-			if !advanceOrStop() {
-				break
-			}
+		if p.declarationConsumeFlag(stmt, startLine) {
 			continue
 		}
-
-		// Identifier (optionally followed by = or += value).
-		// STRING / VARIABLE / DollarLbrace also lead here — Zsh
-		// accepts `typeset -g "$1"="$2"` where the name is the
-		// expansion of `$1`. The composite-name loop below stitches
-		// adjacent no-space parts together regardless of head kind.
-		if p.curTokenIs(token.IDENT) || p.curTokenIs(token.STRING) ||
-			p.curTokenIs(token.VARIABLE) || p.curTokenIs(token.DollarLbrace) {
-			assign := &ast.DeclarationAssignment{
-				Name: &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal},
-			}
-			// Non-trivial composite names: the parser should treat
-			// `X_{A,B}_Y`, `prefix"${1:-}"_suffix`, and
-			// `${arr[$i]}=value` as one logical name. Consume any
-			// sequence of adjacent (no preceding space) tokens that
-			// can participate in a shell-word: LBRACE expansions,
-			// STRING literals, DollarLbrace expansions, VARIABLE
-			// references, and plain IDENT suffixes.
-			for !p.peekToken.HasPrecedingSpace && p.peekToken.Line == startLine {
-				switch {
-				case p.peekTokenIs(token.LBRACE):
-					p.nextToken() // onto {
-					depth := 1
-					for depth > 0 && !p.peekTokenIs(token.EOF) {
-						p.nextToken()
-						switch {
-						case p.curTokenIs(token.LBRACE):
-							depth++
-						case p.curTokenIs(token.RBRACE):
-							depth--
-						}
-					}
-				case p.peekTokenIs(token.DollarLbrace):
-					p.nextToken() // onto ${
-					depth := 1
-					for depth > 0 && !p.peekTokenIs(token.EOF) {
-						p.nextToken()
-						switch {
-						case p.curTokenIs(token.DollarLbrace) || p.curTokenIs(token.LBRACE):
-							depth++
-						case p.curTokenIs(token.RBRACE):
-							depth--
-						}
-					}
-				case p.peekTokenIs(token.STRING):
-					p.nextToken()
-				case p.peekTokenIs(token.IDENT):
-					p.nextToken()
-				case p.peekTokenIs(token.VARIABLE):
-					p.nextToken()
-				default:
-					goto nameDone
-				}
-			}
-		nameDone:
-			// Peek the =/+= before consuming the name so we can decide
-			// whether to stay on the name token (bare declaration) or
-			// move onto the operator (value follows). An empty RHS
-			// (`typeset -g VAR=` at end-of-line) is valid Zsh and sets
-			// the variable to the empty string — do NOT try to parse
-			// the next-line token as the value, that over-consumes
-			// into the following statement exactly like the pre-
-			// declaration fix handled for bare declarations.
-			if p.peekTokenIs(token.PLUSEQ) {
-				p.nextToken() // onto +=
-				assign.IsAppend = true
-				if p.peekToken.Line == startLine && !p.peekTokenIs(token.SEMICOLON) && !p.peekTokenIs(token.EOF) {
-					p.nextToken() // onto value token
-					assign.Value = p.parseDeclarationValue()
-				}
-			} else if p.peekTokenIs(token.ASSIGN) {
-				p.nextToken() // onto =
-				if p.peekToken.Line == startLine && !p.peekTokenIs(token.SEMICOLON) && !p.peekTokenIs(token.EOF) {
-					p.nextToken() // onto value token
-					assign.Value = p.parseDeclarationValue()
-				}
-			}
-			stmt.Assignments = append(stmt.Assignments, assign)
-
-			if !advanceOrStop() {
-				break
-			}
+		if p.declarationConsumeAssignment(stmt, startLine) {
 			continue
 		}
-
 		// Unknown token inside a declaration — stop the loop so we do
 		// not skip tokens belonging to the next statement.
 		break
 	}
-
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
-
 	return stmt
 }
 
@@ -1271,6 +1138,120 @@ func (p *Parser) parseArithmeticCommand() *ast.ArithmeticCommand {
 		return nil
 	}
 	return cmd
+}
+
+// declarationAdvanceOrStop consumes one token within a declaration
+// statement. Returns false when the next token belongs to a following
+// statement (different line, terminator, or EOF) so the caller breaks
+// out of the loop without over-consuming.
+func (p *Parser) declarationAdvanceOrStop(startLine int) bool {
+	if p.peekTokenIs(token.SEMICOLON) || p.peekTokenIs(token.EOF) {
+		return false
+	}
+	if p.peekToken.Line != startLine {
+		return false
+	}
+	p.nextToken()
+	return true
+}
+
+func (p *Parser) declarationConsumeFlag(stmt *ast.DeclarationStatement, startLine int) bool {
+	if !p.declarationCurIsFlag() {
+		return false
+	}
+	stmt.Flags = append(stmt.Flags, p.curToken.Literal)
+	if !p.declarationAdvanceOrStop(startLine) {
+		return false
+	}
+	return true
+}
+
+func (p *Parser) declarationCurIsFlag() bool {
+	if p.curTokenIs(token.MINUS) {
+		return true
+	}
+	if !p.curTokenIs(token.IDENT) {
+		return false
+	}
+	return len(p.curToken.Literal) > 0 && p.curToken.Literal[0] == '-'
+}
+
+func (p *Parser) declarationConsumeAssignment(stmt *ast.DeclarationStatement, startLine int) bool {
+	if !p.declarationCurIsName() {
+		return false
+	}
+	assign := &ast.DeclarationAssignment{
+		Name: &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal},
+	}
+	p.consumeCompositeName(startLine)
+	p.consumeDeclarationValueTail(assign, startLine)
+	stmt.Assignments = append(stmt.Assignments, assign)
+	if !p.declarationAdvanceOrStop(startLine) {
+		return false
+	}
+	return true
+}
+
+func (p *Parser) declarationCurIsName() bool {
+	return p.curTokenIs(token.IDENT) || p.curTokenIs(token.STRING) ||
+		p.curTokenIs(token.VARIABLE) || p.curTokenIs(token.DollarLbrace)
+}
+
+// consumeCompositeName stitches adjacent (no preceding space) word
+// parts onto the declaration name so `prefix"${1:-}"_suffix` and
+// `${arr[$i]}` survive as one logical name.
+func (p *Parser) consumeCompositeName(startLine int) {
+	for !p.peekToken.HasPrecedingSpace && p.peekToken.Line == startLine {
+		switch {
+		case p.peekTokenIs(token.LBRACE):
+			p.nextToken()
+			p.consumeBraceTail(token.LBRACE, token.RBRACE)
+		case p.peekTokenIs(token.DollarLbrace):
+			p.nextToken()
+			p.consumeBraceTail(token.LBRACE, token.RBRACE)
+		case p.peekTokenIs(token.STRING),
+			p.peekTokenIs(token.IDENT),
+			p.peekTokenIs(token.VARIABLE):
+			p.nextToken()
+		default:
+			return
+		}
+	}
+}
+
+// consumeBraceTail walks past the matching close brace of a brace
+// or `${ … }` group, treating both forms as the same nesting kind.
+func (p *Parser) consumeBraceTail(_ token.Type, closeT token.Type) {
+	depth := 1
+	for depth > 0 && !p.peekTokenIs(token.EOF) {
+		p.nextToken()
+		switch {
+		case p.curTokenIs(token.DollarLbrace) || p.curTokenIs(token.LBRACE):
+			depth++
+		case p.curTokenIs(closeT):
+			depth--
+		}
+	}
+}
+
+func (p *Parser) consumeDeclarationValueTail(assign *ast.DeclarationAssignment, startLine int) {
+	switch {
+	case p.peekTokenIs(token.PLUSEQ):
+		p.nextToken()
+		assign.IsAppend = true
+		p.consumeAssignedValue(assign, startLine)
+	case p.peekTokenIs(token.ASSIGN):
+		p.nextToken()
+		p.consumeAssignedValue(assign, startLine)
+	}
+}
+
+func (p *Parser) consumeAssignedValue(assign *ast.DeclarationAssignment, startLine int) {
+	if p.peekToken.Line != startLine || p.peekTokenIs(token.SEMICOLON) || p.peekTokenIs(token.EOF) {
+		return
+	}
+	p.nextToken()
+	assign.Value = p.parseDeclarationValue()
 }
 
 func (p *Parser) parseDeclarationValue() ast.Expression {
