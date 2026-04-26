@@ -3,6 +3,8 @@
 package main
 
 import (
+	"bytes"
+	"flag"
 	"strings"
 	"testing"
 )
@@ -23,6 +25,43 @@ func TestWrapBreaks(t *testing.T) {
 		if len(line) > 12 {
 			t.Errorf("wrap exceeded width: %q", line)
 		}
+	}
+}
+
+func TestFlagValueType(t *testing.T) {
+	fs := flag.NewFlagSet("t", flag.ContinueOnError)
+	fs.String("s", "x", "")
+	fs.Int("i", 0, "")
+	fs.Bool("b", false, "")
+	fs.Float64("f", 0, "")
+
+	cases := map[string]string{
+		"s": "string",
+		"i": "int",
+		"b": "",
+		"f": "float",
+	}
+	for name, want := range cases {
+		f := fs.Lookup(name)
+		if got := flagValueType(f); got != want {
+			t.Errorf("flagValueType(%s) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestRenderFlag(t *testing.T) {
+	fs := flag.NewFlagSet("t", flag.ContinueOnError)
+	fs.String("config", "default.yml", "Path to the config file")
+
+	var buf bytes.Buffer
+	renderFlag(&buf, palette{}, fs.Lookup("config"))
+
+	out := buf.String()
+	if !strings.Contains(out, "-config") {
+		t.Errorf("renderFlag missing flag name: %q", out)
+	}
+	if !strings.Contains(out, "Path to the config file") {
+		t.Errorf("renderFlag missing usage text: %q", out)
 	}
 }
 
