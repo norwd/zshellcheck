@@ -1,20 +1,12 @@
 # Integrations
 
-ZShellCheck is verified against the script trees of these popular Zsh integrations.
-Every release runs a parse + lint sweep over each — no panics, no crashes, deterministic output.
-The list grows each release; the goal is 300+ integrations before v2.
-
-## Summary
-
-|   |   |
-| ---: | :--- |
-| **19** | integrations verified today |
-| **0** | panics on the current sweep |
-| **300+** | targeted before v2 — see [ROADMAP.md](ROADMAP.md) |
+ZShellCheck is verified against the script trees of widely used Zsh integrations.
+Every release runs a parse and lint sweep over each — no panics, no crashes, deterministic output.
+The list grows with every release.
 
 ## Featured
 
-The integrations we test most heavily and link from the docs.
+The integrations the project tests most heavily and links from the docs.
 
 | Integration | Category | Files |
 | :--- | :--- | ---: |
@@ -35,14 +27,14 @@ The integrations we test most heavily and link from the docs.
 | [zephyr](https://github.com/mattmc3/zephyr) | 21 |
 | [zsh-utils](https://github.com/belak/zsh-utils) | 5 |
 
-## Plugin / theme managers
+## Plugin and theme managers
 
 | Integration | Files |
 | :--- | ---: |
 | [antidote](https://github.com/mattmc3/antidote) | 24 |
 | [zinit](https://github.com/zdharma-continuum/zinit) | 9 |
 
-## Plugin / theme tooling
+## Plugin and theme tooling
 
 | Integration | Files |
 | :--- | ---: |
@@ -80,15 +72,15 @@ The integrations we test most heavily and link from the docs.
 
 ## How the sweep runs
 
-Each release tag triggers a parse + lint pass over every integration listed in the **Featured** + per-category tables above.
+Each release tag triggers a parse and lint pass over every integration listed in the **Featured** and per-category tables.
 Each pass produces:
 
 - `parse_errors` — total parser failures across the integration.
-- `violations` — total kata hits (all severities).
+- `violations` — total kata hits across all severities.
 
-A bug surfaced by the sweep gets a GitHub issue, a PR fixes it, and the integration stays in the matrix on every subsequent release.
+When the sweep surfaces a bug, a GitHub issue is filed, a PR fixes it, and the integration stays in the matrix on every subsequent release.
 
 ## Adding an integration
 
-If you maintain (or rely on) a popular Zsh integration not listed above and want it covered by every release sweep, open an issue tagged `integration` with the repo URL and a short note on what it covers.
-We add it to the next sweep and credit the request in the changelog entry.
+To get a popular Zsh integration covered, open an issue tagged `integration` with the repo URL and a short note on what it covers.
+The next sweep adds it and the changelog entry credits the request.

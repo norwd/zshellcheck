@@ -1,43 +1,46 @@
 # Install ZShellCheck
 
-ZShellCheck ships as a single static binary (≈ 2 MB).
-No runtime dependencies, no admin rights, clean uninstall on every supported platform.
+ZShellCheck ships as a single static binary, around 2 MB, with no runtime dependencies.
+Installation requires no admin rights and provides a clean uninstall on every supported platform.
 
 Skip to your platform: [macOS](#macos) · [Windows](#windows) · [Linux](#linux) · [Cross-platform](#cross-platform).
 
-Once installed, verify with `zshellcheck -version`.
+Verify the install with `zshellcheck -version`.
 The full CLI reference lives in [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
-> **Roadmap.** `brew install zshellcheck` (homebrew-core), AUR `zshellcheck-bin`, and an `.app`-free Cask are scheduled — see [ROADMAP.md → Distribution channels](ROADMAP.md#version-1x---beyond-the-milestone).
+> **Roadmap.** `brew install zshellcheck` (homebrew-core), AUR `zshellcheck-bin`, and an `.app`-free Cask are scheduled.
+> See [ROADMAP.md → Distribution channels](ROADMAP.md#version-1x---beyond-the-milestone).
 
 ---
 
 ## macOS
 
-The signed installer below covers Apple Silicon and Intel.
+The signed installer covers Apple Silicon and Intel.
 
-### Recommended — automated installer
+### Recommended: automated installer
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.sh | bash
 ```
 
-What it does:
+What the installer does:
 
 - Resolves the latest GitHub release tag.
 - Verifies the SHA-256 checksum against `checksums.txt`.
-- Verifies the cosign signature **if `cosign` is on `$PATH`** (otherwise the SHA check is the floor).
-- Drops the binary into `~/.local/bin/zshellcheck` (no `sudo` needed).
-- Adds a man page to `~/.local/share/man/man1` and shell completions to `~/.local/share/zsh/site-functions` and `~/.local/share/bash-completion/completions`.
-- Updates your shell `fpath` for completions when you accept the prompt.
+- Verifies the cosign signature when `cosign` is on `$PATH`; the SHA check is the floor when it is not.
+- Drops the binary into `~/.local/bin/zshellcheck` without `sudo`.
+- Installs a man page to `~/.local/share/man/man1` and shell completions to `~/.local/share/zsh/site-functions` and `~/.local/share/bash-completion/completions`.
+- Updates the shell `fpath` for completions when the prompt is accepted.
 
-When run as root, the same script installs to `/usr/local/bin` for system-wide use.
+Run as root and the same script installs to `/usr/local/bin` for system-wide use.
 
 ### Pin a specific version
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.sh | bash -s -- --version v1.0.16
+curl -fsSL https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.sh | bash -s -- --version vX.Y.Z
 ```
+
+Replace `vX.Y.Z` with a tag from [Releases](https://github.com/afadesigns/zshellcheck/releases/latest).
 
 ### Uninstall
 
@@ -57,28 +60,29 @@ tar -xzf zshellcheck.tar.gz
 mv zshellcheck ~/.local/bin/
 ```
 
-`uname -m` returns `arm64` on Apple Silicon and `x86_64` on Intel — both are pre-built and signed.
+`uname -m` returns `arm64` on Apple Silicon and `x86_64` on Intel.
+Both are pre-built and signed.
 The archive includes the binary, `LICENSE`, `README.md`, `CHANGELOG.md`, the man page, and shell completions.
 
 ---
 
 ## Windows
 
-The signed installer below covers x64, ARM64, and x86 (i386) without admin rights.
+The signed installer covers x64, ARM64, and x86 (i386) without admin rights.
 
-### Recommended — automated installer
+### Recommended: automated installer
 
 ```powershell
 irm https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.ps1 | iex
 ```
 
-What it does:
+What the installer does:
 
 - Resolves the latest GitHub release tag.
 - Verifies the SHA-256 checksum against `checksums.txt`.
-- Verifies the cosign signature **if `cosign.exe` is on `$PATH`** (otherwise the SHA check is the floor).
+- Verifies the cosign signature when `cosign.exe` is on `$PATH`; the SHA check is the floor when it is not.
 - Extracts the binary to `%LOCALAPPDATA%\Programs\zshellcheck\bin\zshellcheck.exe`.
-- Adds that directory to your **user** PATH (no admin, no system-wide changes).
+- Adds that directory to the user PATH without admin rights or system-wide changes.
 - Confirms the binary runs by calling `zshellcheck -version`.
 
 ### Pin a specific version
@@ -87,8 +91,10 @@ What it does:
 $ErrorActionPreference = 'Stop'
 $installer = "$env:TEMP\zshellcheck-install.ps1"
 irm https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.ps1 -OutFile $installer
-& $installer -Version v1.0.16 -Yes
+& $installer -Version vX.Y.Z -Yes
 ```
+
+Replace `vX.Y.Z` with a tag from [Releases](https://github.com/afadesigns/zshellcheck/releases/latest).
 
 ### Uninstall
 
@@ -100,24 +106,24 @@ irm https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.ps1 -O
 ```
 
 Removes `%LOCALAPPDATA%\Programs\zshellcheck` and the user PATH entry.
-Nothing else touched.
+Nothing else is touched.
 
 ### Manual archive
 
 1. Download the appropriate `zshellcheck_Windows_<arch>.zip` from [Releases](https://github.com/afadesigns/zshellcheck/releases/latest).
-2. Verify SHA-256 against `checksums.txt` (`Get-FileHash -Algorithm SHA256`).
-3. Extract `zshellcheck.exe` to a directory on your `$PATH`.
+2. Verify SHA-256 against `checksums.txt` with `Get-FileHash -Algorithm SHA256`.
+3. Extract `zshellcheck.exe` into a directory on `$PATH`.
 
 ### Inside WSL
 
-Treat as Linux — pick the matching distribution path below.
+Treat WSL as Linux and pick the matching distribution path below.
 The `install.sh` one-liner works inside WSL exactly as on native Linux.
 
 ---
 
 ## Linux
 
-ZShellCheck ships native packages for the major package managers, plus a tarball fallback.
+ZShellCheck ships native packages for every major package manager, plus a tarball fallback.
 Each release includes signed `.deb`, `.rpm`, and `.apk` artifacts alongside the tarballs.
 
 ### Debian, Ubuntu, derivatives — `.deb`
@@ -149,8 +155,8 @@ sudo rpm -i zshellcheck.rpm
 Uninstall:
 
 ```bash
-sudo dnf remove zshellcheck   # Fedora/RHEL/Rocky
-sudo zypper remove zshellcheck # openSUSE
+sudo dnf remove zshellcheck     # Fedora/RHEL/Rocky
+sudo zypper remove zshellcheck  # openSUSE
 ```
 
 ### Alpine — `.apk`
@@ -171,10 +177,11 @@ sudo apk del zshellcheck
 
 ### Arch, Manjaro, EndeavourOS — AUR
 
-The `zshellcheck-bin` AUR package is in flight (see [ROADMAP.md → Distribution channels](ROADMAP.md#version-1x---beyond-the-milestone)).
-Until it lands, use the automated installer below.
+The `zshellcheck-bin` AUR package is in flight.
+See [ROADMAP.md → Distribution channels](ROADMAP.md#version-1x---beyond-the-milestone).
+Until it lands, use the universal installer below.
 
-### Universal — automated installer
+### Universal: automated installer
 
 Works on every distribution with `bash`, `curl`, and `tar`.
 Skips the package manager.
@@ -183,10 +190,10 @@ Skips the package manager.
 curl -fsSL https://raw.githubusercontent.com/afadesigns/zshellcheck/main/install.sh | bash
 ```
 
-Installs to `~/.local/bin/zshellcheck` (or `/usr/local/bin/zshellcheck` when run as root).
-Same SHA-256 + cosign verification as macOS.
+Installs to `~/.local/bin/zshellcheck`, or `/usr/local/bin/zshellcheck` when run as root.
+Same SHA-256 and cosign verification as macOS.
 
-Pin a version: `bash -s -- --version v1.0.16`.
+Pin a version: `bash -s -- --version vX.Y.Z`.
 Uninstall: `bash -s -- --uninstall`.
 
 ### Manual archive
@@ -211,7 +218,7 @@ These channels run identically on every supported OS.
 docker run --rm -v "$PWD:/work" -w /work ghcr.io/afadesigns/zshellcheck:latest path/to/script.zsh
 ```
 
-Multi-arch image (`linux/amd64`, `linux/arm64`), `FROM scratch`, ≈ 2 MB, signed with cosign.
+Multi-arch image (`linux/amd64`, `linux/arm64`), `FROM scratch`, around 2 MB, signed with cosign.
 Use `--read-only --user 65532:65532` for hardened CI.
 
 ### Go toolchain
@@ -221,30 +228,32 @@ go install github.com/afadesigns/zshellcheck/cmd/zshellcheck@latest
 ```
 
 Builds the latest tagged release into `$GOBIN`.
-This is the only channel that requires a Go toolchain — every other channel is dependency-free.
+This channel requires a Go toolchain.
+Every other channel is dependency-free.
 
 ### GitHub Actions
 
 ```yaml
-- uses: afadesigns/zshellcheck@v1.0.16
+- uses: afadesigns/zshellcheck@latest
   with:
     args: -format sarif -severity warning ./scripts
 ```
 
-The action installs the matching release on the runner.
-Pin to a tag, never `@main`, for reproducibility.
+Pin to a tag for reproducibility.
+Replace `latest` with the tag from [Releases](https://github.com/afadesigns/zshellcheck/releases/latest); never use `@main`.
 
 ### pre-commit
 
 ```yaml
 # .pre-commit-config.yaml
 -   repo: https://github.com/afadesigns/zshellcheck
-    rev: v1.0.16
+    rev: latest
     hooks:
       - id: zshellcheck
 ```
 
-`pre-commit install` registers the hook; subsequent `git commit` invocations run ZShellCheck against staged Zsh files.
+`pre-commit install` registers the hook.
+Subsequent `git commit` invocations run ZShellCheck against staged Zsh files.
 
 ---
 
@@ -253,7 +262,6 @@ Pin to a tag, never `@main`, for reproducibility.
 Every Releases archive ships with three sibling files: `<archive>.pem` (cosign certificate), `<archive>.sig` (cosign signature), and `checksums.txt` (SHA-256 of every artifact).
 
 ```bash
-# Single-archive verification
 cosign verify-blob \
   --certificate zshellcheck_Linux_x86_64.tar.gz.pem \
   --signature   zshellcheck_Linux_x86_64.tar.gz.sig \
@@ -263,20 +271,28 @@ cosign verify-blob \
 ```
 
 The SHA-256 sum file `checksums.txt` is itself signed (`checksums.txt.pem`, `checksums.txt.sig`).
-SLSA Level 3 build provenance lives at `https://github.com/afadesigns/zshellcheck/attestations`.
+SLSA Level 3 build provenance lives at <https://github.com/afadesigns/zshellcheck/attestations>.
 
 ---
 
 ## Troubleshooting
 
-- **`zshellcheck: command not found` after install.** Open a new shell — `~/.local/bin` and `%LOCALAPPDATA%\Programs\zshellcheck\bin` are added to PATH per shell.
-  Verify the directory is on `$PATH` with `echo $PATH | tr ':' '\n' | grep zshellcheck`.
-- **`cosign not on PATH — skipping signature verification`.** Optional but recommended.
-  Install cosign from <https://github.com/sigstore/cosign>; the installer falls back to SHA-256 only.
-- **Apple Silicon vs Intel.** The installer detects `uname -m`.
-  Force a binary with `--arch arm64` or `--arch x86_64` if your shell reports a translated value (Rosetta).
-- **WSL 1 vs WSL 2.** Both run the Linux tarball.
-  WSL 1 lacks some `nfpms` post-install scriptlets — use the universal installer or the manual tarball.
+**`zshellcheck: command not found` after install.**
+Open a new shell.
+`~/.local/bin` and `%LOCALAPPDATA%\Programs\zshellcheck\bin` are added to PATH per shell.
+Verify the directory is on `$PATH` with `echo $PATH | tr ':' '\n' | grep zshellcheck`.
 
-Open a [GitHub issue](https://github.com/afadesigns/zshellcheck/issues/new) if your platform is missing or an install path fails.
-We aim to keep every channel reproducible from a clean machine in under 60 seconds.
+**`cosign not on PATH — skipping signature verification`.**
+Optional but recommended.
+Install cosign from <https://github.com/sigstore/cosign>; the installer falls back to SHA-256 only.
+
+**Apple Silicon vs Intel.**
+The installer detects `uname -m`.
+Force a binary with `--arch arm64` or `--arch x86_64` if the shell reports a translated value (Rosetta).
+
+**WSL 1 vs WSL 2.**
+Both run the Linux tarball.
+WSL 1 lacks some `nfpms` post-install scriptlets — use the universal installer or the manual tarball.
+
+Open a [GitHub issue](https://github.com/afadesigns/zshellcheck/issues/new) when a platform is missing or an install path fails.
+The goal is reproducibility from a clean machine in under 60 seconds on every channel.
