@@ -620,83 +620,66 @@ func (p *Parser) finalizeInvalidArrayAccess(exp *ast.InvalidArrayAccess) ast.Exp
 
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	lit := &ast.FunctionLiteral{Token: p.curToken}
-	// Variable / expansion as the function name:
-	// `function ${=X} { … }` declares functions named by the
-	// split words of `$X`. Skip past the matching `}` and treat
-	// the expansion as the (opaque) name.
 	if p.peekTokenIs(token.DollarLbrace) {
 		nameTok := p.peekToken
-		p.nextToken() // onto ${
-		depth := 1
-		for depth > 0 && !p.peekTokenIs(token.EOF) {
-			p.nextToken()
-			switch {
-			case p.curTokenIs(token.DollarLbrace), p.curTokenIs(token.LBRACE):
-				depth++
-			case p.curTokenIs(token.RBRACE):
-				depth--
-			}
-		}
+		p.nextToken()
+		p.skipDollarBraceBody()
 		lit.Name = &ast.Identifier{Token: nameTok, Value: nameTok.Literal}
 	}
 	if p.peekTokenIs(token.IDENT) {
 		p.nextToken()
 		lit.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-
-		// Composite function names like `function name"${1:-}"suffix() {}`
-		// appear in gitstatus and other Zsh modules that scope the
-		// function to a caller-provided suffix. Absorb any adjacent
-		// (no preceding whitespace) word-forming tokens into the name
-		// so the trailing `()` and `{` position correctly.
-		for !p.peekToken.HasPrecedingSpace {
-			switch {
-			case p.peekTokenIs(token.IDENT),
-				p.peekTokenIs(token.STRING),
-				p.peekTokenIs(token.VARIABLE):
-				p.nextToken()
-			case p.peekTokenIs(token.DollarLbrace):
-				p.nextToken() // onto ${
-				depth := 1
-				for depth > 0 && !p.peekTokenIs(token.EOF) {
-					p.nextToken()
-					switch {
-					case p.curTokenIs(token.DollarLbrace) || p.curTokenIs(token.LBRACE):
-						depth++
-					case p.curTokenIs(token.RBRACE):
-						depth--
-					}
-				}
-			default:
-				goto fnNameDone
-			}
-		}
-	fnNameDone:
+		p.consumeCompositeFunctionName()
 	}
-
-	// Multi-name definitions: `function a b c { ... }` declares the
-	// same body for each of a/b/c. oh-my-zsh's prompt_info_functions
-	// uses this pattern to stub out optional prompt hooks. Swallow
-	// any additional space-separated identifiers before the body so
-	// the parser reaches the opening `{` (or `(`) correctly; the AST
-	// keeps only the first name, which is enough for kata detection.
 	for p.peekTokenIs(token.IDENT) {
 		p.nextToken()
 	}
-
-	// Zsh/Bash allows `function name { ... }` without parens.
 	if p.peekTokenIs(token.LPAREN) {
 		p.nextToken()
 		lit.Params = p.parseFunctionParameters()
 	} else {
 		lit.Params = []*ast.Identifier{}
 	}
-
 	if !p.expectPeek(token.LBRACE) {
 		return nil
 	}
 	p.nextToken()
 	lit.Body = p.parseBlockStatement(token.RBRACE)
 	return lit
+}
+
+// skipDollarBraceBody walks past the matching `}` of a `${ … }`
+// expansion that we don't care to parse structurally.
+func (p *Parser) skipDollarBraceBody() {
+	depth := 1
+	for depth > 0 && !p.peekTokenIs(token.EOF) {
+		p.nextToken()
+		switch {
+		case p.curTokenIs(token.DollarLbrace) || p.curTokenIs(token.LBRACE):
+			depth++
+		case p.curTokenIs(token.RBRACE):
+			depth--
+		}
+	}
+}
+
+// consumeCompositeFunctionName absorbs adjacent (no preceding space)
+// IDENT / STRING / VARIABLE / `${…}` tokens onto the function name so
+// `function n${1:-}suffix() { … }` survives as a single name.
+func (p *Parser) consumeCompositeFunctionName() {
+	for !p.peekToken.HasPrecedingSpace {
+		switch {
+		case p.peekTokenIs(token.IDENT),
+			p.peekTokenIs(token.STRING),
+			p.peekTokenIs(token.VARIABLE):
+			p.nextToken()
+		case p.peekTokenIs(token.DollarLbrace):
+			p.nextToken()
+			p.skipDollarBraceBody()
+		default:
+			return
+		}
+	}
 }
 
 func (p *Parser) parseCommandSubstitution() ast.Expression {
@@ -867,99 +850,16 @@ func (p *Parser) parseRedirection(left ast.Expression) ast.Expression {
 
 func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	exp := &ast.IndexExpression{Token: p.curToken, Left: left}
-
 	p.nextToken()
-
-	// Zsh subscript flags: `arr[(R)value]`, `arr[(r)pat]`, `arr[(I)i]`,
-	// `arr[(ri)pat]`, etc. The `(flags)` tuple precedes the actual
-	// index subject and modifies how the match is performed. Consume
-	// the tuple opaquely before handing the remainder to the generic
-	// expression parser. Without this guard the `(…)` was parsed as a
-	// grouped expression, after which the subject IDENT had nowhere
-	// to land and `expectPeek(RBRACKET)` fired on that token.
 	if p.curTokenIs(token.LPAREN) {
-		depth := 1
-		for depth > 0 && !p.peekTokenIs(token.EOF) {
-			p.nextToken()
-			switch {
-			case p.curTokenIs(token.LPAREN):
-				depth++
-			case p.curTokenIs(token.RPAREN):
-				depth--
-			}
-		}
-		// Advance onto the subject after the closing paren.
-		p.nextToken()
-		// When a flag tuple was present the subject is a glob
-		// pattern (`arr[(r)*.zsh]`, `${1[(wr)^(*=*|sudo)]}`), not
-		// an arithmetic expression. Consume the remainder of the
-		// body opaquely so mixed glob alternations, negations, and
-		// nested classes don't crash the arithmetic parser. The
-		// AST keeps Index set to a placeholder; detection katas
-		// that need the raw subscript text read it from source.
-		exp.Index = &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
-		bdepth := 0
-		for !p.curTokenIs(token.EOF) {
-			switch {
-			case p.curTokenIs(token.RBRACKET):
-				if bdepth == 0 {
-					return exp
-				}
-				bdepth--
-			case p.curTokenIs(token.LBRACKET):
-				bdepth++
-			}
-			p.nextToken()
-		}
-		return exp
+		return p.parseFlaggedSubscript(exp)
 	}
-
-	prevInArithmetic := p.inArithmetic
-	p.inArithmetic = true
-	exp.Index = p.parseExpression(LOWEST)
-	p.inArithmetic = prevInArithmetic
-
-	// Array slices: `${arr[1,8]}`, `${arr[$a,$b]}`. The comma is
-	// the Zsh range separator and the second index is the slice
-	// endpoint. Skip it opaquely and consume the rest of the
-	// subscript body so expectPeek(RBRACKET) lands on the closing
-	// bracket. The AST keeps the first index in Index; detection
-	// katas that need slice info can walk source directly.
-	for p.peekTokenIs(token.COMMA) {
-		p.nextToken() // onto ,
-		p.nextToken() // onto second index token
-		_ = p.parseExpression(LOWEST)
-	}
-
-	// Zsh associative-array keys accept arbitrary tokens — keys
-	// starting with a digit (`emoji[1st_place_medal]`) tokenise as
-	// INT + IDENT, and keys with punctuation (`arr[foo-bar]`,
-	// `arr[x.y]`) split across multiple tokens. The arithmetic
-	// parse above may have already landed curToken on the closing
-	// `]` when a prefix expression's failed RHS swallowed it
-	// (e.g. `${#y[*]}`: parsePrefixExpression on `*` advanced into
-	// the RBRACKET). Only short-circuit when we're clearly at the
-	// outermost subscript's close — detected by peek being the
-	// enclosing `${…}`'s RBRACE. In nested forms like
-	// `FG[$colors[color+1]]` peek is another RBRACKET (the outer
-	// subscript's close) and we must continue to expectPeek it.
+	p.parseArithmeticSubscript(exp)
 	if p.curTokenIs(token.RBRACKET) && p.peekTokenIs(token.RBRACE) {
 		return exp
 	}
 	if !p.peekTokenIs(token.RBRACKET) {
-		bdepth := 0
-		for !p.peekTokenIs(token.EOF) {
-			p.nextToken()
-			switch {
-			case p.curTokenIs(token.LBRACKET):
-				bdepth++
-			case p.curTokenIs(token.RBRACKET):
-				if bdepth == 0 {
-					return exp
-				}
-				bdepth--
-			}
-		}
+		p.drainSubscriptBody()
 		return exp
 	}
 
@@ -968,6 +868,70 @@ func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	}
 
 	return exp
+}
+
+// parseFlaggedSubscript handles `arr[(R)pattern]` style subscripts
+// where a parenthesised flag tuple precedes a glob-pattern subject.
+func (p *Parser) parseFlaggedSubscript(exp *ast.IndexExpression) ast.Expression {
+	depth := 1
+	for depth > 0 && !p.peekTokenIs(token.EOF) {
+		p.nextToken()
+		switch {
+		case p.curTokenIs(token.LPAREN):
+			depth++
+		case p.curTokenIs(token.RPAREN):
+			depth--
+		}
+	}
+	p.nextToken()
+	exp.Index = &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+	bdepth := 0
+	for !p.curTokenIs(token.EOF) {
+		switch {
+		case p.curTokenIs(token.RBRACKET):
+			if bdepth == 0 {
+				return exp
+			}
+			bdepth--
+		case p.curTokenIs(token.LBRACKET):
+			bdepth++
+		}
+		p.nextToken()
+	}
+	return exp
+}
+
+// parseArithmeticSubscript parses the arithmetic body of a regular
+// `arr[expr]` or slice `arr[a,b]` subscript, leaving curToken on the
+// last consumed token.
+func (p *Parser) parseArithmeticSubscript(exp *ast.IndexExpression) {
+	prev := p.inArithmetic
+	p.inArithmetic = true
+	exp.Index = p.parseExpression(LOWEST)
+	p.inArithmetic = prev
+	for p.peekTokenIs(token.COMMA) {
+		p.nextToken()
+		p.nextToken()
+		_ = p.parseExpression(LOWEST)
+	}
+}
+
+// drainSubscriptBody walks forward to the matching `]`, tolerating
+// nested `[ ]` pairs that the arithmetic parser could not consume.
+func (p *Parser) drainSubscriptBody() {
+	bdepth := 0
+	for !p.peekTokenIs(token.EOF) {
+		p.nextToken()
+		switch {
+		case p.curTokenIs(token.LBRACKET):
+			bdepth++
+		case p.curTokenIs(token.RBRACKET):
+			if bdepth == 0 {
+				return
+			}
+			bdepth--
+		}
+	}
 }
 
 func (p *Parser) parseProcessSubstitution() ast.Expression {
