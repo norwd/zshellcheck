@@ -27,3 +27,17 @@ func TestPaletteEnabled(t *testing.T) {
 		t.Errorf("enabled bold missing ANSI: %q", out)
 	}
 }
+
+func TestPaletteAllAccents(t *testing.T) {
+	p := palette{enabled: true}
+	for name, fn := range map[string]func(string) string{
+		"dim":      p.dim,
+		"section":  p.section,
+		"flagName": p.flagName,
+		"link":     p.link,
+	} {
+		if got := fn("x"); !strings.Contains(got, "\x1b[") {
+			t.Errorf("%s did not emit ANSI escape: %q", name, got)
+		}
+	}
+}
