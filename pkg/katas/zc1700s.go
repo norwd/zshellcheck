@@ -733,64 +733,69 @@ func init() {
 
 func checkZC1712(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
+	if !ok || CommandIdentifier(cmd) != "vault" {
+		return nil
+	}
+	start, ok := zc1712SubcommandStart(cmd.Arguments)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-	if ident.Value != "vault" {
-		return nil
-	}
-	if len(cmd.Arguments) == 0 {
-		return nil
-	}
-
-	var start int
-	switch cmd.Arguments[0].String() {
-	case "write":
-		start = 2
-	case "kv":
-		if len(cmd.Arguments) < 2 || cmd.Arguments[1].String() != "put" {
-			return nil
-		}
-		start = 3
-	default:
-		return nil
-	}
-	if start >= len(cmd.Arguments) {
-		return nil
-	}
-
 	for _, arg := range cmd.Arguments[start:] {
 		v := arg.String()
-		eq := strings.IndexByte(v, '=')
-		if eq <= 0 {
+		key, leak, ok := zc1712LeakingPair(v)
+		if !ok {
 			continue
 		}
-		key := strings.ToLower(v[:eq])
-		val := v[eq+1:]
-		if val == "" || val == "-" || strings.HasPrefix(val, "@") {
-			continue
-		}
-		for _, secret := range zc1712SecretKeys {
-			if !strings.Contains(key, secret) {
-				continue
-			}
-			return []Violation{{
-				KataID: "ZC1712",
-				Message: "`vault " + cmd.Arguments[0].String() + " " + v + "` puts the " +
-					"secret value in argv — visible to every local user. Use " +
-					"`" + key + "=@FILE` or `" + key + "=-` to read from disk / stdin.",
-				Line:   cmd.Token.Line,
-				Column: cmd.Token.Column,
-				Level:  SeverityError,
-			}}
-		}
+		_ = leak
+		return []Violation{{
+			KataID: "ZC1712",
+			Message: "`vault " + cmd.Arguments[0].String() + " " + v + "` puts the " +
+				"secret value in argv — visible to every local user. Use " +
+				"`" + key + "=@FILE` or `" + key + "=-` to read from disk / stdin.",
+			Line:   cmd.Token.Line,
+			Column: cmd.Token.Column,
+			Level:  SeverityError,
+		}}
 	}
 	return nil
+}
+
+func zc1712SubcommandStart(args []ast.Expression) (int, bool) {
+	if len(args) == 0 {
+		return 0, false
+	}
+	switch args[0].String() {
+	case "write":
+		if 2 < len(args) {
+			return 2, true
+		}
+	case "kv":
+		if len(args) >= 2 && args[1].String() == "put" && 3 < len(args) {
+			return 3, true
+		}
+	}
+	return 0, false
+}
+
+// zc1712LeakingPair returns (lowercased key, raw value, true) when v is
+// a `key=value` pair where the key matches a secret-shaped name and
+// the value is inline (not `@file`, `-`, or empty).
+func zc1712LeakingPair(v string) (string, string, bool) {
+	eq := strings.IndexByte(v, '=')
+	if eq <= 0 {
+		return "", "", false
+	}
+	key := strings.ToLower(v[:eq])
+	val := v[eq+1:]
+	if val == "" || val == "-" || strings.HasPrefix(val, "@") {
+		return "", "", false
+	}
+	for _, secret := range zc1712SecretKeys {
+		if strings.Contains(key, secret) {
+			return key, val, true
+		}
+	}
+	return "", "", false
 }
 
 func init() {
@@ -2752,57 +2757,48 @@ func init() {
 	})
 }
 
+var zc1743ForceFlags = map[string]struct{}{"--force": {}, "-f": {}}
+
 func checkZC1743(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	tool := CommandIdentifier(cmd)
+	if !zc1743IsAuditFix(cmd, tool) {
 		return nil
 	}
+	if !HasArgFlag(cmd, zc1743ForceFlags) {
+		return nil
+	}
+	return []Violation{{
+		KataID: "ZC1743",
+		Message: "`" + tool + " audit ... --force` accepts every major-" +
+			"version bump an advisory triggers — silent breaking changes. Drop " +
+			"`--force` and triage advisories one by one.",
+		Line:   cmd.Token.Line,
+		Column: cmd.Token.Column,
+		Level:  SeverityWarning,
+	}}
+}
 
-	var matches bool
-	switch ident.Value {
+func zc1743IsAuditFix(cmd *ast.SimpleCommand, tool string) bool {
+	switch tool {
 	case "npm":
-		if len(cmd.Arguments) >= 2 && cmd.Arguments[0].String() == "audit" && cmd.Arguments[1].String() == "fix" {
-			matches = true
-		}
+		return len(cmd.Arguments) >= 2 &&
+			cmd.Arguments[0].String() == "audit" &&
+			cmd.Arguments[1].String() == "fix"
 	case "pnpm":
-		if len(cmd.Arguments) >= 2 && cmd.Arguments[0].String() == "audit" {
-			hasFix := false
-			for _, a := range cmd.Arguments[1:] {
-				if a.String() == "--fix" {
-					hasFix = true
-					break
-				}
-			}
-			if hasFix {
-				matches = true
+		if len(cmd.Arguments) < 2 || cmd.Arguments[0].String() != "audit" {
+			return false
+		}
+		for _, a := range cmd.Arguments[1:] {
+			if a.String() == "--fix" {
+				return true
 			}
 		}
-	default:
-		return nil
 	}
-	if !matches {
-		return nil
-	}
-
-	for _, arg := range cmd.Arguments {
-		if arg.String() == "--force" || arg.String() == "-f" {
-			return []Violation{{
-				KataID: "ZC1743",
-				Message: "`" + ident.Value + " audit ... --force` accepts every major-" +
-					"version bump an advisory triggers — silent breaking changes. Drop " +
-					"`--force` and triage advisories one by one.",
-				Line:   cmd.Token.Line,
-				Column: cmd.Token.Column,
-				Level:  SeverityWarning,
-			}}
-		}
-	}
-	return nil
+	return false
 }
 
 func init() {

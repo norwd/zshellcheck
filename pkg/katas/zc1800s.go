@@ -2505,44 +2505,54 @@ var zc1839DisableServices = map[string]struct{}{
 	"ntp.service":               {},
 }
 
+var (
+	zc1839FalseValues       = map[string]struct{}{"false": {}, "no": {}, "0": {}, "off": {}}
+	zc1839SystemctlActions  = map[string]struct{}{"disable": {}, "mask": {}, "stop": {}}
+)
+
 func checkZC1839(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-
-	switch ident.Value {
+	switch CommandIdentifier(cmd) {
 	case "timedatectl":
-		if len(cmd.Arguments) < 2 {
-			return nil
-		}
-		if cmd.Arguments[0].String() != "set-ntp" {
-			return nil
-		}
-		val := strings.ToLower(cmd.Arguments[1].String())
-		if val == "false" || val == "no" || val == "0" || val == "off" {
-			return zc1839Hit(cmd, "timedatectl set-ntp "+cmd.Arguments[1].String())
+		if where := zc1839TimedatectlOff(cmd); where != "" {
+			return zc1839Hit(cmd, where)
 		}
 	case "systemctl":
-		if len(cmd.Arguments) < 2 {
-			return nil
-		}
-		action := cmd.Arguments[0].String()
-		if action != "disable" && action != "mask" && action != "stop" {
-			return nil
-		}
-		for _, arg := range cmd.Arguments[1:] {
-			svc := strings.ToLower(arg.String())
-			if _, hit := zc1839DisableServices[svc]; hit {
-				return zc1839Hit(cmd, "systemctl "+action+" "+arg.String())
-			}
+		if where := zc1839SystemctlOff(cmd); where != "" {
+			return zc1839Hit(cmd, where)
 		}
 	}
 	return nil
+}
+
+func zc1839TimedatectlOff(cmd *ast.SimpleCommand) string {
+	if len(cmd.Arguments) < 2 || cmd.Arguments[0].String() != "set-ntp" {
+		return ""
+	}
+	val := strings.ToLower(cmd.Arguments[1].String())
+	if _, hit := zc1839FalseValues[val]; !hit {
+		return ""
+	}
+	return "timedatectl set-ntp " + cmd.Arguments[1].String()
+}
+
+func zc1839SystemctlOff(cmd *ast.SimpleCommand) string {
+	if len(cmd.Arguments) < 2 {
+		return ""
+	}
+	action := cmd.Arguments[0].String()
+	if _, hit := zc1839SystemctlActions[action]; !hit {
+		return ""
+	}
+	for _, arg := range cmd.Arguments[1:] {
+		if _, hit := zc1839DisableServices[strings.ToLower(arg.String())]; hit {
+			return "systemctl " + action + " " + arg.String()
+		}
+	}
+	return ""
 }
 
 func zc1839Hit(cmd *ast.SimpleCommand, where string) []Violation {
@@ -6193,37 +6203,30 @@ func init() {
 	})
 }
 
+var (
+	zc1896Runtimes        = map[string]struct{}{"docker": {}, "podman": {}}
+	zc1896RunSubcmd       = map[string]struct{}{"run": {}, "create": {}}
+	zc1896VolumeFlagsSep  = map[string]struct{}{"-v": {}, "--volume": {}, "--mount": {}}
+	zc1896VolumeFlagsKv   = []string{"--volume=", "--mount=", "-v="}
+)
+
 func checkZC1896(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	runtime := CommandIdentifier(cmd)
+	if _, hit := zc1896Runtimes[runtime]; !hit {
 		return nil
 	}
-	if ident.Value != "docker" && ident.Value != "podman" {
+	if !zc1896IsRunOrCreate(cmd.Arguments) {
 		return nil
 	}
-	args := cmd.Arguments
-	if len(args) == 0 || (args[0].String() != "run" && args[0].String() != "create") {
-		return nil
-	}
-	for i := 1; i < len(args); i++ {
-		v := args[i].String()
-		var mount string
-		switch {
-		case (v == "-v" || v == "--volume" || v == "--mount") && i+1 < len(args):
-			mount = args[i+1].String()
-		case strings.HasPrefix(v, "--volume=") || strings.HasPrefix(v, "--mount=") || strings.HasPrefix(v, "-v="):
-			mount = v[strings.Index(v, "=")+1:]
-		default:
-			continue
-		}
+	for _, mount := range zc1896CollectMounts(cmd.Arguments) {
 		if src := zc1896HostKernelSource(mount); src != "" {
 			return []Violation{{
 				KataID: "ZC1896",
-				Message: "`" + ident.Value + " ... -v " + mount + "` bind-mounts host " +
+				Message: "`" + runtime + " ... -v " + mount + "` bind-mounts host " +
 					src + " into the container — every process's `environ`/`cmdline` " +
 					"and `/proc/1/ns/` breakout handles become readable. Use " +
 					"`--cap-add=SYS_PTRACE` or host-side monitoring instead.",
@@ -6234,6 +6237,32 @@ func checkZC1896(node ast.Node) []Violation {
 		}
 	}
 	return nil
+}
+
+func zc1896IsRunOrCreate(args []ast.Expression) bool {
+	if len(args) == 0 {
+		return false
+	}
+	_, hit := zc1896RunSubcmd[args[0].String()]
+	return hit
+}
+
+func zc1896CollectMounts(args []ast.Expression) []string {
+	var out []string
+	for i := 1; i < len(args); i++ {
+		v := args[i].String()
+		if _, hit := zc1896VolumeFlagsSep[v]; hit && i+1 < len(args) {
+			out = append(out, args[i+1].String())
+			continue
+		}
+		for _, prefix := range zc1896VolumeFlagsKv {
+			if strings.HasPrefix(v, prefix) {
+				out = append(out, v[len(prefix):])
+				break
+			}
+		}
+	}
+	return out
 }
 
 func zc1896HostKernelSource(v string) string {

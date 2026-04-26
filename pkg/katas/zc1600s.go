@@ -569,64 +569,71 @@ func init() {
 	})
 }
 
+var (
+	zc1610SystemPrefixes  = []string{"/etc/", "/usr/", "/bin/", "/sbin/", "/lib/", "/lib64/", "/opt/"}
+	zc1610OutputFlagsSep  = map[string]struct{}{"-o": {}, "-O": {}, "--output": {}, "--output-document": {}}
+	zc1610OutputFlagsKv   = []string{"--output=", "--output-document="}
+)
+
 func checkZC1610(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	tool := CommandIdentifier(cmd)
+	if tool != "curl" && tool != "wget" {
 		return nil
 	}
-	if ident.Value != "curl" && ident.Value != "wget" {
+	form, path := zc1610FirstSystemWrite(cmd.Arguments)
+	if form == "" {
 		return nil
 	}
+	return []Violation{{
+		KataID: "ZC1610",
+		Message: "`" + tool + " " + form + path + "` writes " +
+			"an HTTP response straight into a system path — a compromised " +
+			"URL replaces the target. Download to a temp file, verify, " +
+			"then `install` into place.",
+		Line:   cmd.Token.Line,
+		Column: cmd.Token.Column,
+		Level:  SeverityWarning,
+	}}
+}
 
-	systemPrefixes := []string{"/etc/", "/usr/", "/bin/", "/sbin/", "/lib/", "/lib64/", "/opt/"}
-
-	for i, arg := range cmd.Arguments {
+// zc1610FirstSystemWrite returns the (form-prefix, system-path) of the
+// first argument pair that writes into a system prefix, or empty
+// strings when no such write is present.
+func zc1610FirstSystemWrite(args []ast.Expression) (form, path string) {
+	for i, arg := range args {
 		v := arg.String()
-		isOutFlag := v == "-o" || v == "-O" || v == "--output" || v == "--output-document"
-		if isOutFlag && i+1 < len(cmd.Arguments) {
-			next := cmd.Arguments[i+1].String()
-			for _, p := range systemPrefixes {
-				if strings.HasPrefix(next, p) {
-					return []Violation{{
-						KataID: "ZC1610",
-						Message: "`" + ident.Value + " " + v + " " + next + "` writes " +
-							"an HTTP response straight into a system path — a compromised " +
-							"URL replaces the target. Download to a temp file, verify, " +
-							"then `install` into place.",
-						Line:   cmd.Token.Line,
-						Column: cmd.Token.Column,
-						Level:  SeverityWarning,
-					}}
-				}
+		if _, hit := zc1610OutputFlagsSep[v]; hit && i+1 < len(args) {
+			if next := args[i+1].String(); zc1610IsSystemPath(next) {
+				return v + " ", next
 			}
 		}
-		// Handle --output=/path and --output-document=/path joined forms.
-		for _, prefix := range []string{"--output=", "--output-document="} {
-			if strings.HasPrefix(v, prefix) {
-				path := strings.TrimPrefix(v, prefix)
-				for _, p := range systemPrefixes {
-					if strings.HasPrefix(path, p) {
-						return []Violation{{
-							KataID: "ZC1610",
-							Message: "`" + ident.Value + " " + v + "` writes an HTTP " +
-								"response straight into a system path — a compromised " +
-								"URL replaces the target. Download to a temp file, " +
-								"verify, then `install` into place.",
-							Line:   cmd.Token.Line,
-							Column: cmd.Token.Column,
-							Level:  SeverityWarning,
-						}}
-					}
-				}
-			}
+		if p, hit := zc1610JoinedOutput(v); hit && zc1610IsSystemPath(p) {
+			return v, ""
 		}
 	}
-	return nil
+	return "", ""
+}
+
+func zc1610JoinedOutput(v string) (string, bool) {
+	for _, prefix := range zc1610OutputFlagsKv {
+		if strings.HasPrefix(v, prefix) {
+			return strings.TrimPrefix(v, prefix), true
+		}
+	}
+	return "", false
+}
+
+func zc1610IsSystemPath(p string) bool {
+	for _, prefix := range zc1610SystemPrefixes {
+		if strings.HasPrefix(p, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {
