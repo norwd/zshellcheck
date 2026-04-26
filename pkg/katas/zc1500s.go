@@ -426,38 +426,25 @@ func init() {
 	})
 }
 
+var (
+	zc1507SymlinkBareFlags = map[string]struct{}{
+		"-a": {}, "-l": {}, "--archive": {}, "--links": {},
+	}
+	zc1507SafeFlags = map[string]struct{}{
+		"--safe-links": {}, "--copy-unsafe-links": {},
+		"--no-links": {}, "--munge-links": {},
+	}
+)
+
 func checkZC1507(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "rsync" {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	hasSymlinkMode, hasSafe := zc1507ScanSymlinkFlags(cmd.Arguments)
+	if !hasSymlinkMode || hasSafe {
 		return nil
 	}
-	if ident.Value != "rsync" {
-		return nil
-	}
-
-	// Trigger only when rsync is actually asked to handle symlinks:
-	// -l (preserve symlinks) or -a (archive, which includes -l).
-	var hasSymlinkMode, hasSafeHandling bool
-	for _, arg := range cmd.Arguments {
-		v := arg.String()
-		if v == "-a" || v == "-l" || v == "--archive" || v == "--links" ||
-			strings.HasPrefix(v, "-a") && strings.ContainsAny(v[1:], "lavx") {
-			hasSymlinkMode = true
-		}
-		if v == "--safe-links" || v == "--copy-unsafe-links" || v == "--no-links" ||
-			v == "--munge-links" {
-			hasSafeHandling = true
-		}
-	}
-	if !hasSymlinkMode || hasSafeHandling {
-		return nil
-	}
-
 	return []Violation{{
 		KataID: "ZC1507",
 		Message: "`rsync` preserving symlinks without `--safe-links` follows ones pointing " +
@@ -467,6 +454,26 @@ func checkZC1507(node ast.Node) []Violation {
 		Column: cmd.Token.Column,
 		Level:  SeverityWarning,
 	}}
+}
+
+func zc1507ScanSymlinkFlags(args []ast.Expression) (hasSymlinkMode, hasSafe bool) {
+	for _, arg := range args {
+		v := arg.String()
+		if zc1507IsSymlinkMode(v) {
+			hasSymlinkMode = true
+		}
+		if _, hit := zc1507SafeFlags[v]; hit {
+			hasSafe = true
+		}
+	}
+	return
+}
+
+func zc1507IsSymlinkMode(v string) bool {
+	if _, hit := zc1507SymlinkBareFlags[v]; hit {
+		return true
+	}
+	return strings.HasPrefix(v, "-a") && strings.ContainsAny(v[1:], "lavx")
 }
 
 func init() {
@@ -997,39 +1004,11 @@ func init() {
 
 func checkZC1517(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "print" {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-	if ident.Value != "print" {
-		return nil
-	}
-
-	hasP := false
-	var varArg string
-	for _, arg := range cmd.Arguments {
-		v := arg.String()
-		if v == "-P" {
-			hasP = true
-			continue
-		}
-		if !hasP || varArg != "" {
-			continue
-		}
-		// Look for interpolation:  "$x" or $x (double-quoted or unquoted).
-		raw := v
-		if len(raw) >= 2 && raw[0] == '"' && raw[len(raw)-1] == '"' {
-			raw = raw[1 : len(raw)-1]
-		}
-		if strings.Contains(raw, "$") && !(len(v) >= 2 && v[0] == '\'' && v[len(v)-1] == '\'') {
-			varArg = v
-		}
-	}
-	if !hasP || varArg == "" {
+	varArg := zc1517FindPromptInterpolatedVar(cmd)
+	if varArg == "" {
 		return nil
 	}
 	return []Violation{{
@@ -1040,6 +1019,38 @@ func checkZC1517(node ast.Node) []Violation {
 		Column: cmd.Token.Column,
 		Level:  SeverityWarning,
 	}}
+}
+
+func zc1517FindPromptInterpolatedVar(cmd *ast.SimpleCommand) string {
+	hasP := false
+	for _, arg := range cmd.Arguments {
+		v := arg.String()
+		if v == "-P" {
+			hasP = true
+			continue
+		}
+		if !hasP {
+			continue
+		}
+		if zc1517IsInterpolated(v) {
+			return v
+		}
+	}
+	return ""
+}
+
+func zc1517IsInterpolated(v string) bool {
+	raw := v
+	if len(raw) >= 2 && raw[0] == '"' && raw[len(raw)-1] == '"' {
+		raw = raw[1 : len(raw)-1]
+	}
+	if !strings.Contains(raw, "$") {
+		return false
+	}
+	if len(v) >= 2 && v[0] == '\'' && v[len(v)-1] == '\'' {
+		return false
+	}
+	return true
 }
 
 func init() {
@@ -4055,52 +4066,47 @@ func init() {
 
 func checkZC1574(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "git" {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	args := zc1464StringArgs(cmd)
+	if !zc1574HasCredentialStore(args) {
 		return nil
 	}
-	if ident.Value != "git" {
-		return nil
-	}
+	return []Violation{{
+		KataID: "ZC1574",
+		Message: "`git credential.helper store` saves credentials in plaintext — " +
+			"backups leak the token. Use platform helper (manager-core / " +
+			"libsecret) or `cache --timeout=<sec>`.",
+		Line:   cmd.Token.Line,
+		Column: cmd.Token.Column,
+		Level:  SeverityWarning,
+	}}
+}
 
-	args := make([]string, 0, len(cmd.Arguments))
-	for _, a := range cmd.Arguments {
-		args = append(args, a.String())
-	}
-
-	// git config [scope] credential.helper store
+func zc1574HasCredentialStore(args []string) bool {
 	for i, a := range args {
 		if a != "config" {
 			continue
 		}
-		// Walk past optional scope flag.
 		j := i + 1
 		for j < len(args) && strings.HasPrefix(args[j], "--") && args[j] != "--" {
 			j++
 		}
-		if j+1 < len(args) && args[j] == "credential.helper" {
-			v := args[j+1]
-			// Accept bare `store` or quoted `store --file=...`.
-			if v == "store" || strings.HasPrefix(v, "store ") ||
-				strings.Contains(v, "store --file=") ||
-				strings.Contains(v, "'store") || strings.Contains(v, "\"store") {
-				return []Violation{{
-					KataID: "ZC1574",
-					Message: "`git credential.helper store` saves credentials in plaintext — " +
-						"backups leak the token. Use platform helper (manager-core / " +
-						"libsecret) or `cache --timeout=<sec>`.",
-					Line:   cmd.Token.Line,
-					Column: cmd.Token.Column,
-					Level:  SeverityWarning,
-				}}
-			}
+		if j+1 < len(args) && args[j] == "credential.helper" && zc1574IsStoreValue(args[j+1]) {
+			return true
 		}
 	}
-	return nil
+	return false
+}
+
+func zc1574IsStoreValue(v string) bool {
+	if v == "store" || strings.HasPrefix(v, "store ") {
+		return true
+	}
+	return strings.Contains(v, "store --file=") ||
+		strings.Contains(v, "'store") ||
+		strings.Contains(v, "\"store")
 }
 
 func init() {

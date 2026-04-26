@@ -525,59 +525,54 @@ func (l *Lexer) readAngleBracket(isLeft bool) token.Token {
 // lets real scripts parse cleanly; detection katas that care about
 // heredoc content can walk source directly.
 func (l *Lexer) consumeHeredocBody() {
-	// Skip trailing `-` (strip-tabs flavour) and intervening
-	// whitespace to land on the delimiter's first byte.
-	pos := l.readPosition
-	if pos < len(l.input) && l.input[pos] == '-' {
-		pos++
-	}
-	for pos < len(l.input) && (l.input[pos] == ' ' || l.input[pos] == '\t') {
-		pos++
-	}
+	pos := skipHeredocPrefix(l.input, l.readPosition)
 	if pos >= len(l.input) {
 		return
 	}
-	// Pull the delimiter word. Accept quoted and backslash-escaped
-	// forms by stripping those characters but using the literal
-	// body as the match target. When no plausible delimiter is
-	// present, leave the lexer alone.
 	delim, delimEnd := extractHeredocDelim(l.input, pos)
 	if delim == "" {
 		return
 	}
-	// Scan forward to the first byte after a line consisting of
-	// just the delimiter (optionally indented by tabs for `<<-`).
+	if closer := findHeredocCloser(l.input, delim, delimEnd); closer >= 0 {
+		l.fastForwardTo(closer)
+	}
+}
+
+// skipHeredocPrefix advances past the optional `-` strip-tabs marker
+// and any whitespace between `<<` and the delimiter word.
+func skipHeredocPrefix(input string, pos int) int {
+	if pos < len(input) && input[pos] == '-' {
+		pos++
+	}
+	for pos < len(input) && (input[pos] == ' ' || input[pos] == '\t') {
+		pos++
+	}
+	return pos
+}
+
+// findHeredocCloser locates the line whose body matches delim
+// (optionally indented by tabs for `<<-`) and returns the byte index
+// of the newline that ends that closer line, or -1 when no closer
+// is found.
+func findHeredocCloser(input, delim string, delimEnd int) int {
 	i := delimEnd
-	// Walk to the first newline that starts the body.
-	for i < len(l.input) && l.input[i] != '\n' {
+	for i < len(input) && input[i] != '\n' {
 		i++
 	}
-	// Loop over lines until we find one equal to the delimiter.
-	for i < len(l.input) {
-		// Step past the newline to the next line's first byte.
+	for i < len(input) {
 		i++
-		lineStart := i
-		// Allow leading tabs for `<<-` form.
-		for i < len(l.input) && l.input[i] == '\t' {
+		for i < len(input) && input[i] == '\t' {
 			i++
 		}
-		lineBodyStart := i
-		// Advance to end of line.
-		for i < len(l.input) && l.input[i] != '\n' {
+		bodyStart := i
+		for i < len(input) && input[i] != '\n' {
 			i++
 		}
-		// Compare the (possibly tab-stripped) line body against
-		// the delimiter.
-		if l.input[lineBodyStart:i] == delim {
-			// Consume through to just after this closer line's
-			// newline (or EOF). Update position state.
-			_ = lineStart
-			l.fastForwardTo(i)
-			return
+		if input[bodyStart:i] == delim {
+			return i
 		}
 	}
-	// Delimiter never found; leave lexer state alone so the caller
-	// continues as if no heredoc was detected.
+	return -1
 }
 
 // extractHeredocDelim scans a heredoc delimiter word starting at

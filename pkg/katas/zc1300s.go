@@ -3696,59 +3696,64 @@ func init() {
 // contain `HISTORY_IGNORE`, so the rewrite is idempotent on a re-run.
 // Span covers only the bare name occurrences inside the argument
 // string; surrounding `=value` / quoting stays byte-identical.
+var zc1380PrintCmds = map[string]struct{}{
+	"echo": {}, "print": {}, "printf": {}, "export": {},
+}
+
 func fixZC1380(node ast.Node, _ Violation, source []byte) []FixEdit {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-	if ident.Value != "echo" && ident.Value != "print" && ident.Value != "printf" && ident.Value != "export" {
+	if _, hit := zc1380PrintCmds[CommandIdentifier(cmd)]; !hit {
 		return nil
 	}
 	var edits []FixEdit
 	for _, arg := range cmd.Arguments {
-		v := arg.String()
-		if !strings.Contains(v, "HISTIGNORE") || strings.Contains(v, "HISTORY_IGNORE") {
-			continue
-		}
-		tok := arg.TokenLiteralNode()
-		argOff := LineColToByteOffset(source, tok.Line, tok.Column)
-		if argOff < 0 {
-			continue
-		}
-		// Verify the argument literal sits at this offset before
-		// scanning. Some quote shapes alter the start byte; bail on
-		// mismatch rather than risk a misaligned splice.
-		if argOff+len(v) > len(source) || string(source[argOff:argOff+len(v)]) != v {
-			continue
-		}
-		// Replace every occurrence of the bare name inside the arg.
-		idx := 0
-		for {
-			rel := strings.Index(v[idx:], "HISTIGNORE")
-			if rel < 0 {
-				break
-			}
-			absStart := argOff + idx + rel
-			line, col := offsetLineColZC1380(source, absStart)
-			if line > 0 {
-				edits = append(edits, FixEdit{
-					Line:    line,
-					Column:  col,
-					Length:  len("HISTIGNORE"),
-					Replace: "HISTORY_IGNORE",
-				})
-			}
-			idx += rel + len("HISTIGNORE")
-		}
+		edits = append(edits, zc1380ArgEdits(arg, source)...)
 	}
 	if len(edits) == 0 {
 		return nil
 	}
 	return edits
+}
+
+func zc1380ArgEdits(arg ast.Expression, source []byte) []FixEdit {
+	v := arg.String()
+	if !strings.Contains(v, "HISTIGNORE") || strings.Contains(v, "HISTORY_IGNORE") {
+		return nil
+	}
+	tok := arg.TokenLiteralNode()
+	argOff := LineColToByteOffset(source, tok.Line, tok.Column)
+	if argOff < 0 {
+		return nil
+	}
+	if argOff+len(v) > len(source) || string(source[argOff:argOff+len(v)]) != v {
+		return nil
+	}
+	return zc1380BuildEdits(source, v, argOff)
+}
+
+func zc1380BuildEdits(source []byte, v string, argOff int) []FixEdit {
+	var edits []FixEdit
+	idx := 0
+	for {
+		rel := strings.Index(v[idx:], "HISTIGNORE")
+		if rel < 0 {
+			return edits
+		}
+		absStart := argOff + idx + rel
+		line, col := offsetLineColZC1380(source, absStart)
+		if line > 0 {
+			edits = append(edits, FixEdit{
+				Line:    line,
+				Column:  col,
+				Length:  len("HISTIGNORE"),
+				Replace: "HISTORY_IGNORE",
+			})
+		}
+		idx += rel + len("HISTIGNORE")
+	}
 }
 
 func offsetLineColZC1380(source []byte, offset int) (int, int) {

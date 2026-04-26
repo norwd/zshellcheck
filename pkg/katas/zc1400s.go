@@ -4955,38 +4955,46 @@ func init() {
 	})
 }
 
+var (
+	zc1493ZeroValues = map[string]struct{}{
+		"0": {}, "0.0": {}, "0.00": {}, ".0": {}, ".00": {},
+	}
+	zc1493ZeroJoinedFlags = map[string]struct{}{
+		"-n0": {}, "-n0.0": {},
+		"--interval=0": {}, "--interval=0.0": {},
+	}
+)
+
 func checkZC1493(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || CommandIdentifier(cmd) != "watch" {
 		return nil
 	}
+	if hit := zc1493FindZeroInterval(cmd); hit != "" {
+		return zc1493Violation(cmd, hit)
+	}
+	return nil
+}
 
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return nil
-	}
-	if ident.Value != "watch" {
-		return nil
-	}
-
-	var prevN bool
+func zc1493FindZeroInterval(cmd *ast.SimpleCommand) string {
+	prevN := false
 	for _, arg := range cmd.Arguments {
 		v := arg.String()
 		if prevN {
 			prevN = false
-			if v == "0" || v == "0.0" || v == "0.00" || v == ".0" || v == ".00" {
-				return zc1493Violation(cmd, v)
+			if _, hit := zc1493ZeroValues[v]; hit {
+				return v
 			}
 		}
 		if v == "-n" || v == "--interval" {
 			prevN = true
 			continue
 		}
-		if v == "-n0" || v == "-n0.0" || v == "--interval=0" || v == "--interval=0.0" {
-			return zc1493Violation(cmd, v)
+		if _, hit := zc1493ZeroJoinedFlags[v]; hit {
+			return v
 		}
 	}
-	return nil
+	return ""
 }
 
 func zc1493Violation(cmd *ast.SimpleCommand, what string) []Violation {
@@ -5286,20 +5294,16 @@ func init() {
 	})
 }
 
+var zc1499Runtimes = map[string]struct{}{"docker": {}, "podman": {}, "nerdctl": {}}
+
 func checkZC1499(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
 		return nil
 	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
+	if _, hit := zc1499Runtimes[CommandIdentifier(cmd)]; !hit {
 		return nil
 	}
-	if ident.Value != "docker" && ident.Value != "podman" && ident.Value != "nerdctl" {
-		return nil
-	}
-
 	if len(cmd.Arguments) < 2 {
 		return nil
 	}
@@ -5307,36 +5311,39 @@ func checkZC1499(node ast.Node) []Violation {
 	if sub != "pull" && sub != "run" {
 		return nil
 	}
+	if ref := zc1499UnpinnedRef(cmd.Arguments[1:]); ref != "" {
+		return zc1499Violation(cmd, ref)
+	}
+	return nil
+}
 
-	// Find the image reference — for `pull` it is the first non-flag arg; for
-	// `run` it is also typically the first non-flag non-option arg. Bail as
-	// soon as we hit an image-looking token.
-	for _, arg := range cmd.Arguments[1:] {
+func zc1499UnpinnedRef(args []ast.Expression) string {
+	for _, arg := range args {
 		v := arg.String()
 		if strings.HasPrefix(v, "-") || strings.Contains(v, "=") {
 			continue
 		}
-		// Digest pin — explicit immutable reference.
 		if strings.Contains(v, "@sha256:") || strings.Contains(v, "@sha512:") {
-			return nil
+			return ""
 		}
-		// Has a tag — flag only if tag is `latest`.
-		if colon := strings.LastIndex(v, ":"); colon != -1 {
-			tag := v[colon+1:]
-			// Skip port-looking refs like localhost:5000 — not a tag.
-			if strings.Contains(tag, "/") {
-				// registry-with-port, no tag present → unpinned
-				return zc1499Violation(cmd, v)
-			}
-			if tag == "latest" {
-				return zc1499Violation(cmd, v)
-			}
-			return nil
-		}
-		// No colon, no @ — bare image means implicit `:latest`.
-		return zc1499Violation(cmd, v)
+		return zc1499ClassifyImageRef(v)
 	}
-	return nil
+	return ""
+}
+
+func zc1499ClassifyImageRef(v string) string {
+	colon := strings.LastIndex(v, ":")
+	if colon == -1 {
+		return v
+	}
+	tag := v[colon+1:]
+	if strings.Contains(tag, "/") {
+		return v
+	}
+	if tag == "latest" {
+		return v
+	}
+	return ""
 }
 
 func zc1499Violation(cmd *ast.SimpleCommand, ref string) []Violation {
