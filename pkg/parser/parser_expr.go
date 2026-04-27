@@ -1072,9 +1072,20 @@ func (p *Parser) parseProcessSubstitution() ast.Expression {
 	// subsequent `;` separators were crashing as "expected ), got ;".
 	statements := []ast.Statement{}
 	for !p.curTokenIs(token.RPAREN) && !p.curTokenIs(token.EOF) {
+		if p.curTokenIs(token.SEMICOLON) {
+			p.nextToken()
+			continue
+		}
 		stmt := p.parseStatement()
 		if stmt != nil {
 			statements = append(statements, stmt)
+		}
+		// Brace-form / case statements advance past their own
+		// terminator and set consumedBraceTerminator. Skipping the
+		// trailing nextToken keeps the next statement's head live.
+		if p.consumedBraceTerminator {
+			p.consumedBraceTerminator = false
+			continue
 		}
 		p.nextToken()
 	}
