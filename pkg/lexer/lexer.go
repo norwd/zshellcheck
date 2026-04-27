@@ -53,6 +53,13 @@ type Lexer struct {
 	// so that `(( x = $((1+1)) + 2 ))` emits two inner RPARENs for
 	// the `$(` + `(` pair and a final DoubleRparen for the outer `((`.
 	parenStack []byte
+
+	// lastEmittedType is the type of the last token NextToken returned.
+	// Used by readOpenParen to suppress `((` fusion when the previous
+	// token's value position rules out an arithmetic command head
+	// (e.g. `_os=$_sys*~*((alt|alt))` is a glob, not arith).
+	lastEmittedType     token.Type
+	lastEmittedHadSpace bool
 }
 
 func New(input string) *Lexer {
@@ -111,6 +118,8 @@ func (l *Lexer) NextToken() (tok token.Token) {
 		if prevSuppress && tok.Type != token.DOLLAR_LPAREN {
 			l.suppressLparenFusion = false
 		}
+		l.lastEmittedType = tok.Type
+		l.lastEmittedHadSpace = tok.HasPrecedingSpace
 	}()
 	hasSpace := l.skipWhitespace()
 	if shebang, ok := l.tryShebangOrComment(hasSpace); ok {
@@ -152,6 +161,42 @@ func (l *Lexer) tryShebangOrComment(hasSpace bool) (token.Token, bool) {
 		return l.NextToken(), true
 	}
 	return token.Token{}, false
+}
+
+// atArithCommandPos reports whether the upcoming `((` should fuse
+// into DoubleLparen (treated as arithmetic command head) rather than
+// being two separate `(` opens. The previous emitted token determines
+// statement-head context: only after a separator-like token can `((`
+// open arithmetic. Mid-word `*((` (glob alternation) and assignment
+// RHS like `=((` are left as plain LPAREN+LPAREN so the parser can
+// route them to glob / grouped-expression paths.
+func (l *Lexer) atArithCommandPos() bool {
+	switch l.lastEmittedType {
+	// Empty (start-of-input) and statement-separator contexts open
+	// a new statement: `((` here is arithmetic.
+	case "", token.SEMICOLON, token.DSEMI, token.AMPERSAND,
+		token.AND, token.OR, token.PIPE, token.BANG,
+		token.LBRACE, token.LPAREN, token.DoubleLparen,
+		token.LDBRACKET, token.If, token.THEN, token.ELSE, token.ELIF,
+		token.DO, token.WHILE, token.FOR, token.CASE,
+		token.LET, token.RETURN:
+		return true
+	}
+	// A space-separated `((` after a value-like token is also a
+	// statement head (e.g. `cmd ; (( … ))` after a newline/space —
+	// the preceding token is whatever ended the previous statement).
+	return l.lastEmittedHadSpace && l.lastTokenIsValueTerminator()
+}
+
+func (l *Lexer) lastTokenIsValueTerminator() bool {
+	// Tokens that conventionally terminate a value/expression and
+	// allow a fresh statement to follow without a separator.
+	switch l.lastEmittedType {
+	case token.RBRACE, token.RPAREN, token.RBRACKET, token.RDBRACKET,
+		token.DoubleRparen, token.Fi, token.DONE, token.ESAC:
+		return true
+	}
+	return false
 }
 
 // inArithmetic reports whether the lexer is currently inside a `((`
@@ -318,7 +363,7 @@ func (l *Lexer) readSemicolonLead() token.Token {
 
 func (l *Lexer) readOpenParen() token.Token {
 	defer func() { l.suppressLparenFusion = false }()
-	if l.peekChar() == '(' && !l.suppressLparenFusion && !l.inArithmetic() {
+	if l.peekChar() == '(' && !l.suppressLparenFusion && !l.inArithmetic() && l.atArithCommandPos() {
 		tok := l.readFusedToken(token.DoubleLparen)
 		l.parenStack = append(l.parenStack, 'D')
 		return tok
