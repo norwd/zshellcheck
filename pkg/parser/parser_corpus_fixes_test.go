@@ -2,7 +2,11 @@
 // Copyright the ZShellCheck contributors.
 package parser
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/afadesigns/zshellcheck/pkg/lexer"
+)
 
 // Regression tests for parser gaps surfaced by the pinned integration
 // corpora. Each input is a minimal form of a construct that previously
@@ -41,4 +45,39 @@ func TestParseFunctionNameWithPositional(t *testing.T) {
 	// A `function` name can glue in a positional parameter, e.g.
 	// `function _$0_fmt() { … }` (the lexer emits `$0` as DOLLAR + INT).
 	parseSourceClean(t, "function _$0_fmt() {\n  echo hi\n}\n")
+}
+
+// Exercise every operand form the character-code prefix operator accepts,
+// plus the bare-`#` fallback when no operand is glued on.
+func TestParseArithmeticCharCodeOperandForms(t *testing.T) {
+	cases := []string{
+		"(( #name ))\n", // IDENT operand
+		"(( #$var ))\n", // VARIABLE operand
+		"(( ##c ))\n",   // nested HASH operand
+		"(( #${x} ))\n", // ${…} operand
+		"(( #0 ))\n",    // INT operand
+		"(( #>0 ))\n",   // no operand: bare `#` then `>` (fallback)
+		"(( # > 0 ))\n", // bare `#` with spacing
+	}
+	for _, src := range cases {
+		parseSourceClean(t, src)
+	}
+}
+
+// Malformed C-style for headers exercise the error-return paths of
+// parseArithForHeader (a missing `;` or closing `))`). The parser must
+// record an error and not panic; the program value is irrelevant here.
+func TestParseArithmeticForLoopMalformed(t *testing.T) {
+	cases := []string{
+		"for ((i=0 i<3; i++)); do :; done\n", // missing first `;`
+		"for ((i=0; i<3 i++)); do :; done\n", // missing second `;`
+		"for ((i=0; i<3; i++ do :; done\n",   // missing closing `))`
+	}
+	for _, src := range cases {
+		p := New(lexer.New(src))
+		p.ParseProgram()
+		if len(p.Errors()) == 0 {
+			t.Fatalf("expected a parser error for malformed for-header %q", src)
+		}
+	}
 }
