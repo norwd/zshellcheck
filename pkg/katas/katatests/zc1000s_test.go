@@ -1444,6 +1444,27 @@ func TestZC1043(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Regression for #1332 — an inline env-var prefix scopes the
+			// assignment to the following command; it is not a global.
+			name:     "env-prefix on a command is not flagged",
+			input:    "myfunc() { DEBUG=true echo \"foo\"; }",
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "multiple env-prefix assignments are not flagged",
+			input:    "myfunc() { A=1 B=2 mycmd; }",
+			expected: []katas.Violation{},
+		},
+		{
+			// A `;` ends the assignment, so it is a standalone global
+			// and must still be flagged.
+			name:  "semicolon-separated assignment is still flagged",
+			input: "myfunc() { DEBUG=true; echo foo; }",
+			expected: []katas.Violation{
+				{KataID: "ZC1043", Message: "Variable 'DEBUG' is assigned without 'local'. It will be global. Use `local DEBUG=true`.", Line: 1, Column: 12},
+			},
+		},
 	}
 
 	for _, tt := range tests {

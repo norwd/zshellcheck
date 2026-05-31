@@ -9,6 +9,33 @@ import (
 	"github.com/afadesigns/zshellcheck/pkg/lexer"
 )
 
+// TestParseEnvPrefixAssignmentFlag locks the #1332 fix: an assignment
+// that prefixes a command on the same line is marked EnvPrefix, while a
+// standalone assignment (or one ended by `;`) is not.
+func TestParseEnvPrefixAssignmentFlag(t *testing.T) {
+	cases := []struct {
+		src  string
+		want bool
+	}{
+		{"DEBUG=true echo foo\n", true},   // inline env-var prefix
+		{"x+=1 mycmd\n", true},            // `+=` prefix form
+		{"DEBUG=true\n", false},           // standalone assignment
+		{"DEBUG=true; echo foo\n", false}, // `;` ends the assignment
+		{"echo foo\n", false},             // not an assignment at all
+		{"a[0]=1 echo foo\n", false},      // indexed LHS is not a plain name
+	}
+	for _, tc := range cases {
+		prog := New(lexer.New(tc.src)).ParseProgram()
+		es, ok := prog.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf("%q: statement 0 is %T, want *ast.ExpressionStatement", tc.src, prog.Statements[0])
+		}
+		if es.EnvPrefix != tc.want {
+			t.Errorf("%q: EnvPrefix = %v, want %v", tc.src, es.EnvPrefix, tc.want)
+		}
+	}
+}
+
 func TestParseForLoopArithmeticConditionOnly(t *testing.T) {
 	parseSourceClean(t, "for ((i=0; i<3; )) do echo $i; done\n")
 }

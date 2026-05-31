@@ -697,11 +697,30 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.curToken}
 	stmt.Expression = p.parseExpression(LOWEST)
+	stmt.EnvPrefix = p.isEnvPrefixAssignment(stmt.Expression)
 
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 	return stmt
+}
+
+// isEnvPrefixAssignment reports whether the just-parsed expression is a
+// bare `NAME=value` assignment that prefixes a command on the same line
+// — the Zsh inline env-var prefix `NAME=value cmd …`. The parser does
+// not fuse the prefix into the command (the command parses as the next
+// statement); this flag lets scope-oriented katas tell a command-scoped
+// prefix from a persistent global assignment. A trailing `;`, newline,
+// or block close means it is a standalone assignment, not a prefix.
+func (p *Parser) isEnvPrefixAssignment(expr ast.Expression) bool {
+	inf, ok := expr.(*ast.InfixExpression)
+	if !ok || (inf.Operator != "=" && inf.Operator != "+=") {
+		return false
+	}
+	if _, ok := inf.Left.(*ast.Identifier); !ok {
+		return false
+	}
+	return p.peekToken.Line == p.curToken.Line && p.peekStartsArgPrefix()
 }
 
 func (p *Parser) parseIfStatement() *ast.IfStatement {

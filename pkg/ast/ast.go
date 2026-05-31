@@ -98,6 +98,11 @@ func (rs *ReturnStatement) String() string {
 type ExpressionStatement struct {
 	Token      token.Token // the first token of the expression
 	Expression Expression  // expression node
+	// EnvPrefix marks an assignment that prefixes a command on the same
+	// line (Zsh inline env-var prefix, e.g. `DEBUG=true echo foo`). Such
+	// an assignment is scoped to the following command, not a persistent
+	// global, so scope-oriented katas (ZC1043) skip it.
+	EnvPrefix bool
 }
 
 func (es *ExpressionStatement) statementNode()                {}
