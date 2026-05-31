@@ -2486,6 +2486,12 @@ func zc1043UnscopedAssign(n ast.Node, locals map[string]bool) (Violation, bool) 
 	if !ok {
 		return Violation{}, false
 	}
+	// A Zsh inline env-var prefix (`DEBUG=true echo foo`) scopes the
+	// assignment to the following command — it is not a persistent
+	// global, so it must not be flagged.
+	if exprStmt.EnvPrefix {
+		return Violation{}, false
+	}
 	assign, ok := exprStmt.Expression.(*ast.InfixExpression)
 	if !ok || assign.Operator != "=" {
 		return Violation{}, false

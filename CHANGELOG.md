@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Parser: four Zsh word forms surfaced by the corpus sweep now parse cleanly — the arithmetic for-loop comma operator (`for ((i=0, j=1; i<j; i++, j--))`), concatenated `case` subjects (`case $a/$b in`, `case ${a}:${b} in`), the character-code prefix operator in arithmetic (`(( #name ))`, `(( ##c ))`), and function names that glue in a positional parameter (`function _$0_fmt()`).
 - Parser-corpus sweep: the glob list splits without pathname expansion, so a pattern such as `_*` reaches `find` literally instead of matching files in the repository root.
+- ZC1043 no longer flags an inline env-var prefix (`DEBUG=true echo foo`) as a missing-`local` global — the assignment is scoped to the following command, not a persistent global. A standalone `DEBUG=true` (or one ended by `;`) is still flagged. Reported by @eeweegh. (#1332)
 
 ## [1.0.17] - 2026-04-30
 
