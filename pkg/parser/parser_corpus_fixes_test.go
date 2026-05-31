@@ -72,6 +72,9 @@ func TestParseArithmeticForLoopMalformed(t *testing.T) {
 		"for ((i=0 i<3; i++)); do :; done\n", // missing first `;`
 		"for ((i=0; i<3 i++)); do :; done\n", // missing second `;`
 		"for ((i=0; i<3; i++ do :; done\n",   // missing closing `))`
+		"for ((&&; i<3; i++)); do :; done\n", // init slot opens on a non-operand
+		"for ((i=0; &&; i++)); do :; done\n", // cond slot opens on a non-operand
+		"for ((i=0; i<3; &&)); do :; done\n", // post slot opens on a non-operand
 	}
 	for _, src := range cases {
 		p := New(lexer.New(src))
