@@ -23,6 +23,20 @@ func TestParseLetQuotedExpression(t *testing.T) {
 	parseSourceClean(t, "let \"x = 1\" \"y = 2\"\n")
 }
 
+// Zsh short function form: the `function` keyword plus `()` followed
+// by a single command with no `{ … }` block (zshmisc, FUNCTIONS).
+func TestParseFunctionLiteralBracelessBody(t *testing.T) {
+	parseSourceClean(t, "function zgen() zgenom \"$@\"\n")
+}
+
+func TestParseFunctionLiteralBracelessBodyNoParens(t *testing.T) {
+	parseSourceClean(t, "function gr() grep -n\n")
+}
+
+func TestParseFunctionLiteralBracelessCompoundBody(t *testing.T) {
+	parseSourceClean(t, "function loop() for x in 1 2; do echo $x; done\n")
+}
+
 func TestParseFunctionLiteralNoParens(t *testing.T) {
 	parseSourceClean(t, "function name { echo hi; }\n")
 }

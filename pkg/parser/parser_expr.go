@@ -985,11 +985,23 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 	} else {
 		lit.Params = []*ast.Identifier{}
 	}
-	if !p.expectPeek(token.LBRACE) {
-		return nil
+	if p.peekTokenIs(token.LBRACE) {
+		p.nextToken() // onto `{`
+		p.nextToken() // into the body
+		lit.Body = p.parseBlockStatement(token.RBRACE)
+		return lit
 	}
-	p.nextToken()
-	lit.Body = p.parseBlockStatement(token.RBRACE)
+	// Zsh short function form (zshmisc, FUNCTIONS): the body may be a
+	// single command instead of a `{ … }` block, e.g.
+	// `function zgen() zgenom "$@"`. The keyword-less `name() cmd`
+	// path already allows this; mirror it by wrapping the single
+	// statement so FunctionLiteral.Body stays a *BlockStatement.
+	p.nextToken() // onto the body's first token
+	body := &ast.BlockStatement{Token: p.curToken}
+	if stmt := p.parseStatement(); stmt != nil {
+		body.Statements = []ast.Statement{stmt}
+	}
+	lit.Body = body
 	return lit
 }
 
