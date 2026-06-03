@@ -65,6 +65,16 @@ func TestParseForLoopBraceStyle(t *testing.T) {
 	parseSourceClean(t, "for f in *.zsh; { echo $f }\n")
 }
 
+// Zsh short for-loop: a `;`-separated single-command body, no do/done
+// (SHORT_LOOPS, on by default). zsh-lazyload and zsh-bench use it.
+func TestParseForLoopShortFormSemicolon(t *testing.T) {
+	parseSourceClean(t, "for cmd in a b; eval \"echo $cmd\"\n")
+}
+
+func TestParseForLoopShortFormPrint(t *testing.T) {
+	parseSourceClean(t, "for c in a b; print -r -- $c\n")
+}
+
 func TestParseForLoopArithmeticHeader(t *testing.T) {
 	parseSourceClean(t, "for ((i=0; i<3; i++)); do echo $i; done\n")
 }

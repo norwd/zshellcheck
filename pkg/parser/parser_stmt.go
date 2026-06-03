@@ -1172,10 +1172,12 @@ func (p *Parser) parseForLoopStatement() *ast.ForLoopStatement {
 	if p.peekTokenIs(token.IN) {
 		p.consumeForLoopInItems(stmt)
 	}
+	sepSeen := false
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
+		sepSeen = true
 	}
-	return p.consumeForLoopBody(stmt)
+	return p.consumeForLoopBody(stmt, sepSeen)
 }
 
 func (p *Parser) parseArithmeticForLoop(stmt *ast.ForLoopStatement) *ast.ForLoopStatement {
@@ -1298,14 +1300,19 @@ func (p *Parser) consumeForLoopInItems(stmt *ast.ForLoopStatement) {
 	}
 }
 
-func (p *Parser) consumeForLoopBody(stmt *ast.ForLoopStatement) *ast.ForLoopStatement {
+func (p *Parser) consumeForLoopBody(stmt *ast.ForLoopStatement, sepSeen bool) *ast.ForLoopStatement {
 	if p.peekTokenIs(token.LBRACE) {
 		p.nextToken()
 		p.nextToken()
 		stmt.Body = p.parseBlockStatement(token.RBRACE)
 		return stmt
 	}
-	if !p.peekTokenIs(token.DO) && !p.peekTokenIs(token.EOF) && !p.peekOnSameLogicalLine() {
+	// Short for-loop (SHORT_LOOPS, on by default): a braceless single
+	// command body follows a `;` separator (sepSeen) or a newline (peek
+	// on a new logical line), e.g. `for x in a b; print $x`. Without
+	// sepSeen, a same-line `;`-separated body fell through to the `do`
+	// expectation and errored.
+	if !p.peekTokenIs(token.DO) && !p.peekTokenIs(token.EOF) && (sepSeen || !p.peekOnSameLogicalLine()) {
 		p.nextToken()
 		stmt.Body = wrapForLoopBody(stmt.Token, p.parseStatement())
 		return stmt
