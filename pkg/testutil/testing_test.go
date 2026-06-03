@@ -23,6 +23,19 @@ func TestCheck_WithViolations(t *testing.T) {
 	_ = violations
 }
 
+func TestCheckAll_RunsEveryKata(t *testing.T) {
+	// `echo -E` with an expansion fires several echo-related katas at once.
+	all := CheckAll(`echo -E "$x"`)
+	if len(all) == 0 {
+		t.Fatal("expected CheckAll to return violations for `echo -E \"$x\"`")
+	}
+	// CheckAll must be a superset of any single-kata Check on the same input.
+	single := Check(`echo -E "$x"`, "ZC1092")
+	if len(all) < len(single) {
+		t.Errorf("CheckAll returned fewer violations than a single-kata Check: %d < %d", len(all), len(single))
+	}
+}
+
 func TestAssertViolations_Matching(t *testing.T) {
 	actual := []katas.Violation{
 		{KataID: "ZC1001", Message: "test msg", Line: 1, Column: 1},

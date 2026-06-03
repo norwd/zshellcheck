@@ -7,7 +7,7 @@
 Static analysis and auto-fix for the setopts, hooks, and globs Bash never learned.
 
 [![CI](https://github.com/afadesigns/zshellcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/afadesigns/zshellcheck/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v1.0.18-blue)](https://github.com/afadesigns/zshellcheck/releases/latest)
+[![Release](https://img.shields.io/badge/release-v1.1.0-blue)](https://github.com/afadesigns/zshellcheck/releases/latest)
 [![Marketplace](https://img.shields.io/badge/Marketplace-ZshellCheck%20v1-2ea44f?logo=githubactions&logoColor=white)](https://github.com/marketplace/actions/zshellcheck-v1)
 [![Auto-fix](https://img.shields.io/badge/auto--fix-137%20katas-2ea44f)](KATAS.md)
 [![Go Report](https://goreportcard.com/badge/github.com/afadesigns/zshellcheck)](https://goreportcard.com/report/github.com/afadesigns/zshellcheck)
@@ -76,12 +76,30 @@ Trailing, preceding, and file-wide forms are documented in [USER_GUIDE.md](docs/
 
 ### CI/CD
 
+The published action checks out your repository, installs a signed release binary, runs it, and fails the job on any finding.
+Add the SARIF upload to surface results in the repository Security tab:
+
 ```yaml
 # .github/workflows/lint.yml
-- uses: afadesigns/zshellcheck@latest
-  with:
-    args: -format sarif -severity warning ./scripts
+name: zshellcheck
+on: [push, pull_request]
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  zshellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: afadesigns/zshellcheck@latest
+        with:
+          args: -format sarif -severity warning ./scripts > zshellcheck.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: zshellcheck.sarif
 ```
+
+Run it as a pre-commit hook instead:
 
 ```yaml
 # .pre-commit-config.yaml
@@ -91,20 +109,31 @@ Trailing, preceding, and file-wide forms are documented in [USER_GUIDE.md](docs/
       - id: zshellcheck
 ```
 
-Pin to an exact tag for reproducible CI by replacing `latest` with the tag from [Releases](https://github.com/afadesigns/zshellcheck/releases/latest).
+Pin `@latest` and `rev: latest` to a tag from [Releases](https://github.com/afadesigns/zshellcheck/releases/latest) for reproducible CI.
 
 ## Integrations
 
 ZShellCheck is verified against widely used Zsh frameworks, plugin managers, plugins, and prompts on every release.
+Each runs a parse-and-findings sweep: zero parser errors, zero crashes, and kata findings locked to a reviewed baseline.
 The full catalog with file counts lives in [INTEGRATIONS.md](INTEGRATIONS.md).
 
 | Category | Examples |
 | :--- | :--- |
 | Frameworks | [oh-my-zsh](https://github.com/ohmyzsh/ohmyzsh), [prezto](https://github.com/sorin-ionescu/prezto), [prezto-contrib](https://github.com/belak/prezto-contrib), [zephyr](https://github.com/mattmc3/zephyr), [zimfw](https://github.com/zimfw/zimfw) |
 | Plugin managers | [antidote](https://github.com/mattmc3/antidote), [zinit](https://github.com/zdharma-continuum/zinit) |
-| Plugins | [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting), [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions), [zsh-autocomplete](https://github.com/marlonrichert/zsh-autocomplete), [zsh-help](https://github.com/Freed-Wu/zsh-help) |
+| Plugins | [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting), [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions), [zsh-autocomplete](https://github.com/marlonrichert/zsh-autocomplete), [atuin](https://github.com/atuinsh/atuin), [zsh-help](https://github.com/Freed-Wu/zsh-help) |
 | Prompts | [powerlevel10k](https://github.com/romkatv/powerlevel10k), [spaceship-prompt](https://github.com/spaceship-prompt/spaceship-prompt), [starship](https://github.com/starship/starship), [gitstatus](https://github.com/romkatv/gitstatus) |
 | Tooling | [fzf](https://github.com/junegunn/fzf), [fzf-tab](https://github.com/Aloxaf/fzf-tab), [fast-syntax-highlighting](https://github.com/zdharma-continuum/fast-syntax-highlighting) |
+
+## Quality
+
+Every release replays the linter over the pinned integration corpora and gates on two snapshots:
+
+- Parser errors and crashes stay at zero.
+- Kata findings match a reviewed baseline; a new finding on known-good code fails the build as a candidate false positive.
+
+Semantic-preserving rewrites — added blank lines, comments, or variable renames — must not change which katas fire.
+See the [local checks](CONTRIBUTING.md#local-checks) for the commands.
 
 ## Documentation
 

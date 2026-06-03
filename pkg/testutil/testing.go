@@ -44,6 +44,30 @@ func Check(code string, kataID string) []katas.Violation {
 	return result
 }
 
+// CheckAll runs every registered kata over the parsed source and returns all
+// violations. It is the all-katas counterpart to Check, used by the metamorphic
+// format-invariance test to assert that the set of findings is stable under
+// semantic-preserving rewrites.
+func CheckAll(code string) []katas.Violation {
+	l := lexer.New(code)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	var violations []katas.Violation
+	ast.Walk(program, func(node ast.Node) bool {
+		if node == nil {
+			return true
+		}
+		if katasForNode, ok := katas.Registry.KatasByNodeType()[fmt.Sprintf("%T", node)]; ok {
+			for _, kata := range katasForNode {
+				violations = append(violations, kata.Check(node)...)
+			}
+		}
+		return true
+	})
+	return violations
+}
+
 func AssertViolations(t *testing.T, code string, actual []katas.Violation, expected []katas.Violation) {
 	t.Helper()
 

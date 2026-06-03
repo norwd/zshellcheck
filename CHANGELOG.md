@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-03
+
+### Added
+- 50 upstream corpora pinned into the parser sweep matrix (19 → 69), each zero-parse-error and panic-free at the pinned commit. Selected by stargazer count from the most-used Zsh integrations not already covered. The baseline stays empty.
+  - Plugins: atuin, navi, autojump, mcfly, forgit, git-open, git-flow-completion, zsh-nvm, zsh-z, zsh-histdb, git-extra-commands, alias-tips, zsh-abbr, zsh-autoenv, wd, zsh-autopair, zaw, zsh-notify, zsh-better-npm-completion, zsh-defer, zsh-fzf-history-search, zsh-bd, emoji-cli, zsh-interactive-cd, zsh-completion-generator, zsh-shift-select, zsh-hist, zsh-edit, zsh-256color, history-search-multi-word, zsh-dircolors-solarized, zsh-eza, zsh-vimode-visual, zcolors, zhooks, zsh-colored-man-pages, zsh-navigation-tools.
+  - Prompts: typewritten, agkozak-zsh-prompt, bullet-train, geometry, purer, minimal.
+  - Plugin managers: zgen, zsh-snap, zpm, zcomet.
+  - Tooling: F-Sy-H, fzf-zsh-plugin, zsh-async.
+- False-positive ratchet: `scripts/violation-corpus-sweep.sh` snapshots per-file, per-kata findings on the pinned corpora into `.github/violation-baseline.txt` and fails CI when a finding appears, disappears, or changes count. A finding on code already reviewed as clean is a candidate false positive; a vanished finding is a candidate coverage regression. The same snapshot-diff pattern backs shellcheck, Ruff, clippy, and semgrep. Runs in the corpus sweep CI job beside the parser-error gate.
+- Metamorphic format-invariance test (`pkg/katas/katatests/metamorphic_test.go`): leading and trailing blank lines, whole-line comments, and neutral variable renames must not change which katas fire. Catches position- and spelling-sensitive detections.
+
 ## [1.0.18] - 2026-06-01
 
 ### Added
