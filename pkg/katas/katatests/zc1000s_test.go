@@ -3158,6 +3158,37 @@ func TestZC1075(t *testing.T) {
 				},
 			},
 		},
+		{
+			// The RHS of an assignment word given to an assignment
+			// builtin is not glob/split-expanded in Zsh.
+			name:     "export assignment word is not glob-subject",
+			input:    `export FOO=$BAR`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "readonly assignment word is not glob-subject",
+			input:    `readonly R=$S`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "integer assignment word is not glob-subject",
+			input:    `integer n=$m`,
+			expected: []katas.Violation{},
+		},
+		{
+			// A bare name argument (no `=`) to export is a normal
+			// argument and remains flagged.
+			name:  "export of a dynamic name is still flagged",
+			input: `export $dynamic`,
+			expected: []katas.Violation{
+				{
+					KataID:  "ZC1075",
+					Message: "Unquoted variable expansion '$dynamic' is subject to globbing. Quote it: \"$dynamic\".",
+					Line:    1,
+					Column:  8,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

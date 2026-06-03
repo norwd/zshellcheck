@@ -5190,6 +5190,44 @@ func init() {
 	})
 }
 
+// zc1075IsAssignmentBuiltin reports whether name is a Zsh builtin that
+// takes assignment words whose RHS is not glob/split-expanded.
+func zc1075IsAssignmentBuiltin(name ast.Expression) bool {
+	id, ok := name.(*ast.Identifier)
+	if !ok {
+		return false
+	}
+	switch id.Value {
+	case "export", "local", "readonly", "integer", "float", "typeset", "declare":
+		return true
+	}
+	return false
+}
+
+// zc1075IsAssignmentWord reports whether arg is an assignment word
+// (`NAME=...`). The `=` between the name and the value is carried by a
+// literal part of the concatenation — an Identifier (`FOO=`) or, more
+// commonly, a StringLiteral (`FOO` + `=` + `$BAR`).
+func zc1075IsAssignmentWord(arg ast.Expression) bool {
+	concat, ok := arg.(*ast.ConcatenatedExpression)
+	if !ok {
+		return false
+	}
+	for _, part := range concat.Parts {
+		switch p := part.(type) {
+		case *ast.Identifier:
+			if strings.Contains(p.Value, "=") {
+				return true
+			}
+		case *ast.StringLiteral:
+			if strings.Contains(p.Value, "=") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func checkZC1075(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
@@ -5198,7 +5236,19 @@ func checkZC1075(node ast.Node) []Violation {
 
 	violations := []Violation{}
 
+	isAssignBuiltin := zc1075IsAssignmentBuiltin(cmd.Name)
+
 	for _, arg := range cmd.Arguments {
+		// The RHS of an assignment word passed to an assignment builtin
+		// (`export FOO=$BAR`, `local X=$Y`, `readonly`, `integer`,
+		// `float`) is not subject to globbing or word splitting in Zsh,
+		// so it is not a glob hazard. Skip such assignment-word args —
+		// they were flagged inconsistently with the plain `foo=$BAR`
+		// form, which the kata already leaves alone.
+		if isAssignBuiltin && zc1075IsAssignmentWord(arg) {
+			continue
+		}
+
 		// Check if argument is a simple identifier starting with $
 		// or a braced expression ${...} that is NOT inside a string literal.
 		// The parser might wrap these in different ways.

@@ -9,7 +9,7 @@ agkozak-prompt/lib/async.zsh	ZC1017	1
 agkozak-prompt/lib/async.zsh	ZC1043	1
 agkozak-prompt/lib/async.zsh	ZC1065	1
 agkozak-prompt/lib/async.zsh	ZC1069	4
-agkozak-prompt/lib/async.zsh	ZC1075	12
+agkozak-prompt/lib/async.zsh	ZC1075	11
 agkozak-prompt/lib/async.zsh	ZC1079	1
 agkozak-prompt/lib/async.zsh	ZC1085	1
 agkozak-prompt/lib/async.zsh	ZC1134	1
@@ -71,7 +71,6 @@ atuin/atuin.plugin.zsh	ZC1107	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1010	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1043	6
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1067	1
-atuin/crates/atuin/src/shell/atuin.zsh	ZC1075	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1076	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1097	1
 autojump/bin/autojump.zsh	ZC1044	1
@@ -185,7 +184,7 @@ fzf-tab/fzf-tab.zsh	ZC1043	1
 fzf-tab/fzf-tab.zsh	ZC1045	1
 fzf-tab/fzf-tab.zsh	ZC1046	1
 fzf-tab/fzf-tab.zsh	ZC1069	15
-fzf-tab/fzf-tab.zsh	ZC1075	7
+fzf-tab/fzf-tab.zsh	ZC1075	6
 fzf-tab/fzf-tab.zsh	ZC1079	2
 fzf-tab/fzf-tab.zsh	ZC1083	1
 fzf-tab/fzf-tab.zsh	ZC1085	1
@@ -265,7 +264,7 @@ gitstatus/gitstatus.plugin.zsh	ZC1001	9
 gitstatus/gitstatus.plugin.zsh	ZC1043	3
 gitstatus/gitstatus.plugin.zsh	ZC1045	1
 gitstatus/gitstatus.plugin.zsh	ZC1069	12
-gitstatus/gitstatus.plugin.zsh	ZC1075	104
+gitstatus/gitstatus.plugin.zsh	ZC1075	80
 gitstatus/gitstatus.plugin.zsh	ZC1079	3
 gitstatus/gitstatus.plugin.zsh	ZC1085	1
 gitstatus/gitstatus.plugin.zsh	ZC1086	10
@@ -318,7 +317,7 @@ minimal/minimal.zsh	ZC1030	2
 minimal/minimal.zsh	ZC1037	2
 minimal/minimal.zsh	ZC1045	9
 minimal/minimal.zsh	ZC1046	1
-minimal/minimal.zsh	ZC1075	12
+minimal/minimal.zsh	ZC1075	9
 minimal/minimal.zsh	ZC1076	1
 minimal/minimal.zsh	ZC1083	2
 minimal/minimal.zsh	ZC1085	4
@@ -444,7 +443,6 @@ prezto/modules/gnu-utility/init.zsh	ZC1186	1
 prezto/modules/gpg/init.zsh	ZC1001	1
 prezto/modules/gpg/init.zsh	ZC1046	1
 prezto/modules/gpg/init.zsh	ZC1053	1
-prezto/modules/gpg/init.zsh	ZC1075	1
 prezto/modules/gpg/init.zsh	ZC1086	1
 prezto/modules/gpg/init.zsh	ZC1098	1
 prezto/modules/gpg/init.zsh	ZC1125	1
@@ -585,7 +583,7 @@ spaceship/async.zsh	ZC1017	1
 spaceship/async.zsh	ZC1043	1
 spaceship/async.zsh	ZC1065	1
 spaceship/async.zsh	ZC1069	4
-spaceship/async.zsh	ZC1075	12
+spaceship/async.zsh	ZC1075	11
 spaceship/async.zsh	ZC1079	1
 spaceship/async.zsh	ZC1085	1
 spaceship/async.zsh	ZC1134	1
@@ -748,7 +746,7 @@ typewritten/async.zsh	ZC1017	1
 typewritten/async.zsh	ZC1043	1
 typewritten/async.zsh	ZC1065	1
 typewritten/async.zsh	ZC1069	4
-typewritten/async.zsh	ZC1075	12
+typewritten/async.zsh	ZC1075	11
 typewritten/async.zsh	ZC1079	1
 typewritten/async.zsh	ZC1085	1
 typewritten/async.zsh	ZC1134	1
@@ -971,7 +969,7 @@ zephyr/plugins/environment/environment.plugin.zsh	ZC1875	1
 zephyr/plugins/environment/environment.plugin.zsh	ZC1946	1
 zephyr/plugins/environment/environment.plugin.zsh	ZC1995	1
 zephyr/plugins/helper/helper.plugin.zsh	ZC1001	4
-zephyr/plugins/helper/helper.plugin.zsh	ZC1075	4
+zephyr/plugins/helper/helper.plugin.zsh	ZC1075	3
 zephyr/plugins/helper/helper.plugin.zsh	ZC1076	1
 zephyr/plugins/helper/helper.plugin.zsh	ZC1085	1
 zephyr/plugins/helper/helper.plugin.zsh	ZC1086	12
@@ -1094,7 +1092,7 @@ zinit/zinit-autoload.zsh	ZC1065	1
 zinit/zinit-autoload.zsh	ZC1069	201
 zinit/zinit-autoload.zsh	ZC1071	1
 zinit/zinit-autoload.zsh	ZC1073	1
-zinit/zinit-autoload.zsh	ZC1075	63
+zinit/zinit-autoload.zsh	ZC1075	58
 zinit/zinit-autoload.zsh	ZC1079	3
 zinit/zinit-autoload.zsh	ZC1083	2
 zinit/zinit-autoload.zsh	ZC1085	13
@@ -1130,7 +1128,7 @@ zinit/zinit-install.zsh	ZC1064	5
 zinit/zinit-install.zsh	ZC1069	160
 zinit/zinit-install.zsh	ZC1071	2
 zinit/zinit-install.zsh	ZC1073	1
-zinit/zinit-install.zsh	ZC1075	119
+zinit/zinit-install.zsh	ZC1075	95
 zinit/zinit-install.zsh	ZC1079	3
 zinit/zinit-install.zsh	ZC1083	2
 zinit/zinit-install.zsh	ZC1085	7
@@ -1154,7 +1152,7 @@ zinit/zinit-side.zsh	ZC1001	5
 zinit/zinit-side.zsh	ZC1030	1
 zinit/zinit-side.zsh	ZC1037	1
 zinit/zinit-side.zsh	ZC1069	24
-zinit/zinit-side.zsh	ZC1075	13
+zinit/zinit-side.zsh	ZC1075	11
 zinit/zinit-side.zsh	ZC1083	1
 zinit/zinit-side.zsh	ZC1085	7
 zinit/zinit-side.zsh	ZC1091	2
@@ -1174,7 +1172,7 @@ zinit/zinit.zsh	ZC1046	12
 zinit/zinit.zsh	ZC1064	1
 zinit/zinit.zsh	ZC1069	143
 zinit/zinit.zsh	ZC1071	2
-zinit/zinit.zsh	ZC1075	77
+zinit/zinit.zsh	ZC1075	76
 zinit/zinit.zsh	ZC1076	1
 zinit/zinit.zsh	ZC1083	1
 zinit/zinit.zsh	ZC1085	8
@@ -1247,7 +1245,7 @@ zsh-async/async_test.zsh	ZC1004	4
 zsh-async/async_test.zsh	ZC1017	1
 zsh-async/async_test.zsh	ZC1043	1
 zsh-async/async_test.zsh	ZC1069	7
-zsh-async/async_test.zsh	ZC1075	11
+zsh-async/async_test.zsh	ZC1075	9
 zsh-async/async_test.zsh	ZC1079	9
 zsh-async/async_test.zsh	ZC1083	5
 zsh-async/async_test.zsh	ZC1085	3
@@ -1259,7 +1257,7 @@ zsh-async/async.zsh	ZC1017	1
 zsh-async/async.zsh	ZC1043	1
 zsh-async/async.zsh	ZC1065	1
 zsh-async/async.zsh	ZC1069	4
-zsh-async/async.zsh	ZC1075	12
+zsh-async/async.zsh	ZC1075	11
 zsh-async/async.zsh	ZC1079	1
 zsh-async/async.zsh	ZC1085	1
 zsh-async/async.zsh	ZC1134	1
@@ -1310,7 +1308,7 @@ zsh-completion-generator/zsh-completion-generator.plugin.zsh	ZC1069	2
 zsh-completion-generator/zsh-completion-generator.plugin.zsh	ZC1075	2
 zsh-defer/zsh-defer.plugin.zsh	ZC1001	3
 zsh-defer/zsh-defer.plugin.zsh	ZC1069	1
-zsh-defer/zsh-defer.plugin.zsh	ZC1075	12
+zsh-defer/zsh-defer.plugin.zsh	ZC1075	10
 zsh-defer/zsh-defer.plugin.zsh	ZC1079	1
 zsh-defer/zsh-defer.plugin.zsh	ZC1085	1
 zsh-defer/zsh-defer.plugin.zsh	ZC1086	5
@@ -1379,7 +1377,6 @@ zsh-navigation-tools/zsh-navigation-tools.plugin.zsh	ZC1076	2
 zsh-navigation-tools/zsh-navigation-tools.plugin.zsh	ZC1186	4
 zsh-notify/notify.plugin.zsh	ZC1030	1
 zsh-notify/notify.plugin.zsh	ZC1055	1
-zsh-notify/notify.plugin.zsh	ZC1075	1
 zsh-notify/notify.plugin.zsh	ZC1076	1
 zsh-notify/notify.plugin.zsh	ZC1086	6
 zsh-notify/notify.plugin.zsh	ZC1092	1
@@ -1408,7 +1405,7 @@ zsh-utils/history/history.plugin.zsh	ZC1075	1
 zsh-utils/history/history.plugin.zsh	ZC1186	1
 zsh-utils/utility/utility.plugin.zsh	ZC1001	7
 zsh-utils/utility/utility.plugin.zsh	ZC1049	22
-zsh-utils/utility/utility.plugin.zsh	ZC1075	2
+zsh-utils/utility/utility.plugin.zsh	ZC1075	1
 zsh-utils/utility/utility.plugin.zsh	ZC1086	1
 zsh-utils/utility/utility.plugin.zsh	ZC1105	1
 zsh-utils/utility/utility.plugin.zsh	ZC1186	1
@@ -1427,7 +1424,7 @@ zsh-vi-mode/zsh-vi-mode.zsh	ZC1059	1
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1065	2
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1071	3
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1073	12
-zsh-vi-mode/zsh-vi-mode.zsh	ZC1075	164
+zsh-vi-mode/zsh-vi-mode.zsh	ZC1075	142
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1079	27
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1080	1
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1085	11
@@ -1454,7 +1451,7 @@ zsh-z/zsh-z.plugin.zsh	ZC1044	1
 zsh-z/zsh-z.plugin.zsh	ZC1045	2
 zsh-z/zsh-z.plugin.zsh	ZC1049	1
 zsh-z/zsh-z.plugin.zsh	ZC1069	9
-zsh-z/zsh-z.plugin.zsh	ZC1075	7
+zsh-z/zsh-z.plugin.zsh	ZC1075	6
 zsh-z/zsh-z.plugin.zsh	ZC1076	1
 zsh-z/zsh-z.plugin.zsh	ZC1078	1
 zsh-z/zsh-z.plugin.zsh	ZC1079	1
