@@ -3887,73 +3887,38 @@ func TestZC1085(t *testing.T) {
 		input    string
 		expected []katas.Violation
 	}{
+		// Unquoted array iteration is the correct Zsh idiom — quoting
+		// would collapse the array into one word — so the rule no
+		// longer warns on any of these forms.
 		{
-			name:     "valid quoted array expansion",
+			name:     "unquoted array iteration is correct and not flagged",
+			input:    `for i in $items; do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "unquoted array access not flagged",
+			input:    `for i in ${items[@]}; do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "unquoted command substitution not flagged",
+			input:    `for i in $(ls); do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "mixed literal and unquoted not flagged",
+			input:    `for i in start $items end; do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "quoted forms remain clean",
 			input:    `for i in "${items[@]}"; do echo $i; done`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:     "valid quoted variable expansion",
-			input:    `for i in "$items"; do echo $i; done`,
-			expected: []katas.Violation{},
-		},
-		{
-			name:     "valid glob expansion",
+			name:     "glob expansion not flagged",
 			input:    `for i in *.txt; do echo $i; done`,
 			expected: []katas.Violation{},
-		},
-		{
-			name:     "valid command substitution (quoted)",
-			input:    `for i in "$(ls)"; do echo $i; done`,
-			expected: []katas.Violation{},
-		},
-		{
-			name:  "invalid unquoted variable expansion",
-			input: `for i in $items; do echo $i; done`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1085",
-					Message: "Unquoted variable expansion in for loop. This will split on IFS (usually space). Quote it to iterate over lines or array elements.",
-					Line:    1,
-					Column:  10,
-				},
-			},
-		},
-		{
-			name:  "invalid unquoted array expansion",
-			input: `for i in ${items[@]}; do echo $i; done`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1085",
-					Message: "Unquoted variable expansion in for loop. This will split on IFS (usually space). Quote it to iterate over lines or array elements.",
-					Line:    1,
-					Column:  10,
-				},
-			},
-		},
-		{
-			name:  "invalid unquoted command substitution",
-			input: `for i in $(ls); do echo $i; done`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1085",
-					Message: "Unquoted variable expansion in for loop. This will split on IFS (usually space). Quote it to iterate over lines or array elements.",
-					Line:    1,
-					Column:  10,
-				},
-			},
-		},
-		{
-			name:  "invalid mixed unquoted",
-			input: `for i in start $items end; do echo $i; done`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1085",
-					Message: "Unquoted variable expansion in for loop. This will split on IFS (usually space). Quote it to iterate over lines or array elements.",
-					Line:    1,
-					Column:  16,
-				},
-			},
 		},
 	}
 

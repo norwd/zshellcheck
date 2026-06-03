@@ -42,7 +42,6 @@ func TestOffsetLineColHelpers(t *testing.T) {
 		offsetLineColZC1078,
 		offsetLineColZC1079,
 		offsetLineColZC1084,
-		offsetLineColZC1085,
 		offsetLineColZC1086,
 		offsetLineColZC1091,
 		offsetLineColZC1126,
