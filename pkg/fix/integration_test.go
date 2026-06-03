@@ -127,6 +127,17 @@ let counter=counter+1
 	}
 }
 
+func TestFixIntegration_ZC1013_LetCompoundAssign(t *testing.T) {
+	// A compound assignment operator must survive the rewrite. The
+	// operator is the run of arithmetic characters before `=`, so
+	// `index+=1` becomes `(( index += 1 ))`, not `(( index+ = 1 ))`.
+	src := "let index+=1\n"
+	want := "(( index += 1 ))\n"
+	if got := runFix(t, src); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestFixIntegration_ZC1004_ExitToReturn(t *testing.T) {
 	src := `foo() {
   if [[ -z "$1" ]]; then

@@ -665,11 +665,16 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
-	if !p.expectPeek(token.ASSIGN) {
+	// Zsh `let` evaluates arithmetic expressions, so the target may use
+	// any compound assignment operator (`+=`, `-=`, `*=`, `<<=`, ...),
+	// which the lexer fuses to token.PLUSEQ, not only plain `=`.
+	if !p.peekTokenIs(token.ASSIGN) && !p.peekTokenIs(token.PLUSEQ) {
+		p.peekError(token.ASSIGN)
 		return nil
 	}
+	p.nextToken() // move onto the assignment operator
 
-	p.nextToken() // consume '='
+	p.nextToken() // consume the operator
 
 	prevInArithmetic := p.inArithmetic
 	p.inArithmetic = true

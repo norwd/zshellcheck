@@ -1012,14 +1012,36 @@ func fixZC1013(node ast.Node, v Violation, source []byte) []FixEdit {
 	if eq < 0 {
 		return nil
 	}
-	name := body[:eq]
+	// Honour a compound assignment operator (`+=`, `-=`, `*=`, `<<=`,
+	// ...): the operator is the run of arithmetic operator characters
+	// immediately preceding the `=`, so `i+=1` rewrites to
+	// `(( i += 1 ))`, not the broken `(( i+ = 1 ))`. A plain `=`
+	// leaves `op` as `"="`, preserving the original output byte-exact.
+	opStart := eq
+	for opStart > 0 && isArithAssignOpChar(body[opStart-1]) {
+		opStart--
+	}
+	name := body[:opStart]
+	op := body[opStart : eq+1]
 	rhs := body[eq+1:]
 	return []FixEdit{{
 		Line:    v.Line,
 		Column:  v.Column,
 		Length:  end - start,
-		Replace: "(( " + name + " = " + rhs + " ))",
+		Replace: "(( " + name + " " + op + " " + rhs + " ))",
 	}}
+}
+
+// isArithAssignOpChar reports whether b can form part of a Zsh compound
+// arithmetic assignment operator immediately before the `=` (e.g. the
+// `+` in `+=`, or the two `<` in `<<=`).
+func isArithAssignOpChar(b byte) bool {
+	switch b {
+	case '+', '-', '*', '/', '%', '&', '^', '|', '<', '>':
+		return true
+	default:
+		return false
+	}
 }
 
 func checkZC1013(node ast.Node) []Violation {
