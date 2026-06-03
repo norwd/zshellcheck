@@ -22,3 +22,53 @@ prezto	73ae7f11280adcc061c15ebb2f494954c2cc8a38	https://github.com/sorin-ionescu
 spaceship	19cf56d7bf8ca65b160c540dff35e8691da53ebf	https://github.com/spaceship-prompt/spaceship-prompt.git	*.zsh *.zsh-theme
 autosuggestions	85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5	https://github.com/zsh-users/zsh-autosuggestions.git	*.zsh
 completions	dbaeafd96c3fd9d84c8540f6d87c6b37c4c9173d	https://github.com/zsh-users/zsh-completions.git	*.zsh
+F-Sy-H	e9f6487a654ae870154fd9e3384853f37ae01087	https://github.com/z-shell/F-Sy-H.git	*.zsh
+agkozak-prompt	2055c42a6e2f5bdc6e8dc4b453b0084ced3f471a	https://github.com/agkozak/agkozak-zsh-prompt.git	*.zsh *.plugin.zsh
+alias-tips	41cb143ccc3b8cc444bf20257276cb43275f65c4	https://github.com/djui/alias-tips.git	*.zsh *.plugin.zsh
+atuin	c59c934a0c871c03f25764715d3b39bdb2a406d3	https://github.com/atuinsh/atuin.git	*.zsh
+autojump	ee21082751da739c65fe0ec2d02ca95d4266aebc	https://github.com/wting/autojump.git	*.zsh
+bullet-train	d60f62c34b3d9253292eb8be81fb46fa65d8f048	https://github.com/caiogondim/bullet-train.zsh.git	*.zsh-theme *.zsh
+emoji-cli	0fbb2e48e07218c5a2776100a4c708b21cb06688	https://github.com/b4b4r07/emoji-cli.git	*.zsh *.plugin.zsh
+forgit	6a0130bee875fde78010713fec6f52cb72d43b2b	https://github.com/wfxr/forgit.git	*.zsh *.plugin.zsh
+fzf-zsh-plugin	87d14584a9fe82e316173fdade8761dd53e45a62	https://github.com/unixorn/fzf-zsh-plugin.git	*.zsh *.plugin.zsh
+geometry	0f82c567db277024f340b5854a646094d194a31f	https://github.com/geometry-zsh/geometry.git	*.zsh
+git-extra-commands	b6265b45e6f601bbfa29ff47bebb5cb51dbc78fc	https://github.com/unixorn/git-extra-commands.git	*.zsh *.plugin.zsh
+git-flow-completion	cba3ad7b5b51af7de26bb82cb6a1011b86084cad	https://github.com/bobthecow/git-flow-completion.git	*.zsh *.plugin.zsh
+git-open	63c0e77aaf18b72c839b1113c1e2f9514413643b	https://github.com/paulirish/git-open.git	*.plugin.zsh *.zsh
+history-search-multi-word	55d8e061d52f4aa26aac8915d920d3b4f5649429	https://github.com/zdharma-continuum/history-search-multi-word.git	*.zsh *.plugin.zsh
+mcfly	b5b8ba1eb95316184a769b69712daed7d56522db	https://github.com/cantino/mcfly.git	*.zsh
+minimal	6588a399744f34194a25988b4c159cb8b8c67e27	https://github.com/subnixr/minimal.git	*.zsh
+navi	1ac218cb1e0e80649ef23c8a916e67efc3086833	https://github.com/denisidoro/navi.git	*.zsh
+purer	9a2172487e286a2f377d0765dd4321c0a69a9bc1	https://github.com/dfurnes/purer.git	*.zsh *.zsh-theme
+typewritten	06f8575e24792b2a9cd9539e39b537801ec1b4c0	https://github.com/reobin/typewritten.git	*.zsh
+wd	7f87d4caa7d4073da4ba3e26c2cbcd26fe53a83b	https://github.com/mfaerevaag/wd.git	*.zsh *.plugin.zsh
+zaw	c8e6e2a4244491a2b89c2524a2030336be8d7c7f	https://github.com/zsh-users/zaw.git	*.zsh
+zcolors	0988f58fa4db7a6e98ebcc05bac6ca664d7eb0c1	https://github.com/marlonrichert/zcolors.git	*.zsh *.plugin.zsh
+zcomet	3dfe6f837479c6731e74400a233739500ec6d648	https://github.com/agkozak/zcomet.git	*.zsh *.plugin.zsh
+zgen	0b669d2d0dcf788b4c81a7a30b4fa41dfbf7d1a7	https://github.com/tarjoilija/zgen.git	*.zsh
+zhooks	e6616b4a2786b45a56a2f591b79439836e678d22	https://github.com/agkozak/zhooks.git	*.zsh *.plugin.zsh
+znap	25754a45d9ceafe6d7d082c9ebe40a08cb85a4f0	https://github.com/marlonrichert/zsh-snap.git	*.zsh *.plugin.zsh
+zpm	8c7764a17384cd4c52e601325620b053daa7e993	https://github.com/zpm-zsh/zpm.git	*.zsh *.plugin.zsh
+zsh-256color	559fee48bb74b75cec8b9887f8f3e046f01d5d8f	https://github.com/chrissicool/zsh-256color.git	*.zsh *.plugin.zsh
+zsh-abbr	889f4772c12b9dbe4965bbd56f2572af0a28fa3b	https://github.com/olets/zsh-abbr.git	*.zsh *.plugin.zsh
+zsh-async	ee1d11b68c38dec24c22b1c51a45e8a815a79756	https://github.com/mafredri/zsh-async.git	*.zsh
+zsh-autoenv	f5951dd0cfeb37eb18fd62e14edc902a2c308c1e	https://github.com/Tarrasch/zsh-autoenv.git	*.zsh *.plugin.zsh
+zsh-autopair	449a7c3d095bc8f3d78cf37b9549f8bb4c383f3d	https://github.com/hlissner/zsh-autopair.git	*.zsh *.plugin.zsh
+zsh-bd	646f06d9b6a840926a671fdc2da196d4eecfc305	https://github.com/Tarrasch/zsh-bd.git	*.zsh *.plugin.zsh
+zsh-better-npm-completion	02ca404a9b585b59788b15af53d4f46fac297153	https://github.com/lukechilds/zsh-better-npm-completion.git	*.zsh *.plugin.zsh
+zsh-colored-man-pages	57bdda68e52a09075352b18fa3ca21abd31df4cb	https://github.com/ael-code/zsh-colored-man-pages.git	*.zsh *.plugin.zsh
+zsh-completion-generator	d01700d037e87db97f51c5da201d63a3fef7e9f6	https://github.com/RobSis/zsh-completion-generator.git	*.zsh *.plugin.zsh
+zsh-defer	53a26e287fbbe2dcebb3aa1801546c6de32416fa	https://github.com/romkatv/zsh-defer.git	*.zsh *.plugin.zsh
+zsh-dircolors-solarized	6f6fafee27e1d379c46b8c46775bccd1133b43d6	https://github.com/joel-porquet/zsh-dircolors-solarized.git	*.zsh *.plugin.zsh
+zsh-edit	c38cdd72a7abc4238d42f7182dbc2a8a96befb0e	https://github.com/marlonrichert/zsh-edit.git	*.zsh *.plugin.zsh
+zsh-eza	a8714afcb5ac1adfb534062eada9f99a4b9ee1cd	https://github.com/z-shell/zsh-eza.git	*.zsh *.plugin.zsh
+zsh-fzf-history-search	35df458f7d9478fa88c74af762dcd296cdfd485d	https://github.com/joshskidmore/zsh-fzf-history-search.git	*.zsh *.plugin.zsh
+zsh-hist	b2e65350660bdeb20f1a3059a7540c247a21b87d	https://github.com/marlonrichert/zsh-hist.git	*.zsh *.plugin.zsh
+zsh-histdb	90a6c104d0fcc0410d665e148fa7da28c49684eb	https://github.com/larkery/zsh-histdb.git	*.zsh *.plugin.zsh
+zsh-interactive-cd	e7d4802aa526ec069dafec6709549f4344ce9d4a	https://github.com/changyuheng/zsh-interactive-cd.git	*.zsh *.plugin.zsh
+zsh-navigation-tools	0bab1b99041719d35e44e29d9a0dfd3d3b61cf61	https://github.com/z-shell/zsh-navigation-tools.git	*.zsh *.plugin.zsh
+zsh-notify	9c1dac81a48ec85d742ebf236172b4d92aab2f3f	https://github.com/marzocchi/zsh-notify.git	*.zsh *.plugin.zsh
+zsh-nvm	745291dcf20686ec421935f1c3f8f3a2918dd106	https://github.com/lukechilds/zsh-nvm.git	*.zsh *.plugin.zsh
+zsh-shift-select	da460999b7d31aef0f0a82a3e749d70edf6f2ef9	https://github.com/jirutka/zsh-shift-select.git	*.zsh *.plugin.zsh
+zsh-vimode-visual	1e39cf896d87e367f76d84f8db4a79506fc556c1	https://github.com/b4b4r07/zsh-vimode-visual.git	*.zsh *.plugin.zsh
+zsh-z	acd0e1984df350c189f8f9c4956ec586b6c73fca	https://github.com/agkozak/zsh-z.git	*.zsh *.plugin.zsh

@@ -79,7 +79,7 @@ jobs:
           fi
 
   parser-compat:
-    name: Parser corpus sweep
+    name: Corpus parse + findings sweep
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -97,6 +97,10 @@ jobs:
         env:
           ZSHELLCHECK_BIN: ${{ github.workspace }}/zshellcheck
         run: bash scripts/parser-corpus-sweep.sh
+      - name: Sweep kata findings against the violation baseline
+        env:
+          ZSHELLCHECK_BIN: ${{ github.workspace }}/zshellcheck
+        run: bash scripts/violation-corpus-sweep.sh
 
   lint-shell:
     name: Lint Shell Scripts

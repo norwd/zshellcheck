@@ -77,6 +77,19 @@ go test -fuzz=FuzzLexer -fuzztime=10s ./pkg/lexer
 go test -fuzz=FuzzParser -fuzztime=10s ./pkg/parser
 ```
 
+The corpus sweeps run the linter over the pinned upstream integrations and gate on two baselines.
+Run them when changing the parser, the lexer, or any kata:
+
+```bash
+go build -o zshellcheck ./cmd/zshellcheck
+ZSHELLCHECK_BIN=$PWD/zshellcheck bash scripts/parser-corpus-sweep.sh
+ZSHELLCHECK_BIN=$PWD/zshellcheck bash scripts/violation-corpus-sweep.sh
+```
+
+The first sweep requires zero parser errors and zero panics.
+The second snapshots kata findings on that known-good code; a finding that appears, disappears, or changes count fails the gate.
+Review the diff, then re-snapshot with `bash scripts/violation-corpus-sweep.sh --update-baseline` when the change is intended.
+
 ## Adding a new kata
 
 A kata is a Zsh-specific detection rule.
