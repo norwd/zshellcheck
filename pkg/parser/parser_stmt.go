@@ -684,6 +684,21 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
+	// `let name++` / `let name--` is a complete arithmetic expression
+	// with no assignment, so there is no `=` to expect (`let HISTSIZE++`).
+	if p.peekTokenIs(token.INC) || p.peekTokenIs(token.DEC) {
+		p.nextToken()
+		stmt.Value = &ast.PostfixExpression{
+			Token:    p.curToken,
+			Operator: p.curToken.Literal,
+			Left:     stmt.Name,
+		}
+		if p.peekTokenIs(token.SEMICOLON) {
+			p.nextToken()
+		}
+		return stmt
+	}
+
 	// Zsh `let` evaluates arithmetic expressions, so the target may use
 	// any compound assignment operator (`+=`, `-=`, `*=`, `<<=`, ...),
 	// which the lexer fuses to token.PLUSEQ, not only plain `=`.

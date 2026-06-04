@@ -49,6 +49,16 @@ func TestParseForInBracketClass(t *testing.T) {
 	parseSourceClean(t, "for f in /etc/*[[:digit:]]; do :; done\n")
 }
 
+// `let name++` is a complete arithmetic expression with no `=`. The let
+// parser required an assignment and errored on `++`. The zsh
+// distribution uses `let HISTSIZE++` in Misc/zed. Issue #1380. (The
+// `--` form is a separate lexer-gluing issue and is not covered here.)
+func TestParseLetPostIncrement(t *testing.T) {
+	parseSourceClean(t, "let HISTSIZE++\n")
+	parseSourceClean(t, "let count++\n")
+	parseSourceClean(t, "let x=5\n")
+}
+
 func TestParseForLoopArithmeticCommaInit(t *testing.T) {
 	parseSourceClean(t, "for ((i=0, j=10; i<j; i++)) do echo $i; done\n")
 }
