@@ -249,6 +249,23 @@ func TestZC1105(t *testing.T) {
 			input:    `(( 1 + 1 ))`,
 			expected: []katas.Violation{},
 		},
+		{
+			// Grouping parens are precedence control, not a nested
+			// expansion. None of these may flag.
+			name:     "leading grouped operand",
+			input:    `(( (i + 1) % n ))`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "two grouped operands",
+			input:    `(( (a + b) * (c + d) ))`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "grouped operand in assignment",
+			input:    `(( result = (base + offset) * scale ))`,
+			expected: []katas.Violation{},
+		},
 	}
 
 	for _, tt := range tests {

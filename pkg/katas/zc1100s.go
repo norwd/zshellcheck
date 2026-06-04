@@ -234,10 +234,13 @@ func checkZC1105(node ast.Node) []Violation {
 		return nil
 	}
 
-	// Check if the expression contains a nested arithmetic expansion
-	// A simplified check: if the string representation contains another $(( or ((
+	// Flag a genuinely nested arithmetic expansion: a `$(( ... ))` inside the
+	// `(( ... ))` command. Match only on `$((`; plain grouping parens are not
+	// an expansion, and a `(( ... ))` block cannot appear as a sub-expression
+	// inside another (it is a command, not an expression), so a bare `((`
+	// match would only ever catch the printer's grouping output.
 	exprString := arithCmd.Expression.String()
-	if strings.Contains(exprString, "$((") || strings.Contains(exprString, "((") {
+	if strings.Contains(exprString, "$((") {
 		return []Violation{{
 			KataID:  "ZC1105",
 			Message: "Avoid nested arithmetic expansions. Use intermediate variables for clarity.",
