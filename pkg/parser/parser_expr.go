@@ -1012,6 +1012,15 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 		p.skipDollarBraceBody()
 		lit.Name = &ast.Identifier{Token: nameTok, Value: nameTok.Literal}
 	}
+	// A function name spliced from a parameter expansion, e.g.
+	// `function $w-by-keymap { … }` in the zsh distribution. The lexer
+	// emits the leading `$w` as a VARIABLE; consume it and let
+	// consumeCompositeFunctionName glue the rest of the composite name.
+	if p.peekTokenIs(token.VARIABLE) {
+		p.nextToken()
+		lit.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		p.consumeCompositeFunctionName()
+	}
 	// Zsh allows function names that start with `-` (e.g.
 	// `function -coreutils-alias-setup { … }`). The lexer emits the
 	// leading `-` as a MINUS token followed by an IDENT (with no

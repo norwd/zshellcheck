@@ -8,6 +8,14 @@ func TestParseFunctionLiteralDollarBraceName(t *testing.T) {
 	parseSourceClean(t, "function ${=X} { echo hi; }\n")
 }
 
+// A function name spliced from a `$name` parameter expansion, as in the
+// zsh distribution's Zle/keymap+widget (`function $w-by-keymap { … }`).
+// Issue #1381.
+func TestParseFunctionLiteralVariableName(t *testing.T) {
+	parseSourceClean(t, "function $w-bar { print hi }\n")
+	parseSourceClean(t, "function $w { :; }\n")
+}
+
 func TestParseFunctionLiteralCompositeName(t *testing.T) {
 	parseSourceClean(t, "function name\"${1:-}\"suffix() { echo hi; }\n")
 }
