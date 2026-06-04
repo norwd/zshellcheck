@@ -155,6 +155,14 @@ func TestParseDollarBraceHashAfterSpaceNotComment(t *testing.T) {
 	parseSourceClean(t, "H=${${X## ##}%%y##}\n")
 }
 
+// A single quote inside a double-quoted command substitution nested in
+// `${…}` is literal. The embedded-`$()` scanner must scan the `"…"`
+// span as a unit, not treat the `'` in `it's` as a single-quote opener
+// that runs to EOF. Issue #1357.
+func TestParseDollarBraceDoubleQuotedSquoteCommandSub(t *testing.T) {
+	parseSourceClean(t, `echo ${"$(echo "it's")"}`+"\n")
+}
+
 // Zsh glob qualifiers `#` / `##` attach to the preceding pattern
 // character without a space. Inside a case label, `[[:space:]]##`
 // and friends used to split at the HASH because parseCommandWord

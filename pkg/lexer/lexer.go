@@ -1167,6 +1167,21 @@ func (l *Lexer) absorbEmbeddedDollarParen() bool {
 					break
 				}
 			}
+		case '"':
+			// Scan a double-quoted span as a unit so a literal `'`
+			// (e.g. `"it's"`) does not open a bogus single-quote scan and
+			// a literal `)` inside the string does not unbalance depth.
+			// Inside double quotes a backslash escapes the next byte.
+			for l.ch != 0 {
+				l.readChar()
+				if l.ch == '\\' {
+					l.readChar()
+					continue
+				}
+				if l.ch == '"' {
+					break
+				}
+			}
 		case '(':
 			depth++
 		case ')':
