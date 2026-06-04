@@ -5512,126 +5512,25 @@ func init() {
 	RegisterKata(ast.DoubleBracketExpressionNode, Kata{
 		ID:    "ZC1079",
 		Title: "Quote RHS of `==` in `[[ ... ]]` to prevent pattern matching",
-		Description: "In `[[ ... ]]`, unquoted variable expansions on the right-hand side of `==` or `!=` " +
-			"are treated as patterns (globbing). If you intend to compare strings literally, quote the variable.",
+		Description: "Retained for compatibility. In default Zsh a variable on the " +
+			"right-hand side of `==`/`!=` inside `[[ ... ]]` is matched literally; " +
+			"pattern metacharacters in its value are active only with `${~var}` or " +
+			"`GLOB_SUBST` (off by default, unlike Bash), so quoting the RHS is a " +
+			"no-op and this rule no longer warns.",
 		Severity: SeverityWarning,
 		Check:    checkZC1079,
-		Fix:      fixZC1079,
 	})
 }
 
-// fixZC1079 wraps an unquoted RHS variable reference inside `[[ … ]]`
-// with double-quotes. Two edits: one `"` before the RHS token, one
-// after. RHS span is measured from source so `${arr[$i]}` and
-// `${var:-default}` stay whole. When the sibling LHS is an empty
-// string literal, ZC1055's `-z` / `-n` rewrite takes priority and
-// this fix no-ops to avoid overlapping edits.
-func fixZC1079(node ast.Node, v Violation, source []byte) []FixEdit {
-	if dbe, ok := node.(*ast.DoubleBracketExpression); ok {
-		for _, el := range dbe.Elements {
-			infix, ok := el.(*ast.InfixExpression)
-			if !ok {
-				continue
-			}
-			if infix.Operator != "==" && infix.Operator != "=" && infix.Operator != "!=" {
-				continue
-			}
-			if isEmptyStringLiteral(infix.Left) || isEmptyStringLiteral(infix.Right) {
-				// ZC1055 owns this rewrite; skip.
-				return nil
-			}
-		}
-	}
-	start := LineColToByteOffset(source, v.Line, v.Column)
-	if start < 0 || start >= len(source) {
-		return nil
-	}
-	argLen := unquotedArgLen(source, start)
-	if argLen == 0 {
-		return nil
-	}
-	endOff := start + argLen
-	endLine, endCol := offsetLineColZC1079(source, endOff)
-	if endLine < 0 {
-		return nil
-	}
-	return []FixEdit{
-		{Line: v.Line, Column: v.Column, Length: 0, Replace: `"`},
-		{Line: endLine, Column: endCol, Length: 0, Replace: `"`},
-	}
-}
-
-func isEmptyStringLiteral(n ast.Node) bool {
-	str, ok := n.(*ast.StringLiteral)
-	if !ok {
-		return false
-	}
-	return str.Value == `""` || str.Value == `''`
-}
-
-func offsetLineColZC1079(source []byte, offset int) (int, int) {
-	if offset < 0 || offset > len(source) {
-		return -1, -1
-	}
-	line := 1
-	col := 1
-	for i := 0; i < offset; i++ {
-		if source[i] == '\n' {
-			line++
-			col = 1
-			continue
-		}
-		col++
-	}
-	return line, col
-}
-
-var zc1079EqualityOps = map[string]struct{}{"==": {}, "=": {}, "!=": {}}
-
-func checkZC1079(node ast.Node) []Violation {
-	dbe, ok := node.(*ast.DoubleBracketExpression)
-	if !ok {
-		return nil
-	}
-	violations := []Violation{}
-	for _, expr := range dbe.Elements {
-		infix, ok := expr.(*ast.InfixExpression)
-		if !ok {
-			continue
-		}
-		if _, hit := zc1079EqualityOps[infix.Operator]; !hit {
-			continue
-		}
-		if tok := zc1079UnquotedVar(infix.Right); tok != nil {
-			violations = append(violations, Violation{
-				KataID:  "ZC1079",
-				Message: "Unquoted RHS matches as pattern. Quote to force string comparison: `\"$var\"`.",
-				Line:    tok.TokenLiteralNode().Line,
-				Column:  tok.TokenLiteralNode().Column,
-				Level:   SeverityWarning,
-			})
-		}
-	}
-	return violations
-}
-
-// zc1079UnquotedVar returns the token-bearing node when expr resolves
-// to an unquoted variable / array reference; nil otherwise.
-func zc1079UnquotedVar(expr ast.Expression) ast.Node {
-	switch r := expr.(type) {
-	case *ast.Identifier:
-		if len(r.Value) > 0 && r.Value[0] == '$' {
-			return r
-		}
-	case *ast.ArrayAccess, *ast.InvalidArrayAccess:
-		return r.(ast.Node)
-	case *ast.ConcatenatedExpression:
-		for _, part := range r.Parts {
-			if ident, ok := part.(*ast.Identifier); ok && len(ident.Value) > 0 && ident.Value[0] == '$' {
-				return ident
-			}
-		}
-	}
+// checkZC1079 is intentionally inert. In default Zsh a variable on the
+// right-hand side of `==`/`!=`/`=` inside `[[ ... ]]` is matched
+// literally: pattern metacharacters in the value are active only with
+// `${~var}` or `GLOB_SUBST`, both off by default (that activation is
+// Bash behavior). So quoting the RHS to "force string comparison" is a
+// no-op, and `[[ ... ]]` does not elide an empty expansion. The original
+// warning and its quoting autofix were Bash-isms. The kata ID is
+// retained per the no-removal policy.
+func checkZC1079(_ ast.Node) []Violation {
 	return nil
 }
 

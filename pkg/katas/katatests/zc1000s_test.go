@@ -3385,40 +3385,21 @@ func TestZC1079(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid unquoted variable == ",
-			input: `[[ $var == $other ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1079",
-					Message: "Unquoted RHS matches as pattern. Quote to force string comparison: `\"$var\"`.",
-					Line:    1,
-					Column:  12,
-				},
-			},
+			// In default Zsh the RHS variable is matched literally (no
+			// GLOB_SUBST), so quoting it is a no-op and nothing fires.
+			name:     "unquoted variable RHS is literal in zsh",
+			input:    `[[ $var == $other ]]`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid unquoted variable !=",
-			input: `[[ $var != $other ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1079",
-					Message: "Unquoted RHS matches as pattern. Quote to force string comparison: `\"$var\"`.",
-					Line:    1,
-					Column:  12,
-				},
-			},
+			name:     "unquoted variable RHS with != is literal",
+			input:    `[[ $var != $other ]]`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid array access",
-			input: `[[ $var = ${arr[1]} ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1079",
-					Message: "Unquoted RHS matches as pattern. Quote to force string comparison: `\"$var\"`.",
-					Line:    1,
-					Column:  11,
-				},
-			},
+			name:     "unquoted array access RHS is literal",
+			input:    `[[ $var = ${arr[1]} ]]`,
+			expected: []katas.Violation{},
 		},
 		{
 			name:     "non-equality operator",

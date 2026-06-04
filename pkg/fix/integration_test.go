@@ -378,21 +378,6 @@ func TestFixIntegration_ZC1061_SeqVariableArgsSkipped(t *testing.T) {
 	}
 }
 
-func TestFixIntegration_ZC1079_QuoteRhsInBrackets(t *testing.T) {
-	src := `[[ $x == $y ]]` + "\n"
-	want := `[[ $x == "$y" ]]` + "\n"
-	if got := runFix(t, src); got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func TestFixIntegration_ZC1079_AlreadyQuotedRhsUnchanged(t *testing.T) {
-	src := `[[ $x == "$y" ]]` + "\n"
-	if got := runFix(t, src); got != src {
-		t.Errorf("quoted RHS should be idempotent, got %q", got)
-	}
-}
-
 // ZC1085 no longer quotes for-loop expansions (quoting collapses
 // arrays); the former QuoteForLoopExpansion / ArrayExpansionQuoted
 // autofix tests were removed with that behavior. `for f in $files`
