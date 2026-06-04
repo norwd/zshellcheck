@@ -21,13 +21,13 @@ func TestZC1001(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid array access",
+			name:  "braced form preferred for array access",
 			input: `echo $my_array[1]`,
 			expected: []katas.Violation{
 				{
 					KataID: "ZC1001",
-					Message: "Use ${} for array element access. " +
-						"Accessing array elements with `$my_array[...]` is not the correct syntax in Zsh.",
+					Message: "Prefer `${...}` for array element access. " +
+						"`$my_array[...]` is valid Zsh, but the braced form is unambiguous and robust under `KSH_ARRAYS`.",
 					Line:   1,
 					Column: 6,
 				},
@@ -1429,6 +1429,18 @@ func TestZC1043(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
+			// REPLY/reply/MATCH/... are Zsh's value-return parameters;
+			// they are intentionally global and must not be flagged.
+			name:     "REPLY return parameter not flagged",
+			input:    "myfunc() { REPLY=42 }",
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "reply array return parameter not flagged",
+			input:    "myfunc() { reply=(a b c) }",
+			expected: []katas.Violation{},
+		},
+		{
 			// Regression for #1229 — empty-RHS assignment must not
 			// panic during message build. Hint still emitted with an
 			// empty RHS rendered in the template.
@@ -1802,6 +1814,18 @@ func TestZC1049(t *testing.T) {
 			input:    `echo hello`,
 			expected: []katas.Violation{},
 		},
+		{
+			// Global aliases have no function equivalent.
+			name:     "global alias is not flagged",
+			input:    `alias -g GP='| grep'`,
+			expected: []katas.Violation{},
+		},
+		{
+			// Suffix aliases have no function equivalent.
+			name:     "suffix alias is not flagged",
+			input:    `alias -s md=less`,
+			expected: []katas.Violation{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1877,7 +1901,7 @@ func TestZC1051(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1051",
-					Message: "Unquoted variable in `rm`. Quote it to prevent globbing (e.g. `rm \"$VAR\"`).",
+					Message: "Unquoted expansion in `rm`. An empty value changes the target — `rm -rf $dir/` becomes `rm -rf /`. Guard with `${dir:?}`.",
 					Line:    1,
 					Column:  4,
 				},
@@ -2681,103 +2705,57 @@ func TestZC1069(t *testing.T) {
 		input    string
 		expected []katas.Violation
 	}{
+		// ZC1069 is inert. In Zsh `local` equals `typeset` and is valid at
+		// any scope, so none of these inputs may report a violation.
 		{
-			name:     "valid local in function",
+			name:     "local in function",
 			input:    `my_func() { local x=1; }`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:     "valid typeset global",
+			name:     "typeset global",
 			input:    `typeset x=1`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local global",
-			input: `local x=1`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 1,
-				},
-			},
+			name:     "local at global scope (valid in zsh)",
+			input:    `local x=1`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in if block (global)",
-			input: `if true; then local x=1; fi`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 15,
-				},
-			},
+			name:     "local in if block (valid in zsh)",
+			input:    `if true; then local x=1; fi`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:     "valid local in nested function",
+			name:     "local in nested function",
 			input:    `outer() { inner() { local x=1; }; }`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in subshell (global)",
-			input: `( local x=1 )`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 3,
-				},
-			},
+			name:     "local in subshell (valid in zsh)",
+			input:    `( local x=1 )`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:     "valid local in function keyword",
+			name:     "local in function keyword",
 			input:    "function myfunc { local x=1; }",
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in while loop (global)",
-			input: `while true; do local x=1; done`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 16,
-				},
-			},
+			name:     "local in while loop (valid in zsh)",
+			input:    `while true; do local x=1; done`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in for loop (global)",
-			input: `for i in a b c; do local x=1; done`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 20,
-				},
-			},
+			name:     "local in for loop (valid in zsh)",
+			input:    `for i in a b c; do local x=1; done`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in case (global)",
-			input: "case $x in\na) local y=1;;\nesac",
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   2,
-					Column: 4,
-				},
-			},
+			name:     "local in case (valid in zsh)",
+			input:    "case $x in\na) local y=1;;\nesac",
+			expected: []katas.Violation{},
 		},
 		{
 			name:     "regular echo command",
@@ -3123,7 +3101,7 @@ func TestZC1075(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1075",
-					Message: "Unquoted variable expansion '$var' is subject to globbing. Quote it: \"$var\".",
+					Message: "Quote `$var`. An unquoted empty or unset value is elided entirely, dropping the word.",
 					Line:    1,
 					Column:  4,
 				},
@@ -3135,7 +3113,7 @@ func TestZC1075(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1075",
-					Message: "Unquoted array access is subject to globbing. Quote it.",
+					Message: "Quote this array element. An unquoted empty value is elided, dropping the word.",
 					Line:    1,
 					Column:  4,
 				},
@@ -3147,14 +3125,40 @@ func TestZC1075(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "unquoted concatenated",
-			input: `cp $src/file dest`,
+			// A suffixed expansion keeps a literal tail (`/file`), so it
+			// cannot elide and must not be flagged.
+			name:     "suffixed expansion does not elide",
+			input:    `cp $src/file dest`,
+			expected: []katas.Violation{},
+		},
+		{
+			// The RHS of an assignment word given to an assignment
+			// builtin is not glob/split-expanded in Zsh.
+			name:     "export assignment word is not glob-subject",
+			input:    `export FOO=$BAR`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "readonly assignment word is not glob-subject",
+			input:    `readonly R=$S`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "integer assignment word is not glob-subject",
+			input:    `integer n=$m`,
+			expected: []katas.Violation{},
+		},
+		{
+			// A bare name argument (no `=`) to export is a normal
+			// argument and remains flagged.
+			name:  "export of a dynamic name is still flagged",
+			input: `export $dynamic`,
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1075",
-					Message: "Unquoted variable expansion '$src/file' is subject to globbing. Quote it: \"$src/file\".",
+					Message: "Quote `$dynamic`. An unquoted empty or unset value is elided entirely, dropping the word.",
 					Line:    1,
-					Column:  4,
+					Column:  8,
 				},
 			},
 		},
@@ -3381,40 +3385,21 @@ func TestZC1079(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid unquoted variable == ",
-			input: `[[ $var == $other ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1079",
-					Message: "Unquoted RHS matches as pattern. Quote to force string comparison: `\"$var\"`.",
-					Line:    1,
-					Column:  12,
-				},
-			},
+			// In default Zsh the RHS variable is matched literally (no
+			// GLOB_SUBST), so quoting it is a no-op and nothing fires.
+			name:     "unquoted variable RHS is literal in zsh",
+			input:    `[[ $var == $other ]]`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid unquoted variable !=",
-			input: `[[ $var != $other ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1079",
-					Message: "Unquoted RHS matches as pattern. Quote to force string comparison: `\"$var\"`.",
-					Line:    1,
-					Column:  12,
-				},
-			},
+			name:     "unquoted variable RHS with != is literal",
+			input:    `[[ $var != $other ]]`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid array access",
-			input: `[[ $var = ${arr[1]} ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1079",
-					Message: "Unquoted RHS matches as pattern. Quote to force string comparison: `\"$var\"`.",
-					Line:    1,
-					Column:  11,
-				},
-			},
+			name:     "unquoted array access RHS is literal",
+			input:    `[[ $var = ${arr[1]} ]]`,
+			expected: []katas.Violation{},
 		},
 		{
 			name:     "non-equality operator",
@@ -3849,73 +3834,38 @@ func TestZC1085(t *testing.T) {
 		input    string
 		expected []katas.Violation
 	}{
+		// Unquoted array iteration is the correct Zsh idiom — quoting
+		// would collapse the array into one word — so the rule no
+		// longer warns on any of these forms.
 		{
-			name:     "valid quoted array expansion",
+			name:     "unquoted array iteration is correct and not flagged",
+			input:    `for i in $items; do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "unquoted array access not flagged",
+			input:    `for i in ${items[@]}; do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "unquoted command substitution not flagged",
+			input:    `for i in $(ls); do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "mixed literal and unquoted not flagged",
+			input:    `for i in start $items end; do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "quoted forms remain clean",
 			input:    `for i in "${items[@]}"; do echo $i; done`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:     "valid quoted variable expansion",
-			input:    `for i in "$items"; do echo $i; done`,
-			expected: []katas.Violation{},
-		},
-		{
-			name:     "valid glob expansion",
+			name:     "glob expansion not flagged",
 			input:    `for i in *.txt; do echo $i; done`,
 			expected: []katas.Violation{},
-		},
-		{
-			name:     "valid command substitution (quoted)",
-			input:    `for i in "$(ls)"; do echo $i; done`,
-			expected: []katas.Violation{},
-		},
-		{
-			name:  "invalid unquoted variable expansion",
-			input: `for i in $items; do echo $i; done`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1085",
-					Message: "Unquoted variable expansion in for loop. This will split on IFS (usually space). Quote it to iterate over lines or array elements.",
-					Line:    1,
-					Column:  10,
-				},
-			},
-		},
-		{
-			name:  "invalid unquoted array expansion",
-			input: `for i in ${items[@]}; do echo $i; done`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1085",
-					Message: "Unquoted variable expansion in for loop. This will split on IFS (usually space). Quote it to iterate over lines or array elements.",
-					Line:    1,
-					Column:  10,
-				},
-			},
-		},
-		{
-			name:  "invalid unquoted command substitution",
-			input: `for i in $(ls); do echo $i; done`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1085",
-					Message: "Unquoted variable expansion in for loop. This will split on IFS (usually space). Quote it to iterate over lines or array elements.",
-					Line:    1,
-					Column:  10,
-				},
-			},
-		},
-		{
-			name:  "invalid mixed unquoted",
-			input: `for i in start $items end; do echo $i; done`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1085",
-					Message: "Unquoted variable expansion in for loop. This will split on IFS (usually space). Quote it to iterate over lines or array elements.",
-					Line:    1,
-					Column:  16,
-				},
-			},
 		},
 	}
 
@@ -4249,66 +4199,38 @@ func TestZC1090(t *testing.T) {
 			input:    `[[ $v =~ "user_"* ]]`,
 			expected: []katas.Violation{},
 		},
+		// In Zsh the =~ RHS is a regex regardless of quoting (unlike
+		// Bash), and quoting protects metacharacters from globbing and
+		// word splitting — so none of these quoted forms are flagged.
 		{
-			name:  "invalid quoted start anchor",
-			input: `[[ $v =~ "^foo" ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1090",
-					Message: "Quoted regex pattern matches literally. Remove quotes to enable regex matching.",
-					Line:    1,
-					Column:  10, // Points to string
-				},
-			},
-		},
-		{
-			name:  "invalid quoted wildcard",
-			input: `[[ $v =~ "foo.*" ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1090",
-					Message: "Quoted regex pattern matches literally. Remove quotes to enable regex matching.",
-					Line:    1,
-					Column:  10,
-				},
-			},
-		},
-		{
-			name:  "invalid quoted alternation",
-			input: `[[ $v =~ "a|b" ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1090",
-					Message: "Quoted regex pattern matches literally. Remove quotes to enable regex matching.",
-					Line:    1,
-					Column:  10,
-				},
-			},
-		},
-		{
-			name:     "valid quoted literal",
-			input:    `[[ $v =~ "foo" ]]`, // No metachars, arguably valid literal match (though == is better)
+			name:     "quoted start anchor is a valid Zsh regex",
+			input:    `[[ $v =~ "^foo" ]]`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "valid quoted variable",
-			input: `[[ $v =~ "$pat" ]]`, // Treating $pat content literally.
-			// If $pat contains regex, it WON'T work.
-			// But strictly "$pat" contains `$` which I excluded from check.
-			// So this should PASS (silently allowed or handled as literal).
+			name:     "quoted wildcard is a valid Zsh regex",
+			input:    `[[ $v =~ "foo.*" ]]`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid quoted variable with meta",
-			input: `[[ $v =~ "^$pat" ]]`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1090",
-					Message: "Quoted regex pattern matches literally. Remove quotes to enable regex matching.",
-					Line:    1,
-					Column:  10,
-				},
-			},
+			name:     "quoted alternation is a valid Zsh regex",
+			input:    `[[ $v =~ "a|b" ]]`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "quoted regex with a space needs its quotes",
+			input:    `[[ $v =~ "^a b$" ]]`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "quoted literal",
+			input:    `[[ $v =~ "foo" ]]`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "quoted variable with meta",
+			input:    `[[ $v =~ "^$pat" ]]`,
+			expected: []katas.Violation{},
 		},
 		{
 			name:     "non-regex operator ignored",
@@ -4717,6 +4639,25 @@ func TestZC1098(t *testing.T) {
 			name:     "eval with quoted variable",
 			input:    `eval "ls ${(q)dir}"`,
 			expected: []katas.Violation{},
+		},
+		{
+			// `(q)` cannot quote a command substitution, so the
+			// shell-init idiom must not flag.
+			name:     "eval with command substitution only",
+			input:    `eval "$(pyenv init - zsh)"`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:  "eval mixing command substitution and parameter",
+			input: `eval "$(cmd) ${userdata}"`,
+			expected: []katas.Violation{
+				{
+					KataID:  "ZC1098",
+					Message: "Use the `(q)` flag (or `(qq)`, `(q-)`) when using variables in `eval` to prevent injection.",
+					Line:    1,
+					Column:  1,
+				},
+			},
 		},
 	}
 

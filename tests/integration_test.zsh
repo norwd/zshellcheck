@@ -137,7 +137,7 @@ run_test 'source /etc/profile'	"" 'ZC1048: Absolute path (Valid)'
 
 # --- ZC1049: Aliases ---
 run_test 'alias foo="echo bar"'	"ZC1049" 'ZC1049: alias definition'
-run_test 'alias -g G="| grep"'	"ZC1049" 'ZC1049: global alias'
+run_test 'alias -g G="| grep"'	"ZC1771" 'ZC1049 exempts global aliases; ZC1771 fires'
 run_test 'unalias foo'	"" 'ZC1049: unalias (Valid)'
 run_test 'function foo() { printf "bar\n"; }'	"ZC1086" 'ZC1049: function (Invalid ZC1086)'
 
@@ -145,7 +145,7 @@ run_test 'function foo() { printf "bar\n"; }'	"ZC1086" 'ZC1049: function (Invali
 run_test 'for f in $(ls *.txt(N) ); do printf "%s\n" "$f"; done'	"ZC1050" 'ZC1050: for in $(ls)'
 run_test 'for f in `ls *.txt(N)`; do printf "%s\n" "$f"; done'	"ZC1050" 'ZC1050: for in `ls`'
 run_test 'for f in *.txt(N); do printf "%s\n" "$f"; done'	"" 'ZC1050: for in glob (Valid)'
-run_test 'for f in $(find .); do printf "%s\n" "$f"; done'	"ZC1085" 'ZC1050: for in find (Invalid ZC1085)'
+run_test 'for f in $(find .); do printf "%s\n" "$f"; done'	"" 'ZC1050: for in find (ZC1085 retired)'
 
 # --- ZC1051: Unquoted rm ---
 run_test 'rm ${var}'	"ZC1051" 'ZC1051: rm braces'
@@ -236,11 +236,11 @@ run_test 'autoload -Uz add-zsh-hook; add-zsh-hook precmd my_func'	"" 'ZC1068: ad
 run_test 'my_func() { :; }'	"" 'ZC1068: normal function (Valid)'
 
 # --- ZC1069: local scope ---
-run_test 'local x=1'	"ZC1069" 'ZC1069: local global'
+run_test 'local x=1'	"" 'ZC1069 retired: local is valid at global scope in zsh'
 run_test 'typeset x=1'	"" 'ZC1069: typeset global (Valid)'
 run_test 'fn() { local x=1; }'	"" 'ZC1069: local in func (Valid)'
-run_test 'if true; then local x=1; fi'	"ZC1069" 'ZC1069: local in if (global)'
-run_test '( local x=1 )'	"ZC1069" 'ZC1069: local in subshell (global)'
+run_test 'if true; then local x=1; fi'	"" 'ZC1069 retired: local in if is valid in zsh'
+run_test '( local x=1 )'	"ZC1088" 'ZC1069 retired; subshell single command flags ZC1088'
 
 # --- ZC1070: Infinite recursion ---
 run_test 'cd() { cd "$@"; }'	"ZC1070" 'ZC1070: recursive cd'
@@ -257,13 +257,13 @@ run_test 'awk "/pattern/ {print}" file'	"" 'ZC1072: awk only (Valid)'
 # --- ZC1073: Unnecessary $ in arithmetic ---
 run_test '(( $x > 5 ))'	"ZC1073" 'ZC1073: (( $x ))'
 run_test '(( x > 5 ))'	"" 'ZC1073: (( x )) (Valid)'
-run_test '(( $# > 0 ))'	"ZC1105" 'ZC1073: (( $# )) (Valid - Expect ZC1105)'
+run_test '(( $# > 0 ))'	"" 'ZC1073: (( $# > 0 )) is not nested arithmetic'
 
 # --- ZC1083: Brace expansion variables ---
 run_test 'echo {1..$n}'	"ZC1083" 'ZC1083: variable range end'
 run_test 'echo {$n..10}'	"ZC1083" 'ZC1083: variable range start'
 run_test 'printf "%s\n" {1..10}'	"" 'ZC1083: valid range'
-run_test 'printf "%s\n" {a,b,$c}'	"ZC1075" 'ZC1083: valid list expansion (Expect ZC1075)'
+run_test 'printf "%s\n" {a,b,$c}'	"" 'ZC1083: brace list is not a bare expansion'
 run_test 'echo "{1..$n}"'	"ZC1083" 'ZC1083: quoted variable range'
 
 # --- ZC1084: find unquoted glob ---
@@ -274,9 +274,9 @@ run_test 'find . -name "[a-z]"'	"ZC1054" 'ZC1084: "[a-z]" (Expected ZC1054)'
 run_test 'find . -name \*.txt'	"" 'ZC1084: \*.txt (Valid)'
 
 # --- ZC1085: for loop variable expansion ---
-run_test 'for i in $items; do :; done'	"ZC1085" 'ZC1085: $items'
+run_test 'for i in $items; do :; done'	"" 'ZC1085 retired: unquoted for-loop word is valid in zsh'
 run_test 'for i in "$items"; do :; done'	"" 'ZC1085: "$items" (Valid)'
-run_test 'for i in ${arr[@]}; do :; done'	"ZC1085" 'ZC1085: ${arr[@]}'
+run_test 'for i in ${arr[@]}; do :; done'	"" 'ZC1085 retired: unquoted array for-loop word is valid in zsh'
 run_test 'for i in "${arr[@]}"; do :; done'	"" 'ZC1085: "${arr[@]}" (Valid)'
 run_test 'for i in *.txt; do :; done'	"ZC1040" 'ZC1085: glob (Expect ZC1040/ZC1080)'
 
@@ -305,13 +305,13 @@ run_test 'cmd &> file'	"" 'ZC1089: &> file (Valid)'
 
 # --- ZC1090: Quoted regex ---
 run_test '[[ $v =~ ^foo ]]'	"" 'ZC1090: ^foo (Valid)'
-run_test '[[ $v =~ "^foo" ]]'	"ZC1090" 'ZC1090: "^foo" (Invalid)'
+run_test '[[ $v =~ "^foo" ]]'	"" 'ZC1090 retired: quoted =~ RHS is still a regex in zsh'
 
 # --- ZC1091: Arithmetic in [[ ]] ---
 run_test '[[ $a -eq 1 ]]'	"ZC1091" 'ZC1091: -eq'
 run_test '[[ $a -lt 5 ]]'	"ZC1091" 'ZC1091: -lt'
 run_test '(( a < 5 ))'	"" 'ZC1091: (( ... )) (Valid)'
-run_test '[[ $a == $b ]]'	"ZC1079" 'ZC1091: == (Valid - Expect ZC1079)'
+run_test '[[ $a == $b ]]'	"" 'ZC1091: ZC1079 retired; [[ == ]] RHS variable is literal'
 
 # --- Summary ---
 echo "------------------------------------------------"

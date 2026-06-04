@@ -3023,13 +3023,18 @@ func TestCaseMissingIn(t *testing.T) {
 	_ = p.ParseProgram()
 }
 
-func TestForLoopMissingDoKw(t *testing.T) {
-	input := "for i in a b c; echo $i; done"
+func TestForLoopShortFormSemicolonBody(t *testing.T) {
+	// Zsh short loop (SHORT_LOOPS, on by default): a `;`-separated
+	// single-command body with no do/done parses cleanly. This
+	// replaces an earlier "missing do is an error" assertion, which
+	// contradicted valid Zsh — `for i in a b c; echo $i` is the
+	// documented short form, not a malformed loop.
+	input := "for i in a b c; echo $i"
 	l := lexer.New(input)
 	p := New(l)
 	_ = p.ParseProgram()
-	if len(p.Errors()) == 0 {
-		t.Error("expected parser errors for missing 'do'")
+	if len(p.Errors()) != 0 {
+		t.Errorf("short for-loop should parse cleanly, got %v", p.Errors())
 	}
 }
 

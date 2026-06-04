@@ -249,6 +249,23 @@ func TestZC1105(t *testing.T) {
 			input:    `(( 1 + 1 ))`,
 			expected: []katas.Violation{},
 		},
+		{
+			// Grouping parens are precedence control, not a nested
+			// expansion. None of these may flag.
+			name:     "leading grouped operand",
+			input:    `(( (i + 1) % n ))`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "two grouped operands",
+			input:    `(( (a + b) * (c + d) ))`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "grouped operand in assignment",
+			input:    `(( result = (base + offset) * scale ))`,
+			expected: []katas.Violation{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -3305,16 +3322,11 @@ func TestZC1186(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid bare unset",
-			input: `unset myvar`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1186",
-					Message: "Use `unset -v name` for variables or `unset -f name` for functions. Bare `unset` is ambiguous about what is being removed.",
-					Line:    1,
-					Column:  1,
-				},
-			},
+			// Bare `unset name` unsets a parameter only in Zsh; it is
+			// unambiguous, so the rule must stay quiet.
+			name:     "bare unset is valid in zsh",
+			input:    `unset myvar`,
+			expected: []katas.Violation{},
 		},
 	}
 

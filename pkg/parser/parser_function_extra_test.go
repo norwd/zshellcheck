@@ -8,12 +8,41 @@ func TestParseFunctionLiteralDollarBraceName(t *testing.T) {
 	parseSourceClean(t, "function ${=X} { echo hi; }\n")
 }
 
+// A function name spliced from a `$name` parameter expansion, as in the
+// zsh distribution's Zle/keymap+widget (`function $w-by-keymap { … }`).
+// Issue #1381.
+func TestParseFunctionLiteralVariableName(t *testing.T) {
+	parseSourceClean(t, "function $w-bar { print hi }\n")
+	parseSourceClean(t, "function $w { :; }\n")
+}
+
 func TestParseFunctionLiteralCompositeName(t *testing.T) {
 	parseSourceClean(t, "function name\"${1:-}\"suffix() { echo hi; }\n")
 }
 
 func TestParseFunctionLiteralMultiNames(t *testing.T) {
 	parseSourceClean(t, "function a b c { echo hi; }\n")
+}
+
+// Zsh `let` with a quoted whole arithmetic expression, the form
+// documented as equivalent to `(( … ))`. zsh-auto-notify uses it.
+func TestParseLetQuotedExpression(t *testing.T) {
+	parseSourceClean(t, "let \"elapsed = current - START\"\n")
+	parseSourceClean(t, "let \"x = 1\" \"y = 2\"\n")
+}
+
+// Zsh short function form: the `function` keyword plus `()` followed
+// by a single command with no `{ … }` block (zshmisc, FUNCTIONS).
+func TestParseFunctionLiteralBracelessBody(t *testing.T) {
+	parseSourceClean(t, "function zgen() zgenom \"$@\"\n")
+}
+
+func TestParseFunctionLiteralBracelessBodyNoParens(t *testing.T) {
+	parseSourceClean(t, "function gr() grep -n\n")
+}
+
+func TestParseFunctionLiteralBracelessCompoundBody(t *testing.T) {
+	parseSourceClean(t, "function loop() for x in 1 2; do echo $x; done\n")
 }
 
 func TestParseFunctionLiteralNoParens(t *testing.T) {
@@ -42,6 +71,16 @@ func TestParseIfStatementNested(t *testing.T) {
 
 func TestParseForLoopBraceStyle(t *testing.T) {
 	parseSourceClean(t, "for f in *.zsh; { echo $f }\n")
+}
+
+// Zsh short for-loop: a `;`-separated single-command body, no do/done
+// (SHORT_LOOPS, on by default). zsh-lazyload and zsh-bench use it.
+func TestParseForLoopShortFormSemicolon(t *testing.T) {
+	parseSourceClean(t, "for cmd in a b; eval \"echo $cmd\"\n")
+}
+
+func TestParseForLoopShortFormPrint(t *testing.T) {
+	parseSourceClean(t, "for c in a b; print -r -- $c\n")
 }
 
 func TestParseForLoopArithmeticHeader(t *testing.T) {

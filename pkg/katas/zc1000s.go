@@ -15,9 +15,9 @@ func init() {
 	RegisterKata(ast.IndexExpressionNode, Kata{
 		ID:    "ZC1001",
 		Title: "Use ${} for array element access",
-		Description: "In Zsh, accessing array elements with `$my_array[1]` doesn't work as expected. " +
-			"It tries to access an element from an array named `my_array[1]`. " +
-			"The correct way to access an array element is to use `${my_array[1]}`.",
+		Description: "In native Zsh, `$my_array[1]` accesses array element 1 and is valid. " +
+			"The braced form `${my_array[1]}` is preferred: it is unambiguous, reads " +
+			"clearly inside double quotes, and behaves the same under `KSH_ARRAYS`.",
 		Severity: SeverityStyle,
 		Check:    checkZC1001,
 		Fix:      fixZC1001,
@@ -25,9 +25,9 @@ func init() {
 	RegisterKata(ast.InvalidArrayAccessNode, Kata{
 		ID:    "ZC1001",
 		Title: "Use ${} for array element access",
-		Description: "In Zsh, accessing array elements with `$my_array[1]` doesn't work as expected. " +
-			"It tries to access an element from an array named `my_array[1]`. " +
-			"The correct way to access an array element is to use `${my_array[1]}`.",
+		Description: "In native Zsh, `$my_array[1]` accesses array element 1 and is valid. " +
+			"The braced form `${my_array[1]}` is preferred: it is unambiguous, reads " +
+			"clearly inside double quotes, and behaves the same under `KSH_ARRAYS`.",
 		Severity: SeverityStyle,
 		Check:    checkZC1001,
 		Fix:      fixZC1001,
@@ -118,8 +118,8 @@ func checkZC1001(node ast.Node) []Violation {
 			if len(ident.Value) > 0 && ident.Value[0] == '$' {
 				violations = append(violations, Violation{
 					KataID: "ZC1001",
-					Message: "Use ${} for array element access. " +
-						"Accessing array elements with `" + ident.Value + "[...]` is not the correct syntax in Zsh.",
+					Message: "Prefer `${...}` for array element access. " +
+						"`" + ident.Value + "[...]` is valid Zsh, but the braced form is unambiguous and robust under `KSH_ARRAYS`.",
 					Line:   ident.Token.Line,
 					Column: ident.Token.Column,
 					Level:  SeverityStyle,
@@ -129,8 +129,8 @@ func checkZC1001(node ast.Node) []Violation {
 	} else if arrayAccess, ok := node.(*ast.InvalidArrayAccess); ok {
 		violations = append(violations, Violation{
 			KataID: "ZC1001",
-			Message: "Use ${} for array element access. " +
-				"Accessing array elements with `$my_array[1]` is not the correct syntax in Zsh.",
+			Message: "Prefer `${...}` for array element access. " +
+				"`$my_array[1]` is valid Zsh, but the braced form is unambiguous and robust under `KSH_ARRAYS`.",
 			Line:   arrayAccess.Token.Line,
 			Column: arrayAccess.Token.Column,
 			Level:  SeverityStyle,
@@ -1012,14 +1012,36 @@ func fixZC1013(node ast.Node, v Violation, source []byte) []FixEdit {
 	if eq < 0 {
 		return nil
 	}
-	name := body[:eq]
+	// Honour a compound assignment operator (`+=`, `-=`, `*=`, `<<=`,
+	// ...): the operator is the run of arithmetic operator characters
+	// immediately preceding the `=`, so `i+=1` rewrites to
+	// `(( i += 1 ))`, not the broken `(( i+ = 1 ))`. A plain `=`
+	// leaves `op` as `"="`, preserving the original output byte-exact.
+	opStart := eq
+	for opStart > 0 && isArithAssignOpChar(body[opStart-1]) {
+		opStart--
+	}
+	name := body[:opStart]
+	op := body[opStart : eq+1]
 	rhs := body[eq+1:]
 	return []FixEdit{{
 		Line:    v.Line,
 		Column:  v.Column,
 		Length:  end - start,
-		Replace: "(( " + name + " = " + rhs + " ))",
+		Replace: "(( " + name + " " + op + " " + rhs + " ))",
 	}}
+}
+
+// isArithAssignOpChar reports whether b can form part of a Zsh compound
+// arithmetic assignment operator immediately before the `=` (e.g. the
+// `+` in `+=`, or the two `<` in `<<=`).
+func isArithAssignOpChar(b byte) bool {
+	switch b {
+	case '+', '-', '*', '/', '%', '&', '^', '|', '<', '>':
+		return true
+	default:
+		return false
+	}
 }
 
 func checkZC1013(node ast.Node) []Violation {
@@ -2481,6 +2503,17 @@ func zc1043HarvestLocals(n ast.Node, locals map[string]bool) {
 	}
 }
 
+// zc1043ReturnParams are the Zsh special parameters used by convention
+// to return values from a function to its caller (`man zshparam`,
+// `man zshmisc` =~). Assigning them inside a function is intentionally
+// global, so `local` would break the return; ZC1043 must not flag them.
+var zc1043ReturnParams = map[string]bool{
+	"REPLY": true, "reply": true,
+	"MATCH": true, "MBEGIN": true, "MEND": true,
+	"match": true, "mbegin": true, "mend": true,
+	"psvar": true,
+}
+
 func zc1043UnscopedAssign(n ast.Node, locals map[string]bool) (Violation, bool) {
 	exprStmt, ok := n.(*ast.ExpressionStatement)
 	if !ok {
@@ -2497,7 +2530,7 @@ func zc1043UnscopedAssign(n ast.Node, locals map[string]bool) (Violation, bool) 
 		return Violation{}, false
 	}
 	ident, ok := assign.Left.(*ast.Identifier)
-	if !ok || locals[ident.Value] {
+	if !ok || locals[ident.Value] || zc1043ReturnParams[ident.Value] {
 		return Violation{}, false
 	}
 	rhs := ""
@@ -2931,6 +2964,13 @@ func checkZC1049(node ast.Node) []Violation {
 
 	// Check if command is alias
 	if name, ok := cmd.Name.(*ast.Identifier); ok && name.Value == "alias" {
+		// Global (`alias -g`) and suffix (`alias -s`) aliases have no
+		// function equivalent — a global alias expands outside command
+		// position, a suffix alias triggers on a file extension — so
+		// "prefer a function" is impossible advice. Skip them.
+		if zc1049HasGlobalOrSuffixFlag(cmd) {
+			return nil
+		}
 		return []Violation{{
 			KataID: "ZC1049",
 			Message: "Prefer functions over aliases. " +
@@ -2942,6 +2982,44 @@ func checkZC1049(node ast.Node) []Violation {
 	}
 
 	return nil
+}
+
+// zc1049HasGlobalOrSuffixFlag reports whether an alias command carries
+// the `-g` (global) or `-s` (suffix) flag.
+func zc1049HasGlobalOrSuffixFlag(cmd *ast.SimpleCommand) bool {
+	for _, arg := range cmd.Arguments {
+		// A flag such as `-g` lexes as `-` + `g`, so it arrives as a
+		// ConcatenatedExpression rather than a single Identifier;
+		// reassemble the word before inspecting it.
+		v := zc1049ArgText(arg)
+		// A short-flag word (`-g`, `-s`, `-gs`, ...): leading `-`, not
+		// `--`, not a `name=value` assignment word.
+		if len(v) >= 2 && v[0] == '-' && v[1] != '-' && strings.ContainsAny(v, "gs") {
+			return true
+		}
+	}
+	return false
+}
+
+// zc1049ArgText reassembles the literal text of a command argument from
+// its Identifier and StringLiteral parts.
+func zc1049ArgText(arg ast.Expression) string {
+	switch a := arg.(type) {
+	case *ast.Identifier:
+		return a.Value
+	case *ast.ConcatenatedExpression:
+		var b strings.Builder
+		for _, part := range a.Parts {
+			switch p := part.(type) {
+			case *ast.Identifier:
+				b.WriteString(p.Value)
+			case *ast.StringLiteral:
+				b.WriteString(p.Value)
+			}
+		}
+		return b.String()
+	}
+	return ""
 }
 
 func init() {
@@ -3010,9 +3088,13 @@ func getCommandFromSubstitution(node ast.Node) ast.Node {
 func init() {
 	RegisterKata(ast.SimpleCommandNode, Kata{
 		ID:    "ZC1051",
-		Title: "Quote variables in `rm` to avoid globbing",
-		Description: "`rm $VAR` is dangerous if `$VAR` contains spaces or glob characters. " +
-			"Quote the variable (`rm \"$VAR\"`) to ensure safe deletion.",
+		Title: "Guard variables in `rm` against empty values",
+		Description: "An unquoted expansion in `rm` is dangerous when its value is empty " +
+			"or unset: `rm $file` becomes bare `rm`, and `rm -rf $dir/` becomes " +
+			"`rm -rf /`. Quoting alone does not fix the trailing-slash case — guard " +
+			"with `${dir:?}` or `[[ -n $dir ]]`. In default Zsh an unquoted `$var` " +
+			"does not word-split or glob (those are Bash / `emulate sh` behaviors), " +
+			"but unquoted command substitution `$(...)` does split.",
 		Severity: SeverityWarning,
 		Check:    checkZC1051,
 		Fix:      fixZC1051,
@@ -3147,13 +3229,9 @@ func checkZC1051(node ast.Node) []Violation {
 				isUnquoted = true
 			}
 		case *ast.ArrayAccess:
-			// ${var[...]} unquoted
-			// Zsh DOES NOT split unquoted variable expansions by default!
-			// BUT it DOES glob them.
-			// `rm $var`. If var="a b", it deletes "a b" (one file).
-			// If var="*", it expands to all files.
-			// So checking for globbing safety is key.
-			// `rm \"$var\"` prevents globbing.
+			// ${var[...]} unquoted: an empty element is elided, changing
+			// what rm targets. Default Zsh does not split or glob the
+			// expansion; the hazard is the empty/unset value, not globbing.
 			isUnquoted = true
 		case *ast.DollarParenExpression:
 			// $(...)
@@ -3163,7 +3241,7 @@ func checkZC1051(node ast.Node) []Violation {
 		if isUnquoted {
 			violations = append(violations, Violation{
 				KataID:  "ZC1051",
-				Message: "Unquoted variable in `rm`. Quote it to prevent globbing (e.g. `rm \"$VAR\"`).",
+				Message: "Unquoted expansion in `rm`. An empty value changes the target — `rm -rf $dir/` becomes `rm -rf /`. Guard with `${dir:?}`.",
 				Line:    arg.TokenLiteralNode().Line,
 				Column:  arg.TokenLiteralNode().Column,
 				Level:   SeverityWarning,
@@ -4598,172 +4676,24 @@ func init() {
 	RegisterKata(ast.ProgramNode, Kata{
 		ID:    "ZC1069",
 		Title: "Avoid `local` outside of functions",
-		Description: "The `local` builtin can only be used inside functions. " +
-			"Using it in the global scope causes an error.",
+		Description: "Retained for compatibility. In Zsh `local` is equivalent to " +
+			"`typeset` and is valid at any scope (top level, sourced files, even " +
+			"under `emulate sh`); the function-only restriction is Bash/POSIX-only, " +
+			"so this rule no longer warns.",
 		Severity: SeverityInfo,
 		Check:    checkZC1069,
-		Fix:      fixZC1069,
 	})
 }
 
-// fixZC1069 rewrites `local` to `typeset` when used at file scope.
-// `typeset` works in both function and global contexts, so the
-// rewrite is safe wherever the detector fires. Single-edit name
-// swap at the violation column. Idempotent — a re-run sees
-// `typeset`, not `local`. Defensive byte-match guard.
-func fixZC1069(_ ast.Node, v Violation, source []byte) []FixEdit {
-	off := LineColToByteOffset(source, v.Line, v.Column)
-	if off < 0 || off+len("local") > len(source) {
-		return nil
-	}
-	if string(source[off:off+len("local")]) != "local" {
-		return nil
-	}
-	return []FixEdit{{
-		Line:    v.Line,
-		Column:  v.Column,
-		Length:  len("local"),
-		Replace: "typeset",
-	}}
-}
-
-func checkZC1069(node ast.Node) []Violation {
-	program, ok := node.(*ast.Program)
-	if !ok {
-		return nil
-	}
-	w := zc1069Walker{}
-	w.walk(program, false)
-	return w.violations
-}
-
-type zc1069Walker struct {
-	violations []Violation
-}
-
-func (w *zc1069Walker) walk(n ast.Node, inFunction bool) {
-	if n == nil {
-		return
-	}
-	// A Node interface can hold a concrete pointer type with a nil value
-	// underneath (typed nil); it does not compare equal to nil. Descending
-	// hands a switch arm a nil receiver and dereferencing a field panics.
-	if v := reflect.ValueOf(n); v.Kind() == reflect.Pointer && v.IsNil() {
-		return
-	}
-	w.recordIfBareLocal(n, inFunction)
-	w.descendChildren(n, inFunction)
-}
-
-func (w *zc1069Walker) recordIfBareLocal(n ast.Node, inFunction bool) {
-	cmd, ok := n.(*ast.SimpleCommand)
-	if !ok {
-		return
-	}
-	name, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return
-	}
-	if name.Value != "local" || inFunction {
-		return
-	}
-	w.violations = append(w.violations, Violation{
-		KataID: "ZC1069",
-		Message: "`local` can only be used inside functions. " +
-			"Use `typeset`, `declare`, or just assignment for global variables.",
-		Line:   name.Token.Line,
-		Column: name.Token.Column,
-		Level:  SeverityInfo,
-	})
-}
-
-func (w *zc1069Walker) descendChildren(n ast.Node, inFunction bool) {
-	switch t := n.(type) {
-	case *ast.Program:
-		w.walkStatements(t.Statements, inFunction)
-	case *ast.BlockStatement:
-		w.walkStatements(t.Statements, inFunction)
-	case *ast.IfStatement:
-		w.walk(t.Condition, inFunction)
-		w.walk(t.Consequence, inFunction)
-		w.walk(t.Alternative, inFunction)
-	case *ast.ForLoopStatement:
-		w.walkForLoop(t, inFunction)
-	case *ast.WhileLoopStatement:
-		w.walk(t.Condition, inFunction)
-		w.walk(t.Body, inFunction)
-	case *ast.FunctionDefinition:
-		w.walk(t.Name, inFunction)
-		w.walk(t.Body, true)
-	case *ast.FunctionLiteral:
-		w.walkFunctionLiteral(t)
-	case *ast.SimpleCommand:
-		w.walk(t.Name, inFunction)
-		w.walkExpressions(t.Arguments, inFunction)
-	default:
-		w.descendOtherChildren(n, inFunction)
-	}
-}
-
-func (w *zc1069Walker) descendOtherChildren(n ast.Node, inFunction bool) {
-	switch t := n.(type) {
-	case *ast.ExpressionStatement:
-		w.walk(t.Expression, inFunction)
-	case *ast.InfixExpression:
-		w.walk(t.Left, inFunction)
-		w.walk(t.Right, inFunction)
-	case *ast.PrefixExpression:
-		w.walk(t.Right, inFunction)
-	case *ast.PostfixExpression:
-		w.walk(t.Left, inFunction)
-	case *ast.GroupedExpression:
-		w.walk(t.Expression, inFunction)
-	case *ast.CaseStatement:
-		w.walkCaseStatement(t, inFunction)
-	case *ast.ConcatenatedExpression:
-		w.walkExpressions(t.Parts, inFunction)
-	case *ast.CommandSubstitution:
-		w.walk(t.Command, inFunction)
-	case *ast.DollarParenExpression:
-		w.walk(t.Command, inFunction)
-	case *ast.Subshell:
-		w.walk(t.Command, inFunction)
-	}
-}
-
-func (w *zc1069Walker) walkStatements(stmts []ast.Statement, inFunction bool) {
-	for _, s := range stmts {
-		w.walk(s, inFunction)
-	}
-}
-
-func (w *zc1069Walker) walkExpressions(exprs []ast.Expression, inFunction bool) {
-	for _, e := range exprs {
-		w.walk(e, inFunction)
-	}
-}
-
-func (w *zc1069Walker) walkForLoop(t *ast.ForLoopStatement, inFunction bool) {
-	w.walk(t.Init, inFunction)
-	w.walk(t.Condition, inFunction)
-	w.walk(t.Post, inFunction)
-	w.walkExpressions(t.Items, inFunction)
-	w.walk(t.Body, inFunction)
-}
-
-func (w *zc1069Walker) walkFunctionLiteral(t *ast.FunctionLiteral) {
-	for _, p := range t.Params {
-		w.walk(p, false)
-	}
-	w.walk(t.Body, true)
-}
-
-func (w *zc1069Walker) walkCaseStatement(t *ast.CaseStatement, inFunction bool) {
-	w.walk(t.Value, inFunction)
-	for _, clause := range t.Clauses {
-		w.walkExpressions(clause.Patterns, inFunction)
-		w.walk(clause.Body, inFunction)
-	}
+// checkZC1069 is intentionally inert. In Zsh `local` is equivalent to
+// `typeset` and is valid at any scope — top level, sourced files, even
+// under `emulate sh` — so it is not an error outside a function (that
+// restriction is Bash/POSIX-only). The original warning, its false
+// "can only be used inside functions" message, and the `local`->`typeset`
+// autofix were Bash-isms. The kata ID is retained per the no-removal
+// policy.
+func checkZC1069(_ ast.Node) []Violation {
+	return nil
 }
 
 func init() {
@@ -5159,13 +5089,81 @@ func checkZC1074(node ast.Node) []Violation {
 func init() {
 	RegisterKata(ast.SimpleCommandNode, Kata{
 		ID:    "ZC1075",
-		Title: "Quote variable expansions to prevent globbing",
-		Description: "Unquoted variable expansions in Zsh are subject to globbing (filename generation). " +
-			"If the variable contains characters like `*` or `?`, it might match files unexpectedly. " +
-			"Use quotes `\"$var\"` to prevent this.",
+		Title: "Quote variable expansions to prevent empty-word elision",
+		Description: "An unquoted expansion whose value is empty or unset is elided " +
+			"entirely, so the word vanishes from the command (`rm $file` becomes bare " +
+			"`rm` when `$file` is empty). Quote scalars as `\"$var\"` and arrays as " +
+			"`\"${arr[@]}\"`. In default Zsh, unlike Bash, an unquoted `$var` does not " +
+			"word-split or glob unless `SH_WORD_SPLIT` or `GLOB_SUBST` is set, for " +
+			"example under `emulate sh`.",
 		Severity: SeverityWarning,
 		Check:    checkZC1075,
 	})
+}
+
+// zc1075IsAssignmentBuiltin reports whether name is a Zsh builtin that
+// takes assignment words whose RHS is not glob/split-expanded.
+func zc1075IsAssignmentBuiltin(name ast.Expression) bool {
+	id, ok := name.(*ast.Identifier)
+	if !ok {
+		return false
+	}
+	switch id.Value {
+	case "export", "local", "readonly", "integer", "float", "typeset", "declare":
+		return true
+	}
+	return false
+}
+
+// zc1075IsAssignmentWord reports whether arg is an assignment word
+// (`NAME=...`). The `=` between the name and the value is carried by a
+// literal part of the concatenation — an Identifier (`FOO=`) or, more
+// commonly, a StringLiteral (`FOO` + `=` + `$BAR`).
+func zc1075IsAssignmentWord(arg ast.Expression) bool {
+	concat, ok := arg.(*ast.ConcatenatedExpression)
+	if !ok {
+		return false
+	}
+	for _, part := range concat.Parts {
+		switch p := part.(type) {
+		case *ast.Identifier:
+			if strings.Contains(p.Value, "=") {
+				return true
+			}
+		case *ast.StringLiteral:
+			if strings.Contains(p.Value, "=") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// zc1075IsNameByte reports whether c may appear in a parameter name.
+func zc1075IsNameByte(c byte) bool {
+	return c == '_' ||
+		(c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9')
+}
+
+// zc1075IsBareExpansion reports whether v is a bare parameter expansion
+// (`$name` or `$name[sub]`) with no literal tail. Only a bare expansion can
+// elide to a zero-length word when its value is empty; a suffixed form like
+// `$dir/foo` keeps a literal part and never elides, so quoting it changes
+// nothing in default Zsh.
+func zc1075IsBareExpansion(v string) bool {
+	if len(v) < 2 || v[0] != '$' || !zc1075IsNameByte(v[1]) {
+		return false
+	}
+	i := 1
+	for i < len(v) && zc1075IsNameByte(v[i]) {
+		i++
+	}
+	if i < len(v) && v[i] == '[' {
+		return v[len(v)-1] == ']'
+	}
+	return i == len(v)
 }
 
 func checkZC1075(node ast.Node) []Violation {
@@ -5176,28 +5174,41 @@ func checkZC1075(node ast.Node) []Violation {
 
 	violations := []Violation{}
 
+	isAssignBuiltin := zc1075IsAssignmentBuiltin(cmd.Name)
+
 	for _, arg := range cmd.Arguments {
+		// The RHS of an assignment word passed to an assignment builtin
+		// (`export FOO=$BAR`, `local X=$Y`, `readonly`, `integer`,
+		// `float`) is not subject to globbing or word splitting in Zsh,
+		// so it is not a glob hazard. Skip such assignment-word args —
+		// they were flagged inconsistently with the plain `foo=$BAR`
+		// form, which the kata already leaves alone.
+		if isAssignBuiltin && zc1075IsAssignmentWord(arg) {
+			continue
+		}
+
 		// Check if argument is a simple identifier starting with $
 		// or a braced expression ${...} that is NOT inside a string literal.
 		// The parser might wrap these in different ways.
 
 		// If it's a bare IdentifierNode (variable expansion), it's unquoted.
 		if ident, ok := arg.(*ast.Identifier); ok {
-			// Identifiers that start with $ are variable expansions
-			if len(ident.Value) > 0 && ident.Value[0] == '$' {
+			// Only a bare `$name` expansion can elide to nothing; a suffixed
+			// form like `$dir/foo` keeps a literal tail and never elides.
+			if zc1075IsBareExpansion(ident.Value) {
 				violations = append(violations, Violation{
 					KataID:  "ZC1075",
-					Message: "Unquoted variable expansion '" + ident.Value + "' is subject to globbing. Quote it: \"" + ident.Value + "\".",
+					Message: "Quote `" + ident.Value + "`. An unquoted empty or unset value is elided entirely, dropping the word.",
 					Line:    ident.Token.Line,
 					Column:  ident.Token.Column,
 					Level:   SeverityWarning,
 				})
 			}
 		} else if _, ok := arg.(*ast.ArrayAccess); ok {
-			// Array access ${arr[idx]} is also subject to globbing if unquoted
+			// An empty array element is elided when the access is unquoted.
 			violations = append(violations, Violation{
 				KataID:  "ZC1075",
-				Message: "Unquoted array access is subject to globbing. Quote it.",
+				Message: "Quote this array element. An unquoted empty value is elided, dropping the word.",
 				Line:    arg.TokenLiteralNode().Line,
 				Column:  arg.TokenLiteralNode().Column,
 				Level:   SeverityWarning,
@@ -5209,24 +5220,9 @@ func checkZC1075(node ast.Node) []Violation {
 			// We'll skip to reduce noise.
 		}
 
-		// Note: StringLiteral arguments are quoted, so we don't check them.
-		// But ConcatenatedExpression might contain unquoted parts.
-		// e.g. $var/foo
-		if concat, ok := arg.(*ast.ConcatenatedExpression); ok {
-			for _, part := range concat.Parts {
-				if ident, ok := part.(*ast.Identifier); ok {
-					if len(ident.Value) > 0 && ident.Value[0] == '$' {
-						violations = append(violations, Violation{
-							KataID:  "ZC1075",
-							Message: "Unquoted variable expansion '" + ident.Value + "' in concatenated string is subject to globbing.",
-							Line:    ident.Token.Line,
-							Column:  ident.Token.Column,
-							Level:   SeverityWarning,
-						})
-					}
-				}
-			}
-		}
+		// A concatenated expression such as `$var/foo` cannot elide: a
+		// literal part keeps the word non-empty, and Zsh does not split or
+		// glob the expansion by default. Nothing to flag here.
 	}
 
 	return violations
@@ -5516,126 +5512,25 @@ func init() {
 	RegisterKata(ast.DoubleBracketExpressionNode, Kata{
 		ID:    "ZC1079",
 		Title: "Quote RHS of `==` in `[[ ... ]]` to prevent pattern matching",
-		Description: "In `[[ ... ]]`, unquoted variable expansions on the right-hand side of `==` or `!=` " +
-			"are treated as patterns (globbing). If you intend to compare strings literally, quote the variable.",
+		Description: "Retained for compatibility. In default Zsh a variable on the " +
+			"right-hand side of `==`/`!=` inside `[[ ... ]]` is matched literally; " +
+			"pattern metacharacters in its value are active only with `${~var}` or " +
+			"`GLOB_SUBST` (off by default, unlike Bash), so quoting the RHS is a " +
+			"no-op and this rule no longer warns.",
 		Severity: SeverityWarning,
 		Check:    checkZC1079,
-		Fix:      fixZC1079,
 	})
 }
 
-// fixZC1079 wraps an unquoted RHS variable reference inside `[[ … ]]`
-// with double-quotes. Two edits: one `"` before the RHS token, one
-// after. RHS span is measured from source so `${arr[$i]}` and
-// `${var:-default}` stay whole. When the sibling LHS is an empty
-// string literal, ZC1055's `-z` / `-n` rewrite takes priority and
-// this fix no-ops to avoid overlapping edits.
-func fixZC1079(node ast.Node, v Violation, source []byte) []FixEdit {
-	if dbe, ok := node.(*ast.DoubleBracketExpression); ok {
-		for _, el := range dbe.Elements {
-			infix, ok := el.(*ast.InfixExpression)
-			if !ok {
-				continue
-			}
-			if infix.Operator != "==" && infix.Operator != "=" && infix.Operator != "!=" {
-				continue
-			}
-			if isEmptyStringLiteral(infix.Left) || isEmptyStringLiteral(infix.Right) {
-				// ZC1055 owns this rewrite; skip.
-				return nil
-			}
-		}
-	}
-	start := LineColToByteOffset(source, v.Line, v.Column)
-	if start < 0 || start >= len(source) {
-		return nil
-	}
-	argLen := unquotedArgLen(source, start)
-	if argLen == 0 {
-		return nil
-	}
-	endOff := start + argLen
-	endLine, endCol := offsetLineColZC1079(source, endOff)
-	if endLine < 0 {
-		return nil
-	}
-	return []FixEdit{
-		{Line: v.Line, Column: v.Column, Length: 0, Replace: `"`},
-		{Line: endLine, Column: endCol, Length: 0, Replace: `"`},
-	}
-}
-
-func isEmptyStringLiteral(n ast.Node) bool {
-	str, ok := n.(*ast.StringLiteral)
-	if !ok {
-		return false
-	}
-	return str.Value == `""` || str.Value == `''`
-}
-
-func offsetLineColZC1079(source []byte, offset int) (int, int) {
-	if offset < 0 || offset > len(source) {
-		return -1, -1
-	}
-	line := 1
-	col := 1
-	for i := 0; i < offset; i++ {
-		if source[i] == '\n' {
-			line++
-			col = 1
-			continue
-		}
-		col++
-	}
-	return line, col
-}
-
-var zc1079EqualityOps = map[string]struct{}{"==": {}, "=": {}, "!=": {}}
-
-func checkZC1079(node ast.Node) []Violation {
-	dbe, ok := node.(*ast.DoubleBracketExpression)
-	if !ok {
-		return nil
-	}
-	violations := []Violation{}
-	for _, expr := range dbe.Elements {
-		infix, ok := expr.(*ast.InfixExpression)
-		if !ok {
-			continue
-		}
-		if _, hit := zc1079EqualityOps[infix.Operator]; !hit {
-			continue
-		}
-		if tok := zc1079UnquotedVar(infix.Right); tok != nil {
-			violations = append(violations, Violation{
-				KataID:  "ZC1079",
-				Message: "Unquoted RHS matches as pattern. Quote to force string comparison: `\"$var\"`.",
-				Line:    tok.TokenLiteralNode().Line,
-				Column:  tok.TokenLiteralNode().Column,
-				Level:   SeverityWarning,
-			})
-		}
-	}
-	return violations
-}
-
-// zc1079UnquotedVar returns the token-bearing node when expr resolves
-// to an unquoted variable / array reference; nil otherwise.
-func zc1079UnquotedVar(expr ast.Expression) ast.Node {
-	switch r := expr.(type) {
-	case *ast.Identifier:
-		if len(r.Value) > 0 && r.Value[0] == '$' {
-			return r
-		}
-	case *ast.ArrayAccess, *ast.InvalidArrayAccess:
-		return r.(ast.Node)
-	case *ast.ConcatenatedExpression:
-		for _, part := range r.Parts {
-			if ident, ok := part.(*ast.Identifier); ok && len(ident.Value) > 0 && ident.Value[0] == '$' {
-				return ident
-			}
-		}
-	}
+// checkZC1079 is intentionally inert. In default Zsh a variable on the
+// right-hand side of `==`/`!=`/`=` inside `[[ ... ]]` is matched
+// literally: pattern metacharacters in the value are active only with
+// `${~var}` or `GLOB_SUBST`, both off by default (that activation is
+// Bash behavior). So quoting the RHS to "force string comparison" is a
+// no-op, and `[[ ... ]]` does not elide an empty expansion. The original
+// warning and its quoting autofix were Bash-isms. The kata ID is
+// retained per the no-removal policy.
+func checkZC1079(_ ast.Node) []Violation {
 	return nil
 }
 
@@ -6217,124 +6112,25 @@ func init() {
 	RegisterKata(ast.ForLoopStatementNode, Kata{
 		ID:    "ZC1085",
 		Title: "Quote variable expansions in `for` loops",
-		Description: "Unquoted variable expansions in `for` loops are split by IFS (usually spaces). " +
-			"This often leads to iterating over words instead of lines or array elements. Quote the expansion to preserve structure.",
+		Description: "Retained for compatibility. In native Zsh an unquoted " +
+			"variable expansion in a `for` word list does not word-split " +
+			"(`SH_WORD_SPLIT` is off by default), and quoting an array collapses " +
+			"it into one word — `for x in $arr` is the correct element-iteration " +
+			"idiom, so this rule no longer warns.",
 		Severity: SeverityWarning,
 		Check:    checkZC1085,
-		Fix:      fixZC1085,
 	})
 }
 
-// fixZC1085 wraps an unquoted expansion in a `for` loop item list
-// with double-quotes. Two-edit insertion at the span start and end.
-// Span uses the shared unquotedArgLen scanner so `${arr[@]}`,
-// `$(cmd args)`, `${var:-default}` all stay whole.
-func fixZC1085(_ ast.Node, v Violation, source []byte) []FixEdit {
-	start := LineColToByteOffset(source, v.Line, v.Column)
-	if start < 0 || start >= len(source) {
-		return nil
-	}
-	argLen := unquotedArgLen(source, start)
-	if argLen == 0 {
-		return nil
-	}
-	endLine, endCol := offsetLineColZC1085(source, start+argLen)
-	if endLine < 0 {
-		return nil
-	}
-	return []FixEdit{
-		{Line: v.Line, Column: v.Column, Length: 0, Replace: `"`},
-		{Line: endLine, Column: endCol, Length: 0, Replace: `"`},
-	}
-}
-
-func offsetLineColZC1085(source []byte, offset int) (int, int) {
-	if offset < 0 || offset > len(source) {
-		return -1, -1
-	}
-	line := 1
-	col := 1
-	for i := 0; i < offset; i++ {
-		if source[i] == '\n' {
-			line++
-			col = 1
-			continue
-		}
-		col++
-	}
-	return line, col
-}
-
-func checkZC1085(node ast.Node) []Violation {
-	loop, ok := node.(*ast.ForLoopStatement)
-	if !ok {
-		return nil
-	}
-
-	// If Items is nil or empty, it's either C-style or implicit `in "$@"`, ignore
-	if len(loop.Items) == 0 {
-		return nil
-	}
-
-	var violations []Violation
-
-	for _, item := range loop.Items {
-		if isUnquotedExpansion(item) {
-			violations = append(violations, Violation{
-				KataID:  "ZC1085",
-				Message: "Unquoted variable expansion in for loop. This will split on IFS (usually space). Quote it to iterate over lines or array elements.",
-				Line:    item.TokenLiteralNode().Line,
-				Column:  item.TokenLiteralNode().Column,
-				Level:   SeverityWarning,
-			})
-		}
-	}
-
-	return violations
-}
-
-func isUnquotedExpansion(expr ast.Expression) bool {
-	// Check for Identifier (e.g. $var)
-	if id, ok := expr.(*ast.Identifier); ok {
-		return id.TokenLiteralNode().Type == "VARIABLE"
-	}
-
-	// Check for ArrayAccess (e.g. ${arr[@]})
-	if _, ok := expr.(*ast.ArrayAccess); ok {
-		return true
-	}
-
-	// Check for DollarParenExpression (e.g. $(cmd))
-	if _, ok := expr.(*ast.DollarParenExpression); ok {
-		return true
-	}
-
-	// Check for CommandSubstitution (e.g. `cmd`)
-	if _, ok := expr.(*ast.CommandSubstitution); ok {
-		return true
-	}
-
-	// Check for ConcatenatedExpression
-	if concat, ok := expr.(*ast.ConcatenatedExpression); ok {
-		inQuotes := false
-		for _, part := range concat.Parts {
-			if str, ok := part.(*ast.StringLiteral); ok {
-				if str.Value == "\"" {
-					inQuotes = !inQuotes
-					continue
-				}
-				// Single quotes technically shouldn't appear here if parsed as StringLiteral?
-			}
-
-			if !inQuotes {
-				if isUnquotedExpansion(part) {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
+// checkZC1085 is intentionally inert. The original rule warned that an
+// unquoted variable expansion in a `for` word list "splits on IFS" and
+// its autofix wrapped the expansion in quotes. Both are wrong for native
+// Zsh: parameter expansions do not word-split unless `SH_WORD_SPLIT` is
+// set, and quoting an array collapses it into a single word. `for x in
+// $arr` is the correct element-iteration idiom, so warning on it (and the
+// quoting autofix) corrupted valid code.
+func checkZC1085(_ ast.Node) []Violation {
+	return nil
 }
 
 func init() {
@@ -6860,99 +6656,25 @@ func init() {
 	RegisterKata(ast.DoubleBracketExpressionNode, Kata{
 		ID:    "ZC1090",
 		Title: "Quoted regex pattern in `=~`",
-		Description: "Quoting the pattern on the right side of `=~` forces literal string matching in Zsh/Bash. " +
-			"Regex metacharacters inside quotes will be matched literally. " +
-			"Remove quotes to enable regex matching, or use `==` for literal string comparison.",
+		Description: "Retained for compatibility. Unlike Bash, Zsh takes the right " +
+			"side of `=~` as a regular expression regardless of quoting, so " +
+			"`[[ $x =~ \"^[0-9]+$\" ]]` still matches as a regex. Quoting is in " +
+			"fact idiomatic — it protects regex metacharacters from globbing and " +
+			"word splitting — so this rule no longer warns.",
 		Severity: SeverityWarning,
 		Check:    checkZC1090,
 	})
 }
 
-func checkZC1090(node ast.Node) []Violation {
-	expr, ok := node.(*ast.DoubleBracketExpression)
-	if !ok {
-		return nil
-	}
-
-	var violations []Violation
-
-	for _, e := range expr.Elements {
-		infix, ok := e.(*ast.InfixExpression)
-		if !ok {
-			continue
-		}
-
-		if infix.Operator != "=~" {
-			continue
-		}
-
-		// Check Right operand
-		checkOperand(infix.Right, infix, &violations)
-	}
-
-	return violations
-}
-
-func checkOperand(node ast.Expression, infix *ast.InfixExpression, violations *[]Violation) {
-	switch n := node.(type) {
-	case *ast.StringLiteral:
-		if containsRegexMeta(n.Value) {
-			*violations = append(*violations, Violation{
-				KataID:  "ZC1090",
-				Message: "Quoted regex pattern matches literally. Remove quotes to enable regex matching.",
-				Line:    n.TokenLiteralNode().Line,
-				Column:  n.TokenLiteralNode().Column,
-				Level:   SeverityWarning,
-			})
-		}
-	case *ast.ConcatenatedExpression:
-		for _, part := range n.Parts {
-			if sl, ok := part.(*ast.StringLiteral); ok {
-				if containsRegexMeta(sl.Value) {
-					*violations = append(*violations, Violation{
-						KataID:  "ZC1090",
-						Message: "Quoted regex pattern matches literally. Remove quotes from the regex part.",
-						Line:    sl.TokenLiteralNode().Line,
-						Column:  sl.TokenLiteralNode().Column,
-						Level:   SeverityWarning,
-					})
-					return // One violation per expression is enough
-				}
-			}
-		}
-	}
-}
-
-func containsRegexMeta(s string) bool {
-	// Check for regex metacharacters that are likely intended as regex but broken by quotes.
-	// ^ $ * + ? [ ( |
-	// We exclude . because it's common in text.
-	// We exclude $ because it's used for variables (and my parser keeps it in StringLiteral?).
-	// Wait, "$var" literal is "$var" or "value"?
-	// Parser stores raw literal including quotes usually?
-	// Lexer `readString` returns content WITH quotes.
-	// So `s` includes quotes!
-	// `containsRegexMeta` should check INSIDE quotes.
-
-	if len(s) < 2 {
-		return false
-	}
-	// Strip quotes
-	content := s[1 : len(s)-1]
-
-	for _, char := range content {
-		switch char {
-		case '^', '*', '+', '?', '[', '(', '|':
-			return true
-			// case '$':
-			// 	// $ might be variable. Don't flag.
-			// case '.':
-			//  // . is common. Don't flag "file.txt".
-		}
-	}
-	// Check for $ at end? `foo$` -> regex end anchor.
-	// if strings.HasSuffix(content, "$") { ... } - Removed empty block
-	return false
+// checkZC1090 is intentionally inert. In Zsh the right-hand side of
+// `=~` is a regular expression regardless of quoting (unlike Bash,
+// where a quoted RHS matches literally), so a quoted regex still works.
+// The original warning ported the Bash rule, and its "remove quotes"
+// advice broke regexes containing spaces or `[[`-significant characters
+// with a `condition expected` syntax error. The kata ID is retained
+// per the no-removal policy.
+func checkZC1090(_ ast.Node) []Violation {
+	return nil
 }
 
 func init() {
@@ -7428,13 +7150,22 @@ func checkZC1098(node ast.Node) []Violation {
 
 			// If we find `$` but no `(q`, warn.
 
-			// Check for variable usage
+			// Check for a parameter expansion. A `$` that introduces a
+			// command (or arithmetic) substitution `$(` cannot be quoted
+			// with the `(q)` flag — that flag applies only to parameter
+			// expansions `${...}` / `$name` — so skip it. This keeps the
+			// shell-init idiom `eval "$(tool init zsh)"` quiet while still
+			// flagging `eval "$var"` and `eval "$(cmd) ${userdata}"`.
 			hasVar := false
 			for i := 0; i < len(argStr); i++ {
-				if argStr[i] == '$' {
-					hasVar = true
-					break
+				if argStr[i] != '$' {
+					continue
 				}
+				if i+1 < len(argStr) && argStr[i+1] == '(' {
+					continue
+				}
+				hasVar = true
+				break
 			}
 
 			if hasVar {

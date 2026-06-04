@@ -234,10 +234,13 @@ func checkZC1105(node ast.Node) []Violation {
 		return nil
 	}
 
-	// Check if the expression contains a nested arithmetic expansion
-	// A simplified check: if the string representation contains another $(( or ((
+	// Flag a genuinely nested arithmetic expansion: a `$(( ... ))` inside the
+	// `(( ... ))` command. Match only on `$((`; plain grouping parens are not
+	// an expansion, and a `(( ... ))` block cannot appear as a sub-expression
+	// inside another (it is a command, not an expression), so a bare `((`
+	// match would only ever catch the printer's grouping output.
 	exprString := arithCmd.Expression.String()
-	if strings.Contains(exprString, "$((") || strings.Contains(exprString, "((") {
+	if strings.Contains(exprString, "$((") {
 		return []Violation{{
 			KataID:  "ZC1105",
 			Message: "Avoid nested arithmetic expansions. Use intermediate variables for clarity.",
@@ -4564,42 +4567,21 @@ func init() {
 		ID:       "ZC1186",
 		Title:    "Use `unset -v` or `unset -f` for explicit unsetting",
 		Severity: SeverityInfo,
-		Description: "Bare `unset name` is ambiguous — it unsets variables first, then functions. " +
-			"Use `unset -v` for variables or `unset -f` for functions to be explicit.",
+		Description: "Retained for compatibility. In Zsh bare `unset name` unsets a " +
+			"parameter only; reaching a function needs `unset -f`. There is no " +
+			"variable-then-function fall-through (that is Bash), so bare `unset` is " +
+			"not ambiguous and this rule no longer warns.",
 		Check: checkZC1186,
 	})
 }
 
-func checkZC1186(node ast.Node) []Violation {
-	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
-		return nil
-	}
-
-	ident, ok := cmd.Name.(*ast.Identifier)
-	if !ok || ident.Value != "unset" {
-		return nil
-	}
-
-	for _, arg := range cmd.Arguments {
-		val := arg.String()
-		if val == "-v" || val == "-f" {
-			return nil
-		}
-	}
-
-	if len(cmd.Arguments) == 0 {
-		return nil
-	}
-
-	return []Violation{{
-		KataID: "ZC1186",
-		Message: "Use `unset -v name` for variables or `unset -f name` for functions. " +
-			"Bare `unset` is ambiguous about what is being removed.",
-		Line:   cmd.Token.Line,
-		Column: cmd.Token.Column,
-		Level:  SeverityInfo,
-	}}
+// checkZC1186 is intentionally inert. In Zsh bare `unset name` unsets a
+// parameter only; reaching a function requires `unset -f` (or `unfunction`).
+// There is no variable-then-function fall-through — that behaviour is Bash —
+// so bare `unset` is unambiguous and the original "ambiguous" warning was a
+// Bash-ism. The kata ID is retained per the no-removal policy.
+func checkZC1186(_ ast.Node) []Violation {
+	return nil
 }
 
 func init() {

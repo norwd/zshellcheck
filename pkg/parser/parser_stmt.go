@@ -651,6 +651,25 @@ func updateCommandWordBraceDepth(depth int, t token.Type) int {
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	stmt := &ast.LetStatement{Token: p.curToken}
 
+	// Zsh `let` accepts one or more quoted arithmetic expressions
+	// (`let "x = y"`, documented as equivalent to `(( … ))`). There is
+	// no bare NAME=value to split, so parse the string as the value and
+	// leave Name nil — the ZC1013 auto-fix bails on a nil Name.
+	if p.peekTokenIs(token.STRING) {
+		p.nextToken()
+		prevInArithmetic := p.inArithmetic
+		p.inArithmetic = true
+		stmt.Value = p.parseExpression(LOWEST)
+		p.inArithmetic = prevInArithmetic
+		for !p.peekTokenIs(token.SEMICOLON) && !p.peekTokenIs(token.EOF) && p.peekOnSameLogicalLine() {
+			p.nextToken() // consume any further args, e.g. `let "a" "b"`
+		}
+		if p.peekTokenIs(token.SEMICOLON) {
+			p.nextToken()
+		}
+		return stmt
+	}
+
 	if !p.expectPeek(token.IDENT) {
 		return nil
 	}
@@ -665,11 +684,31 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
-	if !p.expectPeek(token.ASSIGN) {
-		return nil
+	// `let name++` / `let name--` is a complete arithmetic expression
+	// with no assignment, so there is no `=` to expect (`let HISTSIZE++`).
+	if p.peekTokenIs(token.INC) || p.peekTokenIs(token.DEC) {
+		p.nextToken()
+		stmt.Value = &ast.PostfixExpression{
+			Token:    p.curToken,
+			Operator: p.curToken.Literal,
+			Left:     stmt.Name,
+		}
+		if p.peekTokenIs(token.SEMICOLON) {
+			p.nextToken()
+		}
+		return stmt
 	}
 
-	p.nextToken() // consume '='
+	// Zsh `let` evaluates arithmetic expressions, so the target may use
+	// any compound assignment operator (`+=`, `-=`, `*=`, `<<=`, ...),
+	// which the lexer fuses to token.PLUSEQ, not only plain `=`.
+	if !p.peekTokenIs(token.ASSIGN) && !p.peekTokenIs(token.PLUSEQ) {
+		p.peekError(token.ASSIGN)
+		return nil
+	}
+	p.nextToken() // move onto the assignment operator
+
+	p.nextToken() // consume the operator
 
 	prevInArithmetic := p.inArithmetic
 	p.inArithmetic = true
@@ -783,6 +822,13 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 	for p.curTokenIs(token.ELIF) {
 		elifToken := p.curToken
 		p.nextToken() // consume "elif"
+		// Clear consumedBraceTerminator possibly left set by a brace-
+		// closing statement at the tail of the preceding then-body
+		// (e.g. a `case … esac` or an inner `if … fi`). Without this the
+		// elif condition's parseBlockStatement(THEN) inherits the flag,
+		// skips its post-statement nextToken, and drops onto `))` with no
+		// prefix handler. Mirrors the clear in the brace-form `if` above.
+		p.consumedBraceTerminator = false
 		elif := &ast.IfStatement{Token: elifToken}
 		elif.Condition = p.parseBlockStatement(token.THEN)
 		if !p.curTokenIs(token.THEN) {
@@ -1001,18 +1047,27 @@ func (p *Parser) parseCaseStatement() *ast.CaseStatement {
 	// parseExpression stopped at the first `/` or `:` and mis-reported
 	// the trailing parts as an unexpected token before `in`.
 	stmt.Value = p.parseCommandWord()
-	if !p.expectPeek(token.IN) {
+	// Zsh opens a case body with `in` or `{` (zshmisc, ALTERNATE FORMS
+	// FOR COMPLEX COMMANDS). A brace-opened body may close with `}` or
+	// `esac`. An `in`-opened body closes only with `esac`: it must NOT
+	// also accept `}`, or a `}` from an enclosing function or brace
+	// block would close the case early.
+	braceOpened := false
+	if p.peekTokenIs(token.LBRACE) {
+		braceOpened = true
+		p.nextToken() // step onto `{`
+	} else if !p.expectPeek(token.IN) {
 		return nil
 	}
 	p.nextToken()
-	for !p.curTokenIs(token.ESAC) && !p.curTokenIs(token.EOF) {
+	for !p.curTokenIsCaseCloser(braceOpened) && !p.curTokenIs(token.EOF) {
 		for p.curTokenIs(token.SEMICOLON) {
 			p.nextToken()
 		}
-		if p.curTokenIs(token.ESAC) {
+		if p.curTokenIsCaseCloser(braceOpened) {
 			break
 		}
-		clause := p.parseCaseClause()
+		clause := p.parseCaseClause(braceOpened)
 		if clause == nil {
 			return nil
 		}
@@ -1030,11 +1085,20 @@ func (p *Parser) parseCaseStatement() *ast.CaseStatement {
 	// Skip the advance when the successor is a pipeline / logical
 	// continuation — consumePipelineTail expects peek=PIPE/AND/OR
 	// — or EOF, where there is nothing to advance onto.
-	if p.curTokenIs(token.ESAC) && p.shouldAdvancePastEsac() {
+	if p.curTokenIsCaseCloser(braceOpened) && p.shouldAdvancePastEsac() {
 		p.nextToken()
 		p.consumedBraceTerminator = true
 	}
 	return stmt
+}
+
+// curTokenIsCaseCloser reports whether the current token closes a case
+// body. `esac` always closes; `}` closes only a brace-opened body.
+func (p *Parser) curTokenIsCaseCloser(braceOpened bool) bool {
+	if p.curTokenIs(token.ESAC) {
+		return true
+	}
+	return braceOpened && p.curTokenIs(token.RBRACE)
 }
 
 // shouldAdvancePastEsac reports whether parseCaseStatement should step
@@ -1053,7 +1117,7 @@ func (p *Parser) parseShebangStatement() *ast.Shebang {
 	return &ast.Shebang{Token: p.curToken, Path: p.curToken.Literal}
 }
 
-func (p *Parser) parseCaseClause() *ast.CaseClause {
+func (p *Parser) parseCaseClause(braceOpened bool) *ast.CaseClause {
 	clause := &ast.CaseClause{Token: p.curToken}
 	if p.curTokenIs(token.LPAREN) && p.lookaheadCaseLabelOpener() {
 		p.nextToken()
@@ -1079,7 +1143,14 @@ func (p *Parser) parseCaseClause() *ast.CaseClause {
 		return nil
 	}
 	p.nextToken()
-	clause.Body = p.parseBlockStatement(token.DSEMI, token.ESAC)
+	// A clause body ends at `;;`, or at the case closer when the final
+	// clause omits the `;;`. `}` is a valid closer only for a
+	// brace-opened case, so it joins the terminator set only then.
+	terminators := []token.Type{token.DSEMI, token.ESAC}
+	if braceOpened {
+		terminators = append(terminators, token.RBRACE)
+	}
+	clause.Body = p.parseBlockStatement(terminators...)
 	return clause
 }
 
@@ -1123,10 +1194,12 @@ func (p *Parser) parseForLoopStatement() *ast.ForLoopStatement {
 	if p.peekTokenIs(token.IN) {
 		p.consumeForLoopInItems(stmt)
 	}
+	sepSeen := false
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
+		sepSeen = true
 	}
-	return p.consumeForLoopBody(stmt)
+	return p.consumeForLoopBody(stmt, sepSeen)
 }
 
 func (p *Parser) parseArithmeticForLoop(stmt *ast.ForLoopStatement) *ast.ForLoopStatement {
@@ -1249,14 +1322,19 @@ func (p *Parser) consumeForLoopInItems(stmt *ast.ForLoopStatement) {
 	}
 }
 
-func (p *Parser) consumeForLoopBody(stmt *ast.ForLoopStatement) *ast.ForLoopStatement {
+func (p *Parser) consumeForLoopBody(stmt *ast.ForLoopStatement, sepSeen bool) *ast.ForLoopStatement {
 	if p.peekTokenIs(token.LBRACE) {
 		p.nextToken()
 		p.nextToken()
 		stmt.Body = p.parseBlockStatement(token.RBRACE)
 		return stmt
 	}
-	if !p.peekTokenIs(token.DO) && !p.peekTokenIs(token.EOF) && !p.peekOnSameLogicalLine() {
+	// Short for-loop (SHORT_LOOPS, on by default): a braceless single
+	// command body follows a `;` separator (sepSeen) or a newline (peek
+	// on a new logical line), e.g. `for x in a b; print $x`. Without
+	// sepSeen, a same-line `;`-separated body fell through to the `do`
+	// expectation and errored.
+	if !p.peekTokenIs(token.DO) && !p.peekTokenIs(token.EOF) && (sepSeen || !p.peekOnSameLogicalLine()) {
 		p.nextToken()
 		stmt.Body = wrapForLoopBody(stmt.Token, p.parseStatement())
 		return stmt

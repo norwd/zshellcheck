@@ -62,6 +62,40 @@ func TestParseArithDollarBraceSimple(t *testing.T) {
 	parseSourceClean(t, "(( x = ${y} + 1 ))\n")
 }
 
+// `#` inside `$(( … ))` arithmetic expansion is an operator (the
+// char-code prefix `##A` or the positional-arg count `#`), not a comment
+// opener, even with a preceding space. The lexer marks the inner `(` of
+// `$((` so inArithmetic() holds. Issue #1361.
+func TestParseArithDollarParenHashNotComment(t *testing.T) {
+	parseSourceClean(t, "x=$(( ##A ))\n")
+	parseSourceClean(t, "y=$(( # > 0 ))\n")
+}
+
+// A bare `?` in arithmetic prefix position is the `$?` special parameter,
+// not the ternary operator. `(( ? == 0 ))` must read as `$? == 0`; the
+// operator-followed form used to error "no prefix for ==". The ternary
+// `?` (infix) is unaffected. Issue #1378 (used by the Pure prompt).
+func TestParseArithBareQuestionBeforeOperator(t *testing.T) {
+	parseSourceClean(t, "x=$((? == 0))\n")
+	parseSourceClean(t, "y=$(( ? != 0 ))\n")
+	parseSourceClean(t, "z=$(( ? + 1 ))\n")
+	parseSourceClean(t, "t=$(( cond ? 2 : 3 ))\n")
+	parseSourceClean(t, "n=$(( a ? b : c ? d : e ))\n")
+}
+
+// In arithmetic a reserved word is a variable name, not a control-flow
+// keyword or a terminator: `(( done = 1 ))` assigns to the variable
+// `done`, both as the left-hand side and as a right-hand operand. The
+// zsh distribution uses this (Calendar/calendar_add). Issue #1379.
+func TestParseArithReservedWordAsVariable(t *testing.T) {
+	parseSourceClean(t, "(( done = 1 ))\n")
+	parseSourceClean(t, "(( in = 5 ))\n")
+	parseSourceClean(t, "x=$(( case + 1 ))\n")
+	parseSourceClean(t, "(( x = done ))\n")
+	parseSourceClean(t, "(( done = in + 1 ))\n")
+	parseSourceClean(t, "(( $+widgets[$KEYMAP] == 1 ))\n")
+}
+
 // TestParseArithAllCompoundOpsRegression is a stress test exercising all
 // compound-assign operators in a single arithmetic block.
 func TestParseArithAllCompoundOpsRegression(t *testing.T) {

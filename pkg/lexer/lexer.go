@@ -256,7 +256,10 @@ func (l *Lexer) lastTokenIsValueTerminator() bool {
 // arithmetic group. The parser's `((`-marker is 'D' on parenStack.
 func (l *Lexer) inArithmetic() bool {
 	for i := len(l.parenStack) - 1; i >= 0; i-- {
-		if l.parenStack[i] == 'D' {
+		// 'D' marks a `((` arithmetic command; 'A' marks the inner `(`
+		// of `$((` arithmetic expansion. Both make `#` an operator (the
+		// positional-arg count / char-code prefix), not a comment opener.
+		if l.parenStack[i] == 'D' || l.parenStack[i] == 'A' {
 			return true
 		}
 	}
@@ -452,7 +455,17 @@ func (l *Lexer) readOpenParen() token.Token {
 		return tok
 	}
 	tok := newToken(token.LPAREN, l.ch, l.line, l.column)
-	l.parenStack = append(l.parenStack, 'P')
+	// The inner `(` of `$((` arithmetic: `suppressLparenFusion` means the
+	// previous token was `$(`, and adjacency (no space before this `(`)
+	// distinguishes `$((` arithmetic from `$( (subshell`. Mark it 'A' so
+	// inArithmetic() holds inside `$(( … ))` (e.g. a spaced `#` is the
+	// arg-count operator, not a comment) while it still closes with a
+	// single RPAREN like a plain 'P'.
+	marker := byte('P')
+	if l.suppressLparenFusion && l.position > 0 && l.input[l.position-1] == '(' {
+		marker = 'A'
+	}
+	l.parenStack = append(l.parenStack, marker)
 	return tok
 }
 
@@ -1164,6 +1177,21 @@ func (l *Lexer) absorbEmbeddedDollarParen() bool {
 			for l.ch != 0 {
 				l.readChar()
 				if l.ch == '\'' {
+					break
+				}
+			}
+		case '"':
+			// Scan a double-quoted span as a unit so a literal `'`
+			// (e.g. `"it's"`) does not open a bogus single-quote scan and
+			// a literal `)` inside the string does not unbalance depth.
+			// Inside double quotes a backslash escapes the next byte.
+			for l.ch != 0 {
+				l.readChar()
+				if l.ch == '\\' {
+					l.readChar()
+					continue
+				}
+				if l.ch == '"' {
 					break
 				}
 			}
