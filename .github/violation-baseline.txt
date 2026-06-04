@@ -26,7 +26,7 @@ antidote/tests/bin/init_fixtures.zsh	ZC1004	1
 antidote/tests/bin/init_fixtures.zsh	ZC1016	1
 antidote/tests/bin/init_fixtures.zsh	ZC1043	3
 antidote/tests/bin/init_fixtures.zsh	ZC1097	3
-antidote/tests/bin/test_fzf_opts_manual.zsh	ZC1017	1
+antidote/tests/bin/test_fzf_opts_manual.zsh	ZC1017	2
 antidote/tests/bin/test_fzf_opts_manual.zsh	ZC1075	2
 antidote/tests/__init__.zsh	ZC1031	1
 antidote/tests/testdata/real/.zsh_plugins.zsh	ZC1001	2
@@ -914,7 +914,6 @@ zinit/zinit-additional.zsh	ZC1877	1
 zinit/zinit-additional.zsh	ZC1916	1
 zinit/zinit-autoload.zsh	ZC1001	16
 zinit/zinit-autoload.zsh	ZC1002	2
-zinit/zinit-autoload.zsh	ZC1010	1
 zinit/zinit-autoload.zsh	ZC1012	2
 zinit/zinit-autoload.zsh	ZC1015	2
 zinit/zinit-autoload.zsh	ZC1017	2
@@ -925,7 +924,6 @@ zinit/zinit-autoload.zsh	ZC1046	5
 zinit/zinit-autoload.zsh	ZC1049	7
 zinit/zinit-autoload.zsh	ZC1053	1
 zinit/zinit-autoload.zsh	ZC1064	1
-zinit/zinit-autoload.zsh	ZC1065	1
 zinit/zinit-autoload.zsh	ZC1071	1
 zinit/zinit-autoload.zsh	ZC1073	1
 zinit/zinit-autoload.zsh	ZC1075	40
