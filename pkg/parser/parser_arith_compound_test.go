@@ -83,6 +83,19 @@ func TestParseArithBareQuestionBeforeOperator(t *testing.T) {
 	parseSourceClean(t, "n=$(( a ? b : c ? d : e ))\n")
 }
 
+// In arithmetic a reserved word is a variable name, not a control-flow
+// keyword or a terminator: `(( done = 1 ))` assigns to the variable
+// `done`, both as the left-hand side and as a right-hand operand. The
+// zsh distribution uses this (Calendar/calendar_add). Issue #1379.
+func TestParseArithReservedWordAsVariable(t *testing.T) {
+	parseSourceClean(t, "(( done = 1 ))\n")
+	parseSourceClean(t, "(( in = 5 ))\n")
+	parseSourceClean(t, "x=$(( case + 1 ))\n")
+	parseSourceClean(t, "(( x = done ))\n")
+	parseSourceClean(t, "(( done = in + 1 ))\n")
+	parseSourceClean(t, "(( $+widgets[$KEYMAP] == 1 ))\n")
+}
+
 // TestParseArithAllCompoundOpsRegression is a stress test exercising all
 // compound-assign operators in a single arithmetic block.
 func TestParseArithAllCompoundOpsRegression(t *testing.T) {

@@ -24,7 +24,28 @@ var expressionTerminators = map[token.Type]struct{}{
 	token.TYPESET: {}, token.DECLARE: {},
 }
 
+// arithKeywordTokens are reserved-word tokens that, inside arithmetic, are
+// ordinary variable names rather than control-flow keywords or expression
+// terminators — `(( done = 1 ))`, `(( in + 1 ))`. Reserved words are
+// special only in command position.
+var arithKeywordTokens = map[token.Type]struct{}{
+	token.If: {}, token.THEN: {}, token.ELSE: {}, token.ELIF: {},
+	token.Fi: {}, token.FOR: {}, token.WHILE: {}, token.DO: {},
+	token.DONE: {}, token.IN: {}, token.CASE: {}, token.ESAC: {},
+	token.SELECT: {}, token.FUNCTION: {}, token.COPROC: {},
+}
+
 func (p *Parser) parseExpression(precedence int) ast.Expression {
+	// In arithmetic a reserved word in operand position is a variable
+	// name, not a control-flow keyword or a terminator. Parse it as an
+	// identifier and run the infix chain so `(( done = 1 ))` reads as an
+	// assignment to the variable `done`.
+	if p.inArithmetic {
+		if _, kw := arithKeywordTokens[p.curToken.Type]; kw {
+			tok := p.curToken
+			return p.parseInfixChain(&ast.Identifier{Token: tok, Value: tok.Literal}, precedence)
+		}
+	}
 	if _, hit := expressionTerminators[p.curToken.Type]; hit {
 		return nil
 	}
@@ -40,7 +61,13 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 		p.noPrefixParseFnError(p.curToken.Type)
 		return nil
 	}
-	leftExp := prefix()
+	return p.parseInfixChain(prefix(), precedence)
+}
+
+// parseInfixChain folds infix operators onto leftExp until precedence or a
+// syntactic boundary stops it. Shared by the prefix-dispatch path and the
+// arithmetic-keyword-as-identifier path in parseExpression.
+func (p *Parser) parseInfixChain(leftExp ast.Expression, precedence int) ast.Expression {
 	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
 		if p.expressionInfixShouldBreak() {
 			break
@@ -494,7 +521,11 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	// otherwise parseStatement's outer nextToken would skip past
 	// the keyword.
 	isAssign := p.curTokenIs(token.ASSIGN) || p.curTokenIs(token.PLUSEQ)
-	if isAssign && isEmptyRhsTerminator(p.peekToken.Type) {
+	// In arithmetic an assignment always has a right-hand side, and a
+	// reserved word after `=` is a variable (`(( x = done ))`), not an
+	// empty-RHS next-statement keyword. The empty-RHS shortcut is for the
+	// command-context `X=<NL>for …` form only.
+	if isAssign && !p.inArithmetic && isEmptyRhsTerminator(p.peekToken.Type) {
 		return expression
 	}
 	p.nextToken()
