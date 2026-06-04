@@ -1137,7 +1137,11 @@ func (p *Parser) parseCommandSubstitution() ast.Expression {
 func (p *Parser) parseDollarParenExpression() ast.Expression {
 	exp := &ast.DollarParenExpression{Token: p.curToken}
 
-	if p.peekTokenIs(token.LPAREN) {
+	// `$((…))` arithmetic: the inner `(` is glued to `$(` with no space.
+	// `$( (cmd) )` (a space before the `(`) is a command substitution
+	// whose body is a subshell, not arithmetic — fall through to the
+	// command-list path so the subshell parses.
+	if p.peekTokenIs(token.LPAREN) && !p.peekToken.HasPrecedingSpace {
 		p.nextToken()
 		p.nextToken() // consume `(`
 
