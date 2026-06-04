@@ -70,6 +70,20 @@ func TestStringEscapedDollarBraceDoesNotSwallow(t *testing.T) {
 	}
 }
 
+// The nested-quote skip inside `${…}` covers a `'…'` span, a `"…"`
+// span with a `\"` escape, and an unterminated span that runs to EOF.
+// A brace hidden in any of these must not unbalance the expansion.
+func TestStringNestedQuoteSpansInsideDollarBrace(t *testing.T) {
+	for _, src := range []string{
+		"echo \"${x:-'a}b'}\"\nnext=1\n",       // single-quoted span hides `}`
+		"echo \"${x:-\"a\\\"}b\"}\"\nnext=2\n", // double-quoted span with \" and `}`
+		"echo \"${x:-\"unterminated}",          // nested span runs to EOF
+	} {
+		// Must not panic or loop; tokensFor caps runaway lexing.
+		tokensFor(t, src)
+	}
+}
+
 // A nested `${…${…}…}` must still balance: the inner `${` opener is
 // counted and its `}` decrements, so the outer expansion closes
 // correctly. Guards against over-correcting the #1377 fix.
