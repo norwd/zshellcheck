@@ -47,6 +47,25 @@ func TestParseFunctionNameWithPositional(t *testing.T) {
 	parseSourceClean(t, "function _$0_fmt() {\n  echo hi\n}\n")
 }
 
+// `until` is a Zsh reserved word with the same grammar as `while`. It
+// previously lexed as a plain command, so its `(( … ))` condition was
+// parsed as an argument and a grouped sub-expression (`( a ) != b`)
+// errored. The zsh-z plugin uses this form; sharing the WHILE token
+// routes `until` through the loop parser. Each input is `zsh -n` clean.
+func TestParseUntilLoop(t *testing.T) {
+	cases := []string{
+		"until true; do break; done\n",
+		"until [[ -f x ]]; do sleep 1; done\n",
+		"until (( ( a ) != b )); do :; done\n",
+		"until (( ( ${#cd:h} - ${#${${cd:h}//${~q}/}} ) != q_chars )); do :; done\n",
+		"until (( ( ${#cd:h} - ${#${${${cd:h}:l}//${~${q:l}}/}} ) != q )); do :; done\n",
+		"until cmd; do echo loop; done\n",
+	}
+	for _, src := range cases {
+		parseSourceClean(t, src)
+	}
+}
+
 // Exercise every operand form the character-code prefix operator accepts,
 // plus the bare-`#` fallback when no operand is glued on.
 func TestParseArithmeticCharCodeOperandForms(t *testing.T) {
