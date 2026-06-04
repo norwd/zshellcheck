@@ -2705,103 +2705,57 @@ func TestZC1069(t *testing.T) {
 		input    string
 		expected []katas.Violation
 	}{
+		// ZC1069 is inert. In Zsh `local` equals `typeset` and is valid at
+		// any scope, so none of these inputs may report a violation.
 		{
-			name:     "valid local in function",
+			name:     "local in function",
 			input:    `my_func() { local x=1; }`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:     "valid typeset global",
+			name:     "typeset global",
 			input:    `typeset x=1`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local global",
-			input: `local x=1`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 1,
-				},
-			},
+			name:     "local at global scope (valid in zsh)",
+			input:    `local x=1`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in if block (global)",
-			input: `if true; then local x=1; fi`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 15,
-				},
-			},
+			name:     "local in if block (valid in zsh)",
+			input:    `if true; then local x=1; fi`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:     "valid local in nested function",
+			name:     "local in nested function",
 			input:    `outer() { inner() { local x=1; }; }`,
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in subshell (global)",
-			input: `( local x=1 )`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 3,
-				},
-			},
+			name:     "local in subshell (valid in zsh)",
+			input:    `( local x=1 )`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:     "valid local in function keyword",
+			name:     "local in function keyword",
 			input:    "function myfunc { local x=1; }",
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in while loop (global)",
-			input: `while true; do local x=1; done`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 16,
-				},
-			},
+			name:     "local in while loop (valid in zsh)",
+			input:    `while true; do local x=1; done`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in for loop (global)",
-			input: `for i in a b c; do local x=1; done`,
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   1,
-					Column: 20,
-				},
-			},
+			name:     "local in for loop (valid in zsh)",
+			input:    `for i in a b c; do local x=1; done`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid local in case (global)",
-			input: "case $x in\na) local y=1;;\nesac",
-			expected: []katas.Violation{
-				{
-					KataID: "ZC1069",
-					Message: "`local` can only be used inside functions. " +
-						"Use `typeset`, `declare`, or just assignment for global variables.",
-					Line:   2,
-					Column: 4,
-				},
-			},
+			name:     "local in case (valid in zsh)",
+			input:    "case $x in\na) local y=1;;\nesac",
+			expected: []katas.Violation{},
 		},
 		{
 			name:     "regular echo command",

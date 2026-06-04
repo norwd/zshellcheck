@@ -4676,172 +4676,24 @@ func init() {
 	RegisterKata(ast.ProgramNode, Kata{
 		ID:    "ZC1069",
 		Title: "Avoid `local` outside of functions",
-		Description: "The `local` builtin can only be used inside functions. " +
-			"Using it in the global scope causes an error.",
+		Description: "Retained for compatibility. In Zsh `local` is equivalent to " +
+			"`typeset` and is valid at any scope (top level, sourced files, even " +
+			"under `emulate sh`); the function-only restriction is Bash/POSIX-only, " +
+			"so this rule no longer warns.",
 		Severity: SeverityInfo,
 		Check:    checkZC1069,
-		Fix:      fixZC1069,
 	})
 }
 
-// fixZC1069 rewrites `local` to `typeset` when used at file scope.
-// `typeset` works in both function and global contexts, so the
-// rewrite is safe wherever the detector fires. Single-edit name
-// swap at the violation column. Idempotent — a re-run sees
-// `typeset`, not `local`. Defensive byte-match guard.
-func fixZC1069(_ ast.Node, v Violation, source []byte) []FixEdit {
-	off := LineColToByteOffset(source, v.Line, v.Column)
-	if off < 0 || off+len("local") > len(source) {
-		return nil
-	}
-	if string(source[off:off+len("local")]) != "local" {
-		return nil
-	}
-	return []FixEdit{{
-		Line:    v.Line,
-		Column:  v.Column,
-		Length:  len("local"),
-		Replace: "typeset",
-	}}
-}
-
-func checkZC1069(node ast.Node) []Violation {
-	program, ok := node.(*ast.Program)
-	if !ok {
-		return nil
-	}
-	w := zc1069Walker{}
-	w.walk(program, false)
-	return w.violations
-}
-
-type zc1069Walker struct {
-	violations []Violation
-}
-
-func (w *zc1069Walker) walk(n ast.Node, inFunction bool) {
-	if n == nil {
-		return
-	}
-	// A Node interface can hold a concrete pointer type with a nil value
-	// underneath (typed nil); it does not compare equal to nil. Descending
-	// hands a switch arm a nil receiver and dereferencing a field panics.
-	if v := reflect.ValueOf(n); v.Kind() == reflect.Pointer && v.IsNil() {
-		return
-	}
-	w.recordIfBareLocal(n, inFunction)
-	w.descendChildren(n, inFunction)
-}
-
-func (w *zc1069Walker) recordIfBareLocal(n ast.Node, inFunction bool) {
-	cmd, ok := n.(*ast.SimpleCommand)
-	if !ok {
-		return
-	}
-	name, ok := cmd.Name.(*ast.Identifier)
-	if !ok {
-		return
-	}
-	if name.Value != "local" || inFunction {
-		return
-	}
-	w.violations = append(w.violations, Violation{
-		KataID: "ZC1069",
-		Message: "`local` can only be used inside functions. " +
-			"Use `typeset`, `declare`, or just assignment for global variables.",
-		Line:   name.Token.Line,
-		Column: name.Token.Column,
-		Level:  SeverityInfo,
-	})
-}
-
-func (w *zc1069Walker) descendChildren(n ast.Node, inFunction bool) {
-	switch t := n.(type) {
-	case *ast.Program:
-		w.walkStatements(t.Statements, inFunction)
-	case *ast.BlockStatement:
-		w.walkStatements(t.Statements, inFunction)
-	case *ast.IfStatement:
-		w.walk(t.Condition, inFunction)
-		w.walk(t.Consequence, inFunction)
-		w.walk(t.Alternative, inFunction)
-	case *ast.ForLoopStatement:
-		w.walkForLoop(t, inFunction)
-	case *ast.WhileLoopStatement:
-		w.walk(t.Condition, inFunction)
-		w.walk(t.Body, inFunction)
-	case *ast.FunctionDefinition:
-		w.walk(t.Name, inFunction)
-		w.walk(t.Body, true)
-	case *ast.FunctionLiteral:
-		w.walkFunctionLiteral(t)
-	case *ast.SimpleCommand:
-		w.walk(t.Name, inFunction)
-		w.walkExpressions(t.Arguments, inFunction)
-	default:
-		w.descendOtherChildren(n, inFunction)
-	}
-}
-
-func (w *zc1069Walker) descendOtherChildren(n ast.Node, inFunction bool) {
-	switch t := n.(type) {
-	case *ast.ExpressionStatement:
-		w.walk(t.Expression, inFunction)
-	case *ast.InfixExpression:
-		w.walk(t.Left, inFunction)
-		w.walk(t.Right, inFunction)
-	case *ast.PrefixExpression:
-		w.walk(t.Right, inFunction)
-	case *ast.PostfixExpression:
-		w.walk(t.Left, inFunction)
-	case *ast.GroupedExpression:
-		w.walk(t.Expression, inFunction)
-	case *ast.CaseStatement:
-		w.walkCaseStatement(t, inFunction)
-	case *ast.ConcatenatedExpression:
-		w.walkExpressions(t.Parts, inFunction)
-	case *ast.CommandSubstitution:
-		w.walk(t.Command, inFunction)
-	case *ast.DollarParenExpression:
-		w.walk(t.Command, inFunction)
-	case *ast.Subshell:
-		w.walk(t.Command, inFunction)
-	}
-}
-
-func (w *zc1069Walker) walkStatements(stmts []ast.Statement, inFunction bool) {
-	for _, s := range stmts {
-		w.walk(s, inFunction)
-	}
-}
-
-func (w *zc1069Walker) walkExpressions(exprs []ast.Expression, inFunction bool) {
-	for _, e := range exprs {
-		w.walk(e, inFunction)
-	}
-}
-
-func (w *zc1069Walker) walkForLoop(t *ast.ForLoopStatement, inFunction bool) {
-	w.walk(t.Init, inFunction)
-	w.walk(t.Condition, inFunction)
-	w.walk(t.Post, inFunction)
-	w.walkExpressions(t.Items, inFunction)
-	w.walk(t.Body, inFunction)
-}
-
-func (w *zc1069Walker) walkFunctionLiteral(t *ast.FunctionLiteral) {
-	for _, p := range t.Params {
-		w.walk(p, false)
-	}
-	w.walk(t.Body, true)
-}
-
-func (w *zc1069Walker) walkCaseStatement(t *ast.CaseStatement, inFunction bool) {
-	w.walk(t.Value, inFunction)
-	for _, clause := range t.Clauses {
-		w.walkExpressions(clause.Patterns, inFunction)
-		w.walk(clause.Body, inFunction)
-	}
+// checkZC1069 is intentionally inert. In Zsh `local` is equivalent to
+// `typeset` and is valid at any scope — top level, sourced files, even
+// under `emulate sh` — so it is not an error outside a function (that
+// restriction is Bash/POSIX-only). The original warning, its false
+// "can only be used inside functions" message, and the `local`->`typeset`
+// autofix were Bash-isms. The kata ID is retained per the no-removal
+// policy.
+func checkZC1069(_ ast.Node) []Violation {
+	return nil
 }
 
 func init() {
