@@ -3322,16 +3322,11 @@ func TestZC1186(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid bare unset",
-			input: `unset myvar`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1186",
-					Message: "Use `unset -v name` for variables or `unset -f name` for functions. Bare `unset` is ambiguous about what is being removed.",
-					Line:    1,
-					Column:  1,
-				},
-			},
+			// Bare `unset name` unsets a parameter only in Zsh; it is
+			// unambiguous, so the rule must stay quiet.
+			name:     "bare unset is valid in zsh",
+			input:    `unset myvar`,
+			expected: []katas.Violation{},
 		},
 	}
 
