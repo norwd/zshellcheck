@@ -1007,7 +1007,6 @@ zephyr/tests/__init__.zsh	ZC1075	12
 zephyr/tests/__init__.zsh	ZC1079	1
 zephyr/tests/__init__.zsh	ZC1085	8
 zephyr/tests/__init__.zsh	ZC1086	8
-zephyr/tests/__init__.zsh	ZC1090	1
 zephyr/tests/__init__.zsh	ZC1092	4
 zephyr/tests/__init__.zsh	ZC1105	2
 zephyr/tests/__init__.zsh	ZC1136	1
@@ -1029,7 +1028,6 @@ zgen/zgen.zsh	ZC1046	2
 zgen/zgen.zsh	ZC1069	14
 zgen/zgen.zsh	ZC1071	1
 zgen/zgen.zsh	ZC1075	2
-zgen/zgen.zsh	ZC1090	3
 zgen/zgen.zsh	ZC1097	7
 zgen/zgen.zsh	ZC1098	2
 zgen/zgen.zsh	ZC1830	1
@@ -1415,7 +1413,6 @@ zsh-vi-mode/zsh-vi-mode.zsh	ZC1079	27
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1080	1
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1085	11
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1086	71
-zsh-vi-mode/zsh-vi-mode.zsh	ZC1090	31
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1091	2
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1092	23
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1098	8
