@@ -1150,6 +1150,9 @@ func (l *Lexer) readStringFlavour(quote byte, honourEscapes bool) string {
 		if honourEscapes && l.absorbEmbeddedDollarParen() {
 			continue
 		}
+		if l.absorbNestedQuoteInBrace(braceDepth) {
+			continue
+		}
 		l.trackBraceDepth(&braceDepth)
 	}
 	return l.sliceClosedString(position)
@@ -1212,6 +1215,34 @@ func (l *Lexer) absorbStringEscape(honourEscapes bool) bool {
 	return true
 }
 
+// absorbNestedQuoteInBrace skips a quoted span nested inside a `${…}`
+// expansion (braceDepth > 0) so that braces inside it never reach the
+// depth tracker. zsh treats a `${…}` body's `"…"` / `'…'` as data; its
+// braces — including escaped `\${` / `\}` forms — must not open or
+// close the expansion. Without this, the unbalanced `'…\${+f[p10k]\}…'`
+// span in powerlevel10k's p10k.zsh inflated the depth and swallowed the
+// string's closing quote, cascading every later string. A double-quoted
+// span honours `\` escapes; a single-quoted span is literal. Issue #1377.
+func (l *Lexer) absorbNestedQuoteInBrace(braceDepth int) bool {
+	if braceDepth == 0 || (l.ch != '"' && l.ch != '\'') {
+		return false
+	}
+	q := l.ch
+	for {
+		l.readChar()
+		if l.ch == 0 {
+			return true
+		}
+		if q == '"' && l.ch == '\\' {
+			l.readChar()
+			continue
+		}
+		if l.ch == q {
+			return true
+		}
+	}
+}
+
 func (l *Lexer) absorbDollarBraceOpen(honourEscapes bool, braceDepth *int) bool {
 	if !honourEscapes || l.ch != '$' || l.peekChar() != '{' {
 		return false
@@ -1223,14 +1254,12 @@ func (l *Lexer) absorbDollarBraceOpen(honourEscapes bool, braceDepth *int) bool 
 
 func (l *Lexer) trackBraceDepth(braceDepth *int) {
 	// Inside a `${…}` only a nested `${` increases nesting, and that
-	// open is already counted by absorbDollarBraceOpen. A bare `{` is
-	// a literal: zsh closes the expansion at the next unescaped `}`
-	// (`"${x:-a{b}"` yields the value of `x`, the lone `{` is data).
-	// Counting a lone `{` here inflated the depth so the closing `}`
-	// never balanced — most visibly the `{` left behind after an
-	// escaped `\${` (`"${(%):-a\${b}"`) — and the string then swallowed
-	// its own closing quote, cascading every later string. Decrement
-	// on `}` only. Issue #1377.
+	// open is counted by absorbDollarBraceOpen. A bare `{` is literal
+	// data — zsh closes the expansion at the next unescaped `}`
+	// (`"${x:-a{b}"` is the value of `x`, the `{` is a literal byte) —
+	// so a lone `{` must not increment the depth. Braces hidden inside
+	// a nested quoted span are skipped earlier by absorbNestedQuoteInBrace.
+	// Decrement on `}` only.
 	if *braceDepth > 0 && l.ch == '}' {
 		*braceDepth--
 	}
