@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-06-04
+
+### Fixed
+- Parser and lexer: four more real-world Zsh constructs that previously failed to parse, each confirmed valid by `zsh -n`, parsing with zero errors across the corpus sweep, and producing no false-positive drift.
+  - A command substitution whose body is a subshell with a leading space (`$( (cmd) )`) is no longer mistaken for arithmetic; the inner subshell's `)` is distinguished from the substitution's close.
+  - A `case … esac` or a `{ } always { }` try block inside a command substitution (`$( case … esac )`) now parses; the body drain follows the `case` past its own `esac` and honours the `always` continuation.
+  - Consecutive subshells separated only by a newline (`(a)⏎(b)`) no longer drop the second subshell; the linter had silently skipped scanning it.
+  - A double-quoted string whose `${…}` body contains an escaped `\${` no longer swallows its own closing quote. The lexer counted the lone `{` as opening a nested expansion; it now decrements on `}` only, matching Zsh, which closes the expansion at the next unescaped `}`. This unblocks Powerlevel10k's `p10k.zsh`.
+
 ## [1.2.0] - 2026-06-04
 
 ### Fixed
