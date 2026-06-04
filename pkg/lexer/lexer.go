@@ -1222,13 +1222,16 @@ func (l *Lexer) absorbDollarBraceOpen(honourEscapes bool, braceDepth *int) bool 
 }
 
 func (l *Lexer) trackBraceDepth(braceDepth *int) {
-	if *braceDepth == 0 {
-		return
-	}
-	switch l.ch {
-	case '{':
-		*braceDepth++
-	case '}':
+	// Inside a `${…}` only a nested `${` increases nesting, and that
+	// open is already counted by absorbDollarBraceOpen. A bare `{` is
+	// a literal: zsh closes the expansion at the next unescaped `}`
+	// (`"${x:-a{b}"` yields the value of `x`, the lone `{` is data).
+	// Counting a lone `{` here inflated the depth so the closing `}`
+	// never balanced — most visibly the `{` left behind after an
+	// escaped `\${` (`"${(%):-a\${b}"`) — and the string then swallowed
+	// its own closing quote, cascading every later string. Decrement
+	// on `}` only. Issue #1377.
+	if *braceDepth > 0 && l.ch == '}' {
 		*braceDepth--
 	}
 }
