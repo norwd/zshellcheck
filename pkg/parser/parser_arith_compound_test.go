@@ -62,6 +62,15 @@ func TestParseArithDollarBraceSimple(t *testing.T) {
 	parseSourceClean(t, "(( x = ${y} + 1 ))\n")
 }
 
+// `#` inside `$(( … ))` arithmetic expansion is an operator (the
+// char-code prefix `##A` or the positional-arg count `#`), not a comment
+// opener, even with a preceding space. The lexer marks the inner `(` of
+// `$((` so inArithmetic() holds. Issue #1361.
+func TestParseArithDollarParenHashNotComment(t *testing.T) {
+	parseSourceClean(t, "x=$(( ##A ))\n")
+	parseSourceClean(t, "y=$(( # > 0 ))\n")
+}
+
 // TestParseArithAllCompoundOpsRegression is a stress test exercising all
 // compound-assign operators in a single arithmetic block.
 func TestParseArithAllCompoundOpsRegression(t *testing.T) {
