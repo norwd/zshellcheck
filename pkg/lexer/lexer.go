@@ -849,7 +849,7 @@ func extractHeredocDelim(input string, pos int) (string, int) {
 		pos++
 	}
 	start := pos
-	for pos < len(input) && (isWordByte(input[pos])) {
+	for pos < len(input) && isWordByte(input[pos]) {
 		pos++
 	}
 	if pos == start {
