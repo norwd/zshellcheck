@@ -64,6 +64,14 @@ func (p *Parser) parsePipelineHeadStatement() (ast.Statement, bool) {
 		stmt := p.parseWhileLoopStatement()
 		p.consumePipelineTail()
 		return stmt, true
+	case token.REPEAT:
+		stmt := p.parseRepeatLoopStatement()
+		p.consumePipelineTail()
+		return stmt, true
+	case token.FOREACH:
+		stmt := p.parseForeachLoopStatement()
+		p.consumePipelineTail()
+		return stmt, true
 	case token.SELECT:
 		stmt := p.parseSelectStatement()
 		p.consumePipelineTail()
@@ -79,7 +87,16 @@ func (p *Parser) parsePipelineHeadStatement() (ast.Statement, bool) {
 func (p *Parser) parseStatementBranch() ast.Statement {
 	switch p.curToken.Type {
 	case token.LBRACE:
-		return p.parseBraceGroupStatement()
+		stmt := p.parseBraceGroupStatement()
+		// A brace group at statement level (top level or function body)
+		// reaches neither the pipeline-head drain nor the
+		// parseCommandPipeline redirection loop, so `{ … } 2>/dev/null`
+		// orphans the redirect into a bogus `(2 > /dev/null)` statement
+		// that swallows the following command. Drain the trailing
+		// redirections, then any `| cmd` tail the redirect was hiding.
+		p.drainTrailingRedirections()
+		p.consumePipelineTail()
+		return stmt
 	case token.DoubleLparen:
 		return p.parseDoubleLparenStatement()
 	case token.LDBRACKET:
@@ -148,6 +165,40 @@ func (p *Parser) drainFDPrefixedRedirections() {
 		p.nextToken() // operator
 		p.nextToken() // target
 		_ = p.parseCommandWord()
+	}
+}
+
+// drainTrailingRedirections consumes redirections that trail a
+// brace-group statement — bare (`} >f`, `} 2>&1` via GTAMP) and
+// FD-number-prefixed (`} 2>f`, `} 5>&1`). Only the statement-dispatch
+// path needs this: the pipeline-head path drains via the
+// parseCommandPipeline redirection loop, which must keep building its
+// ast.Redirection nodes untouched. The redirect set mirrors that loop.
+func (p *Parser) drainTrailingRedirections() {
+	for {
+		switch {
+		case p.peekTokenIs(token.GT), p.peekTokenIs(token.GTGT),
+			p.peekTokenIs(token.LT), p.peekTokenIs(token.LTLT),
+			p.peekTokenIs(token.GTAMP), p.peekTokenIs(token.LTAMP):
+			p.nextToken() // operator
+			p.nextToken() // target
+			_ = p.parseCommandWord()
+		case p.peekTokenIs(token.INT):
+			// FD-number-prefixed form. Without 2-token lookahead the
+			// number is consumed first; a brace group is never validly
+			// followed by a bare integer command, so this is safe.
+			p.nextToken() // FD number
+			if !p.peekTokenIs(token.GT) && !p.peekTokenIs(token.GTGT) &&
+				!p.peekTokenIs(token.LT) && !p.peekTokenIs(token.LTLT) &&
+				!p.peekTokenIs(token.GTAMP) && !p.peekTokenIs(token.LTAMP) {
+				return
+			}
+			p.nextToken() // operator
+			p.nextToken() // target
+			_ = p.parseCommandWord()
+		default:
+			return
+		}
 	}
 }
 
@@ -250,6 +301,13 @@ func (p *Parser) peekStartsArgPrefix() bool {
 	case p.peekTokenIs(token.TILDE), p.peekTokenIs(token.ASTERISK):
 		return true
 	case p.peekTokenIs(token.BANG), p.peekTokenIs(token.LBRACE):
+		return true
+	case p.peekTokenIs(token.LT_LPAREN), p.peekTokenIs(token.GT_LPAREN),
+		p.peekTokenIs(token.EQ_LPAREN):
+		// Process substitution `<(…)` / `>(…)` / `=(…)` as the first
+		// argument (`diff <(a) <(b)`). Without this the command falls to
+		// the expression path, parsing only the bare name and orphaning
+		// each substitution into its own bogus top-level statement.
 		return true
 	}
 	return false
@@ -946,7 +1004,7 @@ func (p *Parser) parseBlockStatement(terminators ...token.Type) *ast.BlockStatem
 	block.Statements = []ast.Statement{}
 
 	for !p.curTokenIs(token.EOF) {
-		isTerm := false
+		isTerm := p.curIsForeachEnd()
 		for _, t := range terminators {
 			if p.curTokenIs(t) {
 				isTerm = true
@@ -999,7 +1057,7 @@ func (p *Parser) parseBlockStatement(terminators ...token.Type) *ast.BlockStatem
 		// on block keywords. Advancing unconditionally here would
 		// step past it and the outer if/loop/case would then see
 		// EOF and report "expected FI got EOF".
-		curIsTerm := false
+		curIsTerm := p.curIsForeachEnd()
 		for _, t := range terminators {
 			if p.curTokenIs(t) {
 				// An RBRACE that closed a `${…}` is not the block's
@@ -1409,6 +1467,92 @@ func (p *Parser) parseWhileLoopStatement() *ast.WhileLoopStatement {
 	p.nextToken()
 	stmt.Body = p.parseBlockStatement(token.DONE)
 	return stmt
+}
+
+// parseRepeatLoopStatement parses the Zsh `repeat <count> …` loop, which
+// has no Bash analogue. The count is a single word; the body is a
+// `do … done` block, a `{ … }` brace block, or — under SHORT_LOOPS — a
+// single braceless command. The loop reuses WhileLoopStatement with the
+// count standing in for the condition, so every body-level kata walks
+// the body and no `do`/`done`/`}` is left orphaned.
+func (p *Parser) parseRepeatLoopStatement() *ast.WhileLoopStatement {
+	stmt := &ast.WhileLoopStatement{Token: p.curToken}
+	p.nextToken() // onto the count word
+	stmt.Condition = p.parseCommandWord()
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+	switch {
+	case p.peekTokenIs(token.LBRACE):
+		p.nextToken() // onto {
+		p.nextToken() // into body
+		stmt.Body = p.parseBlockStatement(token.RBRACE)
+		if p.curTokenIs(token.RBRACE) {
+			p.nextToken()
+			p.consumedBraceTerminator = true
+		}
+	case p.peekTokenIs(token.DO):
+		p.nextToken() // onto do
+		p.nextToken() // into body
+		stmt.Body = p.parseBlockStatement(token.DONE)
+	case !p.peekTokenIs(token.EOF):
+		p.nextToken()
+		stmt.Body = wrapForLoopBody(stmt.Token, p.parseStatement())
+	}
+	return stmt
+}
+
+// parseForeachLoopStatement parses the Zsh csh-style loop
+// `foreach <name> (<list>) … end` (the `in <list>` spelling is also
+// accepted). It reuses ForLoopStatement; the body runs until the literal
+// `end`, recognised context-sensitively via foreachDepth so `end` stays
+// a valid identifier elsewhere (`end() { … }`).
+func (p *Parser) parseForeachLoopStatement() *ast.ForLoopStatement {
+	stmt := &ast.ForLoopStatement{Token: p.curToken}
+	if !p.expectPeek(token.IDENT) {
+		return nil
+	}
+	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	stmt.Items = []ast.Expression{}
+	switch {
+	case p.peekTokenIs(token.LPAREN):
+		p.nextToken() // onto (
+		for !p.peekTokenIs(token.RPAREN) && !p.peekTokenIs(token.EOF) {
+			p.nextToken()
+			if p.curTokenIs(token.RPAREN) {
+				break
+			}
+			stmt.Items = append(stmt.Items, p.parseCommandWord())
+		}
+		if !p.expectPeek(token.RPAREN) {
+			return nil
+		}
+	case p.peekTokenIs(token.IN):
+		p.nextToken() // onto in
+		for !p.peekTokenIs(token.SEMICOLON) && !p.peekTokenIs(token.EOF) && p.peekOnSameLogicalLine() {
+			p.nextToken()
+			stmt.Items = append(stmt.Items, p.parseCommandWord())
+		}
+	}
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+	p.nextToken() // into the body
+	p.foreachDepth++
+	stmt.Body = p.parseBlockStatement()
+	p.foreachDepth--
+	// parseBlockStatement stops with curToken on the literal `end`; the
+	// caller's post-statement nextToken advances past it, like any other
+	// compound terminator.
+	return stmt
+}
+
+// curIsForeachEnd reports whether the current token is the literal `end`
+// that closes a `foreach` body. `end` is not a global keyword (it is a
+// valid command / function name), so it is matched by literal only while
+// foreachDepth is positive.
+func (p *Parser) curIsForeachEnd() bool {
+	return p.foreachDepth > 0 && p.curTokenIs(token.IDENT) && p.curToken.Literal == "end"
 }
 
 func (p *Parser) parseSelectStatement() *ast.SelectStatement {

@@ -88,6 +88,11 @@ type Parser struct {
 
 	inBackticks  int
 	inArithmetic bool
+	// foreachDepth is positive while parsing the body of a `foreach …
+	// end` loop. It lets parseBlockStatement recognise the literal `end`
+	// as a body terminator without making `end` a global keyword, so
+	// `end` stays usable as a command or function name elsewhere.
+	foreachDepth int
 	// inDoubleBracket is set while parsing the body of a `[[ … ]]`
 	// conditional. Inside that context `(pat|pat)` is a glob
 	// alternation, not a call expression, and adjacent groups like

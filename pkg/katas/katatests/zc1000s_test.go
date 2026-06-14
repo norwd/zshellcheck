@@ -33,6 +33,18 @@ func TestZC1001(t *testing.T) {
 				},
 			},
 		},
+		{
+			// `$+commands[ls]` is the parameter-existence operator, not
+			// array element access — it returns 0 or 1 inside `(( … ))`.
+			name:     "existence test on commands is not element access",
+			input:    `(( $+commands[ls] ))`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "existence test on functions is not element access",
+			input:    `(( $+functions[foo] ))`,
+			expected: []katas.Violation{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -441,6 +453,21 @@ func TestCheckZC1012(t *testing.T) {
 			input:    `read -er line`, // heuristic support
 			expected: []katas.Violation{},
 		},
+		{
+			name:     "read -k reads raw chars so -r is a no-op",
+			input:    `read -k 3 key`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "read -q reads a single y/n char",
+			input:    `read -q "REPLY?ok"`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "read -z reads the editor buffer",
+			input:    `read -z buf`,
+			expected: []katas.Violation{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -606,6 +633,42 @@ func TestZC1016(t *testing.T) {
 				},
 			},
 		},
+		{
+			// `key` is a substring of `monkey`; whole-name matching
+			// must not flag it.
+			name:     "non-secret substring monkey",
+			input:    `read monkey`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "non-secret substring keyword",
+			input:    `read keyword`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "non-secret substring keys",
+			input:    `read keys`,
+			expected: []katas.Violation{},
+		},
+		{
+			// `pwd` was an over-broad substring; the print-working-dir
+			// name is not a secret.
+			name:     "non-secret pwd",
+			input:    `read pwd`,
+			expected: []katas.Violation{},
+		},
+		{
+			// `-s` is meaningless when stdin comes from a file: no
+			// terminal echo to hide.
+			name:     "secret from file redirection",
+			input:    `read secret < /etc/secret`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "secret from here-string",
+			input:    `read password <<< "$data"`,
+			expected: []katas.Violation{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -622,7 +685,13 @@ func TestCheckZC1017(t *testing.T) {
 		expected []katas.Violation
 	}{
 		{
-			input: `print "hello"`,
+			// No backslash escape — nothing for `print` to interpret,
+			// so `-r` makes no difference and the kata stays quiet.
+			input:    `print "hello"`,
+			expected: []katas.Violation{},
+		},
+		{
+			input: `print "a\tb"`,
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1017",
@@ -633,7 +702,21 @@ func TestCheckZC1017(t *testing.T) {
 			},
 		},
 		{
-			input:    `print -r "hello"`,
+			input:    `print -r "a\tb"`,
+			expected: []katas.Violation{},
+		},
+		{
+			// Prompt escapes are expanded by `-P`; `-r` does not suppress
+			// them and the content carries no backslash escape.
+			input:    `print -P "%F{green}done%f"`,
+			expected: []katas.Violation{},
+		},
+		{
+			input:    `print -l -- $usage`,
+			expected: []katas.Violation{},
+		},
+		{
+			input:    `print "${cmd}"`,
 			expected: []katas.Violation{},
 		},
 	}
@@ -1147,6 +1230,11 @@ func TestZC1037(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
+			name:     "single-quoted dollar is literal",
+			input:    `echo 'cost is $5'`,
+			expected: []katas.Violation{},
+		},
+		{
 			name:  "invalid echo with variable",
 			input: `echo $var`,
 			expected: []katas.Violation{
@@ -1292,6 +1380,36 @@ func TestZC1040(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
+			// Nullglob `N` may appear with other qualifiers in any
+			// order: `(@N)`, `(.N)` — all are nullglob-enabled.
+			name:     "safe glob with combined N qualifier",
+			input:    `for f in $x/*(@N); do echo $f; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "safe glob with dot-N qualifier",
+			input:    `for f in *.log(.N); do echo $f; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			// An array subscript `$arr[@]` is not a filename glob and
+			// never triggers nomatch.
+			name:     "array subscript at-all is not a glob",
+			input:    `for w in $empty[@]; do echo $w; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "array subscript index is not a glob",
+			input:    `for f in $arr[1]; do echo $f; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			// A brace range expands in the shell and never nomatches.
+			name:     "brace range is not a glob",
+			input:    `for i in {3..1}; do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
 			name:     "no glob pattern",
 			input:    `for f in a b c; do echo $f; done`,
 			expected: []katas.Violation{},
@@ -1305,6 +1423,19 @@ func TestZC1040(t *testing.T) {
 			name:     "quoted string is not a glob",
 			input:    `for f in "*.txt"; do echo $f; done`,
 			expected: []katas.Violation{},
+		},
+		{
+			name:  "bare glob without qualifier fires",
+			input: `for f in *.txt; do echo $f; done`,
+			expected: []katas.Violation{
+				{
+					KataID: "ZC1040",
+					Message: "Glob pattern '*.txt' may error if no files match. " +
+						"Append '(N)' to enable nullglob behavior: '*.txt(N)'",
+					Line:   1,
+					Column: 10,
+				},
+			},
 		},
 	}
 
@@ -1669,6 +1800,26 @@ func TestZC1045(t *testing.T) {
 			name:     "arithmetic modulo masks no command",
 			input:    `readonly slot=$(( RANDOM % 1000 ))`,
 			expected: []katas.Violation{},
+		},
+		{
+			name:     "integer-literal arithmetic masks no command",
+			input:    `local n=$(( 5 ))`,
+			expected: []katas.Violation{},
+		},
+		{
+			// A pipeline inside the substitution is a command, so the
+			// exit code is masked and the kata fires.
+			name:  "pipeline command substitution masks return",
+			input: `local out=$(a | b)`,
+			expected: []katas.Violation{
+				{
+					KataID: "ZC1045",
+					Message: "Declare and assign separately to avoid masking return values. " +
+						"`local var=$(cmd)` masks the exit code of `cmd`.",
+					Line:   1,
+					Column: 7,
+				},
+			},
 		},
 	}
 
@@ -2137,6 +2288,28 @@ func TestZC1054(t *testing.T) {
 			name:     "command with no args",
 			input:    `ls`,
 			expected: []katas.Violation{},
+		},
+		{
+			name:     "digit range is locale-invariant",
+			input:    `grep -o '[0-9]*'`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "octal digit range is locale-invariant",
+			input:    `grep -o '[0-7]'`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:  "alphabetic range is collation-sensitive",
+			input: `grep -o '[a-z]*'`,
+			expected: []katas.Violation{
+				{
+					KataID:  "ZC1054",
+					Message: "Ranges like `[a-z]` are locale-dependent. Use POSIX classes like `[[:lower:]]` or `[[:digit:]]`.",
+					Line:    1,
+					Column:  9,
+				},
+			},
 		},
 	}
 
@@ -2916,6 +3089,51 @@ func TestZC1071(t *testing.T) {
 			},
 		},
 		{
+			name:  "valid append whole array first then new elements",
+			input: `arr=($arr a b)`,
+			expected: []katas.Violation{
+				{
+					KataID:  "ZC1071",
+					Message: "Appending to an array using `arr=($arr ...)` is verbose and slower. Use `arr+=(...)` instead.",
+					Line:    1,
+					Column:  1,
+				},
+			},
+		},
+		{
+			name:  "valid append whole array via bracket-at form",
+			input: `arr=(${arr[@]} x)`,
+			expected: []katas.Violation{
+				{
+					KataID:  "ZC1071",
+					Message: "Appending to an array using `arr=($arr ...)` is verbose and slower. Use `arr+=(...)` instead.",
+					Line:    1,
+					Column:  1,
+				},
+			},
+		},
+		{
+			// Prepend: the new element comes first, so `+=` would append
+			// to the wrong end. `path=($new $path)` is not a true append.
+			name:     "prepend is not an append",
+			input:    `path=($new $path)`,
+			expected: []katas.Violation{},
+		},
+		{
+			// Transform: `${files##*/}` rewrites every element; `+=` is
+			// meaningless here.
+			name:     "transform is not an append",
+			input:    `files=(${files##*/})`,
+			expected: []katas.Violation{},
+		},
+		{
+			// Truncate: `${tokens[0,-2]}` drops the last element; `+=`
+			// cannot express that.
+			name:     "truncate is not an append",
+			input:    `tokens=(${tokens[0,-2]})`,
+			expected: []katas.Violation{},
+		},
+		{
 			name:     "no self reference in array",
 			input:    `arr=(a b c)`,
 			expected: []katas.Violation{},
@@ -3357,7 +3575,7 @@ func TestZC1078(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1078",
-					Message: "Unquoted $@ splits arguments. Use \"$@\" to preserve structure.",
+					Message: "Unquoted $@ drops empty elements. Use \"$@\" to preserve every positional parameter.",
 					Line:    1,
 					Column:  5,
 				},
@@ -3369,7 +3587,7 @@ func TestZC1078(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1078",
-					Message: "Unquoted $* splits arguments. Use \"$*\" to preserve structure.",
+					Message: "Unquoted $* drops empty elements. Use \"$*\" to preserve every positional parameter.",
 					Line:    1,
 					Column:  5,
 				},
@@ -3381,7 +3599,7 @@ func TestZC1078(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1078",
-					Message: "Unquoted $@ splits arguments. Use \"$@\" to preserve structure.",
+					Message: "Unquoted $@ drops empty elements. Use \"$@\" to preserve every positional parameter.",
 					Line:    1,
 					Column:  10,
 				},
@@ -3669,60 +3887,51 @@ func TestZC1083(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid variable as range end",
-			input: `echo {1..$n}`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1083",
-					Message: "Brace expansion limits cannot be variables. `{...$var...}` is treated as a literal string. Use `seq` or `for ((...))`.",
-					Line:    1,
-					Column:  6,
-				},
-			},
+			// Zsh resolves `$n` to an integer before brace expansion, so
+			// `{1..$n}` expands correctly. This is the Bash-only failure
+			// the kata used to flag; under Zsh it is valid.
+			name:     "valid variable as range end in Zsh",
+			input:    `echo {1..$n}`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid variable as range start",
-			input: `echo {$n..10}`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1083",
-					Message: "Brace expansion limits cannot be variables. `{...$var...}` is treated as a literal string. Use `seq` or `for ((...))`.",
-					Line:    1,
-					Column:  6,
-				},
-			},
+			name:     "valid variable as range start in Zsh",
+			input:    `echo {$n..10}`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid variable as range start and end",
-			input: `echo {$min..$max}`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1083",
-					Message: "Brace expansion limits cannot be variables. `{...$var...}` is treated as a literal string. Use `seq` or `for ((...))`.",
-					Line:    1,
-					Column:  6,
-				},
-			},
+			name:     "valid variable as range start and end in Zsh",
+			input:    `echo {$min..$max}`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid command substitution in range",
-			input: `echo {1..$(echo 10)}`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1083",
-					Message: "Brace expansion limits cannot be variables. `{...$var...}` is treated as a literal string. Use `seq` or `for ((...))`.",
-					Line:    1,
-					Column:  6,
-				},
-			},
+			name:     "valid command substitution in range in Zsh",
+			input:    `echo {1..$(echo 10)}`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid quoted brace expansion with variable",
+			// A param substitution that merely contains `{`, `..`, and `$`
+			// is not a brace range — the `{` is preceded by `$`.
+			name:     "valid param substitution that looks like a range",
+			input:    `echo "${branch/foo../bar}"`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "valid param substitution replace empty",
+			input:    `echo "${x/../}"`,
+			expected: []katas.Violation{},
+		},
+		{
+			// A quoted brace range with a parameter bound: the quotes
+			// suppress the expansion that the unquoted form gets in Zsh,
+			// so the value stays the literal string. A `{` preceded by `$`
+			// (a `${…}` expansion) is excluded by zc1083HasBareBraceOpen.
+			name:  "invalid quoted brace range stays literal",
 			input: `echo "{1..$n}"`,
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1083",
-					Message: "Brace expansion limits cannot be variables. `{...$var...}` is treated as a literal string. Use `seq` or `for ((...))`.",
+					Message: "A quoted brace range stays literal. `\"{1..$n}\"` does not expand; in Zsh the unquoted `{1..$n}` does. Drop the quotes to expand the range.",
 					Line:    1,
 					Column:  6,
 				},
@@ -4443,20 +4652,30 @@ func TestZC1094(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid simple sed substitution",
-			input: `sed 's/foo/bar/'`,
+			name:     "bare sed reads a stream not a variable",
+			input:    `sed 's/foo/bar/'`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "sed below a non-echo pipe has no variable to expand",
+			input:    `git branch | sed 's/foo/bar/'`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:  "echo of a variable into sed",
+			input: `echo $v | sed 's/foo/bar/'`,
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1094",
 					Message: "Use `${var//pattern/replacement}` instead of piping through `sed` for simple substitutions. Parameter expansion avoids spawning an external process.",
 					Line:    1,
-					Column:  1,
+					Column:  11,
 				},
 			},
 		},
 		{
-			name:  "invalid sed global substitution",
-			input: `sed 's/foo/bar/g'`,
+			name:  "here-string of a variable into sed",
+			input: `sed 's/foo/bar/' <<< $v`,
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1094",
@@ -4655,6 +4874,21 @@ func TestZC1098(t *testing.T) {
 		{
 			name:     "eval without variables",
 			input:    `eval "echo hello"`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "eval of a bare variable command string",
+			input:    `eval $cmd`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "eval of a quoted standalone variable",
+			input:    `eval "$REPLY"`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "eval of a single flagged expansion",
+			input:    `eval ${(e)x}`,
 			expected: []katas.Violation{},
 		},
 		{

@@ -126,7 +126,7 @@ func TestZC1502(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1502",
-					Message: "Variable `\"$pattern\"` used as pattern without `--` end-of-flags marker — attacker-controlled leading `-` becomes a flag. Write `grep -- \"$var\"`.",
+					Message: "Variable `\"$pattern\"` passed without a `--` end-of-flags marker — an attacker-controlled leading `-` becomes a flag. Write `grep -- \"$var\"`.",
 					Line:    1,
 					Column:  1,
 				},
@@ -138,7 +138,7 @@ func TestZC1502(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1502",
-					Message: "Variable `$pattern` used as pattern without `--` end-of-flags marker — attacker-controlled leading `-` becomes a flag. Write `grep -- \"$var\"`.",
+					Message: "Variable `$pattern` passed without a `--` end-of-flags marker — an attacker-controlled leading `-` becomes a flag. Write `grep -- \"$var\"`.",
 					Line:    1,
 					Column:  1,
 				},

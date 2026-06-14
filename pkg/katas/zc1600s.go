@@ -247,6 +247,16 @@ func checkZC1604(node ast.Node) []Violation {
 		return nil
 	}
 
+	// A process or command substitution argument (`source <(cmd)`,
+	// `source $(cmd)`) is dynamic output, not a filename glob. A `*` or
+	// `[` inside its body is part of the command, not a match pattern,
+	// so it must not be read as glob-sourcing.
+	switch cmd.Arguments[0].(type) {
+	case *ast.ProcessSubstitution, *ast.DollarParenExpression,
+		*ast.CommandSubstitution, *ast.Subshell:
+		return nil
+	}
+
 	target := cmd.Arguments[0].String()
 	if !strings.ContainsAny(target, "*?[") {
 		return nil

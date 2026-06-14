@@ -1464,39 +1464,14 @@ func checkZC1127(node ast.Node) []Violation {
 func init() {
 	RegisterKata(ast.SimpleCommandNode, Kata{
 		ID:    "ZC1128",
-		Title: "Use `> file` instead of `touch file` for creation",
-		Description: "If the goal is to create an empty file, `> file` does it without " +
-			"spawning `touch`. Use `touch` only when you need to update timestamps.",
+		Title: "Prefer a redirection over `touch` for a brand-new empty file",
+		Description: "Creating a file with `touch file` spawns an external process. " +
+			"For a file that does not yet exist, `: >| file` creates it in the shell. " +
+			"Keep `touch` when the file may already exist: `touch` preserves contents, " +
+			"whereas a `>` redirection truncates an existing file.",
 		Severity: SeverityStyle,
 		Check:    checkZC1128,
-		Fix:      fixZC1128,
 	})
-}
-
-// fixZC1128 rewrites `touch file` into `> file`. Detector already
-// guards against flagged forms (timestamp updates) and multi-arg
-// invocations, so the fix covers only the single-file case.
-func fixZC1128(node ast.Node, v Violation, source []byte) []FixEdit {
-	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
-		return nil
-	}
-	if len(cmd.Arguments) != 1 {
-		return nil
-	}
-	nameOff := LineColToByteOffset(source, v.Line, v.Column)
-	if nameOff < 0 || nameOff+len("touch") > len(source) {
-		return nil
-	}
-	if string(source[nameOff:nameOff+len("touch")]) != "touch" {
-		return nil
-	}
-	return []FixEdit{{
-		Line:    v.Line,
-		Column:  v.Column,
-		Length:  len("touch"),
-		Replace: ">",
-	}}
 }
 
 func checkZC1128(node ast.Node) []Violation {
@@ -1525,8 +1500,8 @@ func checkZC1128(node ast.Node) []Violation {
 
 	return []Violation{{
 		KataID: "ZC1128",
-		Message: "Use `> file` instead of `touch file` to create an empty file. " +
-			"This avoids spawning an external process.",
+		Message: "Prefer `: >| file` over `touch file` for a brand-new empty file. " +
+			"Keep `touch` when the file may already exist, because `>` truncates it.",
 		Line:   cmd.Token.Line,
 		Column: cmd.Token.Column,
 		Level:  SeverityStyle,

@@ -260,10 +260,13 @@ run_test '(( x > 5 ))'	"" 'ZC1073: (( x )) (Valid)'
 run_test '(( $# > 0 ))'	"" 'ZC1073: (( $# > 0 )) is not nested arithmetic'
 
 # --- ZC1083: Brace expansion variables ---
-run_test 'echo {1..$n}'	"ZC1083" 'ZC1083: variable range end'
-run_test 'echo {$n..10}'	"ZC1083" 'ZC1083: variable range start'
+# Zsh expands `{1..$n}` (parameter resolves before brace expansion),
+# unlike Bash; an unquoted variable range is valid and must not fire.
+run_test 'val=({1..$n})'	"" 'ZC1083: unquoted variable range end is valid in Zsh'
+run_test 'val=({$n..10})'	"" 'ZC1083: unquoted variable range start is valid in Zsh'
 run_test 'printf "%s\n" {1..10}'	"" 'ZC1083: valid range'
 run_test 'printf "%s\n" {a,b,$c}'	"" 'ZC1083: brace list is not a bare expansion'
+# Quoting suppresses the expansion, so a quoted range stays literal.
 run_test 'echo "{1..$n}"'	"ZC1083" 'ZC1083: quoted variable range'
 
 # --- ZC1084: find unquoted glob ---

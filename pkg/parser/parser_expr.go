@@ -542,7 +542,15 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	// reserved word after `=` is a variable (`(( x = done ))`), not an
 	// empty-RHS next-statement keyword. The empty-RHS shortcut is for the
 	// command-context `X=<NL>for …` form only.
-	if isAssign && !p.inArithmetic && isEmptyRhsTerminator(p.peekToken.Type) {
+	//
+	// A bare `X=` at end of line is a standalone empty assignment: Zsh
+	// does not continue an assignment RHS across an unescaped newline, so
+	// the next line's command (`X=<NL>print $A`) is a separate statement,
+	// not the RHS nor an env-prefix target. Without the line-boundary
+	// check the `=` infix swallowed that command (`X = print`) and
+	// orphaned its arguments, leaving them unlinted.
+	if isAssign && !p.inArithmetic &&
+		(isEmptyRhsTerminator(p.peekToken.Type) || !p.peekOnSameLogicalLine()) {
 		return expression
 	}
 	p.nextToken()

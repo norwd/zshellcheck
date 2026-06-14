@@ -213,8 +213,8 @@ func checkZC1502(node ast.Node) []Violation {
 	}
 	return []Violation{{
 		KataID: "ZC1502",
-		Message: "Variable `" + firstVar.String() + "` used as pattern without `--` end-of-flags " +
-			"marker — attacker-controlled leading `-` becomes a flag. Write `grep -- \"$var\"`.",
+		Message: "Variable `" + firstVar.String() + "` passed without a `--` end-of-flags " +
+			"marker — an attacker-controlled leading `-` becomes a flag. Write `grep -- \"$var\"`.",
 		Line:   cmd.Token.Line,
 		Column: cmd.Token.Column,
 		Level:  SeverityWarning,
