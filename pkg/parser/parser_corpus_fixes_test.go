@@ -258,6 +258,9 @@ func TestParseRepeatAndForeachLoops(t *testing.T) {
 		"foreach x (1 2 3); print $x; end\n":                                 1,
 		"foreach f (*.txt)\n  rm $f\nend\nprint after\n":                     2,
 		"foreach x (1 2)\n  if [[ -n $x ]]; then\n    print $x\n  fi\nend\n": 1,
+		// The `in <list>` spelling of foreach.
+		"foreach x in a b c; print $x; end\n": 1,
+		"foreach x in $items\n  rm $x\nend\n": 1,
 		// `end` stays a valid identifier outside foreach.
 		"end() { print x }\nend\n": 2,
 		"local end=5\n":            1,

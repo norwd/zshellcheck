@@ -1801,6 +1801,26 @@ func TestZC1045(t *testing.T) {
 			input:    `readonly slot=$(( RANDOM % 1000 ))`,
 			expected: []katas.Violation{},
 		},
+		{
+			name:     "integer-literal arithmetic masks no command",
+			input:    `local n=$(( 5 ))`,
+			expected: []katas.Violation{},
+		},
+		{
+			// A pipeline inside the substitution is a command, so the
+			// exit code is masked and the kata fires.
+			name:  "pipeline command substitution masks return",
+			input: `local out=$(a | b)`,
+			expected: []katas.Violation{
+				{
+					KataID: "ZC1045",
+					Message: "Declare and assign separately to avoid masking return values. " +
+						"`local var=$(cmd)` masks the exit code of `cmd`.",
+					Line:   1,
+					Column: 7,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
