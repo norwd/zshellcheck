@@ -79,7 +79,16 @@ func (p *Parser) parsePipelineHeadStatement() (ast.Statement, bool) {
 func (p *Parser) parseStatementBranch() ast.Statement {
 	switch p.curToken.Type {
 	case token.LBRACE:
-		return p.parseBraceGroupStatement()
+		stmt := p.parseBraceGroupStatement()
+		// A brace group at statement level (top level or function body)
+		// reaches neither the pipeline-head drain nor the
+		// parseCommandPipeline redirection loop, so `{ … } 2>/dev/null`
+		// orphans the redirect into a bogus `(2 > /dev/null)` statement
+		// that swallows the following command. Drain the trailing
+		// redirections, then any `| cmd` tail the redirect was hiding.
+		p.drainTrailingRedirections()
+		p.consumePipelineTail()
+		return stmt
 	case token.DoubleLparen:
 		return p.parseDoubleLparenStatement()
 	case token.LDBRACKET:
@@ -148,6 +157,40 @@ func (p *Parser) drainFDPrefixedRedirections() {
 		p.nextToken() // operator
 		p.nextToken() // target
 		_ = p.parseCommandWord()
+	}
+}
+
+// drainTrailingRedirections consumes redirections that trail a
+// brace-group statement — bare (`} >f`, `} 2>&1` via GTAMP) and
+// FD-number-prefixed (`} 2>f`, `} 5>&1`). Only the statement-dispatch
+// path needs this: the pipeline-head path drains via the
+// parseCommandPipeline redirection loop, which must keep building its
+// ast.Redirection nodes untouched. The redirect set mirrors that loop.
+func (p *Parser) drainTrailingRedirections() {
+	for {
+		switch {
+		case p.peekTokenIs(token.GT), p.peekTokenIs(token.GTGT),
+			p.peekTokenIs(token.LT), p.peekTokenIs(token.LTLT),
+			p.peekTokenIs(token.GTAMP), p.peekTokenIs(token.LTAMP):
+			p.nextToken() // operator
+			p.nextToken() // target
+			_ = p.parseCommandWord()
+		case p.peekTokenIs(token.INT):
+			// FD-number-prefixed form. Without 2-token lookahead the
+			// number is consumed first; a brace group is never validly
+			// followed by a bare integer command, so this is safe.
+			p.nextToken() // FD number
+			if !p.peekTokenIs(token.GT) && !p.peekTokenIs(token.GTGT) &&
+				!p.peekTokenIs(token.LT) && !p.peekTokenIs(token.LTLT) &&
+				!p.peekTokenIs(token.GTAMP) && !p.peekTokenIs(token.LTAMP) {
+				return
+			}
+			p.nextToken() // operator
+			p.nextToken() // target
+			_ = p.parseCommandWord()
+		default:
+			return
+		}
 	}
 }
 
@@ -250,6 +293,13 @@ func (p *Parser) peekStartsArgPrefix() bool {
 	case p.peekTokenIs(token.TILDE), p.peekTokenIs(token.ASTERISK):
 		return true
 	case p.peekTokenIs(token.BANG), p.peekTokenIs(token.LBRACE):
+		return true
+	case p.peekTokenIs(token.LT_LPAREN), p.peekTokenIs(token.GT_LPAREN),
+		p.peekTokenIs(token.EQ_LPAREN):
+		// Process substitution `<(…)` / `>(…)` / `=(…)` as the first
+		// argument (`diff <(a) <(b)`). Without this the command falls to
+		// the expression path, parsing only the bare name and orphaning
+		// each substitution into its own bogus top-level statement.
 		return true
 	}
 	return false

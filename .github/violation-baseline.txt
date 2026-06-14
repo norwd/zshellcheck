@@ -407,7 +407,7 @@ geometry/geometry.zsh	ZC1001	3
 geometry/geometry.zsh	ZC1017	1
 geometry/geometry.zsh	ZC1043	1
 geometry/geometry.zsh	ZC1045	5
-geometry/geometry.zsh	ZC1075	11
+geometry/geometry.zsh	ZC1075	9
 geometry/geometry.zsh	ZC1091	1
 geometry/geometry.zsh	ZC1097	1
 geometry/geometry.zsh	ZC1107	1
@@ -1523,7 +1523,7 @@ zimfw/zimfw.zsh	ZC1043	23
 zimfw/zimfw.zsh	ZC1045	3
 zimfw/zimfw.zsh	ZC1046	1
 zimfw/zimfw.zsh	ZC1065	1
-zimfw/zimfw.zsh	ZC1075	121
+zimfw/zimfw.zsh	ZC1075	123
 zimfw/zimfw.zsh	ZC1080	1
 zimfw/zimfw.zsh	ZC1091	10
 zimfw/zimfw.zsh	ZC1107	10

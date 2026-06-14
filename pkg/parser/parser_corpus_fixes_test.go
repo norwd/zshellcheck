@@ -168,3 +168,51 @@ func TestParseMultilineCondTrailingSubshell(t *testing.T) {
 		}
 	}
 }
+
+// A redirection trailing a brace-group statement (`{ … } 2>/dev/null`)
+// was left unconsumed on the statement-dispatch path, orphaning the
+// redirect into a bogus `(2 > /dev/null)` statement that swallowed the
+// next command. zinit's install path uses the `} 2>/dev/null | while`
+// form. Each input is `zsh -n` clean and is one statement plus the
+// trailing `print`.
+func TestParseBraceGroupTrailingRedirection(t *testing.T) {
+	cases := map[string]int{
+		"{\n  print x\n} 2>/dev/null\nprint after\n":                                                2,
+		"{\n  print x\n} >/dev/null\nprint after\n":                                                 2,
+		"{\n  print x\n} >>log\nprint after\n":                                                      2,
+		"foo() {\n  {\n    print\n  } 2>/dev/null | while read -r l; do\n    print $l\n  done\n}\n": 1,
+	}
+	for src, want := range cases {
+		p := New(lexer.New(src))
+		prog := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Errorf("unexpected errors for %q: %v", src, p.Errors())
+		}
+		if len(prog.Statements) != want {
+			t.Errorf("want %d statements for %q, got %d (the trailing redirect orphaned)", want, src, len(prog.Statements))
+		}
+	}
+}
+
+// A process substitution as the first argument (`diff <(a) <(b)`) fell
+// to the expression path, which parsed only the bare command name and
+// orphaned each `<(…)` into its own bogus top-level statement. Every
+// input is a single SimpleCommand and `zsh -n` clean.
+func TestParseProcessSubstitutionFirstArg(t *testing.T) {
+	cases := []string{
+		"diff <(echo a) <(echo b)\n",
+		"cat <(gen)\n",
+		"source <(zstyle -L | awk '{print $2}')\n",
+		"tee >(logger)\n",
+	}
+	for _, src := range cases {
+		p := New(lexer.New(src))
+		prog := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Errorf("unexpected errors for %q: %v", src, p.Errors())
+		}
+		if len(prog.Statements) != 1 {
+			t.Errorf("want 1 statement for %q, got %d (the process substitution orphaned)", src, len(prog.Statements))
+		}
+	}
+}

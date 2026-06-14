@@ -249,6 +249,18 @@ func TestZC1604(t *testing.T) {
 				},
 			},
 		},
+		{
+			// A process substitution is dynamic command output, not a
+			// filename glob; a `*` inside its body is not a match pattern.
+			name:     "valid — source process substitution with glob in body",
+			input:    `source <(zstyle -L ':z:*' | awk '{print $2}')`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "valid — source command substitution",
+			input:    `source $(find . -name '*.sh')`,
+			expected: []katas.Violation{},
+		},
 	}
 
 	for _, tt := range tests {
