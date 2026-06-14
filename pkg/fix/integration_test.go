@@ -138,26 +138,6 @@ func TestFixIntegration_ZC1013_LetCompoundAssign(t *testing.T) {
 	}
 }
 
-func TestFixIntegration_ZC1004_ExitToReturn(t *testing.T) {
-	src := `foo() {
-  if [[ -z "$1" ]]; then
-    exit 1
-  fi
-  exit
-}
-`
-	want := `foo() {
-  if [[ -z "$1" ]]; then
-    return 1
-  fi
-  return
-}
-`
-	if got := runFix(t, src); got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
 func TestFixIntegration_ZC1001_BraceArrayAccess(t *testing.T) {
 	src := `x=$arr[1]
 y=$other[2]
@@ -521,21 +501,6 @@ func TestFixIntegration_ZC1124_CatDevNullTruncate(t *testing.T) {
 	want := ": > file\n"
 	if got := runFix(t, src); got != want {
 		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func TestFixIntegration_ZC1128_TouchToEmptyRedirect(t *testing.T) {
-	src := "touch file\n"
-	want := "> file\n"
-	if got := runFix(t, src); got != want {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func TestFixIntegration_ZC1128_TouchWithFlagsUnchanged(t *testing.T) {
-	src := "touch -t 202504240000 file\n"
-	if got := runFix(t, src); got != src {
-		t.Errorf("flagged touch should stay, got %q", got)
 	}
 }
 

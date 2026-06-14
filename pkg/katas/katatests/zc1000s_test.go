@@ -633,6 +633,42 @@ func TestZC1016(t *testing.T) {
 				},
 			},
 		},
+		{
+			// `key` is a substring of `monkey`; whole-name matching
+			// must not flag it.
+			name:     "non-secret substring monkey",
+			input:    `read monkey`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "non-secret substring keyword",
+			input:    `read keyword`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "non-secret substring keys",
+			input:    `read keys`,
+			expected: []katas.Violation{},
+		},
+		{
+			// `pwd` was an over-broad substring; the print-working-dir
+			// name is not a secret.
+			name:     "non-secret pwd",
+			input:    `read pwd`,
+			expected: []katas.Violation{},
+		},
+		{
+			// `-s` is meaningless when stdin comes from a file: no
+			// terminal echo to hide.
+			name:     "secret from file redirection",
+			input:    `read secret < /etc/secret`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "secret from here-string",
+			input:    `read password <<< "$data"`,
+			expected: []katas.Violation{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1344,6 +1380,36 @@ func TestZC1040(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
+			// Nullglob `N` may appear with other qualifiers in any
+			// order: `(@N)`, `(.N)` — all are nullglob-enabled.
+			name:     "safe glob with combined N qualifier",
+			input:    `for f in $x/*(@N); do echo $f; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "safe glob with dot-N qualifier",
+			input:    `for f in *.log(.N); do echo $f; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			// An array subscript `$arr[@]` is not a filename glob and
+			// never triggers nomatch.
+			name:     "array subscript at-all is not a glob",
+			input:    `for w in $empty[@]; do echo $w; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "array subscript index is not a glob",
+			input:    `for f in $arr[1]; do echo $f; done`,
+			expected: []katas.Violation{},
+		},
+		{
+			// A brace range expands in the shell and never nomatches.
+			name:     "brace range is not a glob",
+			input:    `for i in {3..1}; do echo $i; done`,
+			expected: []katas.Violation{},
+		},
+		{
 			name:     "no glob pattern",
 			input:    `for f in a b c; do echo $f; done`,
 			expected: []katas.Violation{},
@@ -1357,6 +1423,19 @@ func TestZC1040(t *testing.T) {
 			name:     "quoted string is not a glob",
 			input:    `for f in "*.txt"; do echo $f; done`,
 			expected: []katas.Violation{},
+		},
+		{
+			name:  "bare glob without qualifier fires",
+			input: `for f in *.txt; do echo $f; done`,
+			expected: []katas.Violation{
+				{
+					KataID: "ZC1040",
+					Message: "Glob pattern '*.txt' may error if no files match. " +
+						"Append '(N)' to enable nullglob behavior: '*.txt(N)'",
+					Line:   1,
+					Column: 10,
+				},
+			},
 		},
 	}
 

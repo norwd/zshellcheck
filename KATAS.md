@@ -11,7 +11,7 @@ Auto-generated list of all 1000 implemented checks. Do not edit by hand — rege
 | `info` | 64 |
 | `style` | 257 |
 | **total** | **1000** |
-| **with auto-fix** | **134** |
+| **with auto-fix** | **132** |
 
 Auto-fix availability is marked per-entry below as **Auto-fix:** `yes` or `no`. Run `zshellcheck -fix path/...` to apply every available rewrite, or `-diff` to preview without writing.
 
@@ -20,7 +20,7 @@ Auto-fix availability is marked per-entry below as **Auto-fix:** `yes` or `no`. 
 - [ZC1001: Use ${} for array element access](#zc1001) · auto-fix
 - [ZC1002: Use $(...) instead of backticks](#zc1002) · auto-fix
 - [ZC1003: Use `((...))` for arithmetic comparisons instead of `\[` or `test`](#zc1003) · auto-fix
-- [ZC1004: Use `return` instead of `exit` in functions](#zc1004) · auto-fix
+- [ZC1004: Use `return` instead of `exit` in functions](#zc1004)
 - [ZC1005: Use whence instead of which](#zc1005) · auto-fix
 - [ZC1006: Prefer \[\[ over test for tests](#zc1006) · auto-fix
 - [ZC1007: Avoid using `chmod 777`](#zc1007)
@@ -144,7 +144,7 @@ Auto-fix availability is marked per-entry below as **Auto-fix:** `yes` or `no`. 
 - [ZC1125: Avoid `echo \| grep` for string matching](#zc1125)
 - [ZC1126: Use `sort -u` instead of `sort \| uniq`](#zc1126) · auto-fix
 - [ZC1127: Avoid `ls` for counting files](#zc1127)
-- [ZC1128: Use `> file` instead of `touch file` for creation](#zc1128) · auto-fix
+- [ZC1128: Prefer a redirection over `touch` for a brand-new empty file](#zc1128)
 - [ZC1129: Use Zsh `stat` module instead of `wc -c` for file size](#zc1129)
 - [ZC1131: Avoid `cat file \| while read` — use redirection](#zc1131)
 - [ZC1132: Use Zsh pattern extraction instead of `grep -o`](#zc1132)
@@ -1060,7 +1060,7 @@ Disable by adding `ZC1003` to `disabled_katas` in `.zshellcheckrc`.
 ### ZC1004 — Use `return` instead of `exit` in functions
 
 **Severity:** `warning`  
-**Auto-fix:** `yes`
+**Auto-fix:** `no`
 
 Using `exit` in a function terminates the entire shell, which is often unintended in interactive sessions or sourced scripts. Use `return` to exit the function.
 
@@ -2545,12 +2545,12 @@ Disable by adding `ZC1127` to `disabled_katas` in `.zshellcheckrc`.
 ---
 
 <a id="zc1128"></a>
-### ZC1128 — Use `> file` instead of `touch file` for creation
+### ZC1128 — Prefer a redirection over `touch` for a brand-new empty file
 
 **Severity:** `style`  
-**Auto-fix:** `yes`
+**Auto-fix:** `no`
 
-If the goal is to create an empty file, `> file` does it without spawning `touch`. Use `touch` only when you need to update timestamps.
+Creating a file with `touch file` spawns an external process. For a file that does not yet exist, `: >| file` creates it in the shell. Keep `touch` when the file may already exist: `touch` preserves contents, whereas a `>` redirection truncates an existing file.
 
 Disable by adding `ZC1128` to `disabled_katas` in `.zshellcheckrc`.
 

@@ -1254,7 +1254,7 @@ func TestZC1128(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1128",
-					Message: "Use `> file` instead of `touch file` to create an empty file. This avoids spawning an external process.",
+					Message: "Prefer `: >| file` over `touch file` for a brand-new empty file. Keep `touch` when the file may already exist, because `>` truncates it.",
 					Line:    1,
 					Column:  1,
 				},

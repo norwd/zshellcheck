@@ -53,7 +53,6 @@ antidote/tests/bin/init_fixtures.zsh	ZC1004	1
 antidote/tests/bin/init_fixtures.zsh	ZC1006	1
 antidote/tests/bin/init_fixtures.zsh	ZC1010	5
 antidote/tests/bin/init_fixtures.zsh	ZC1011	1
-antidote/tests/bin/init_fixtures.zsh	ZC1016	1
 antidote/tests/bin/init_fixtures.zsh	ZC1020	1
 antidote/tests/bin/init_fixtures.zsh	ZC1036	1
 antidote/tests/bin/init_fixtures.zsh	ZC1043	3
@@ -403,7 +402,6 @@ mcfly/dev.zsh	ZC1100	1
 mcfly/dev.zsh	ZC1128	1
 mcfly/dev.zsh	ZC1275	1
 mcfly/mcfly.zsh	ZC1010	4
-mcfly/mcfly.zsh	ZC1016	1
 mcfly/mcfly.zsh	ZC1030	6
 mcfly/mcfly.zsh	ZC1031	1
 mcfly/mcfly.zsh	ZC1037	3
@@ -1390,7 +1388,7 @@ zinit/zinit-autoload.zsh	ZC1002	2
 zinit/zinit-autoload.zsh	ZC1012	1
 zinit/zinit-autoload.zsh	ZC1015	2
 zinit/zinit-autoload.zsh	ZC1017	1
-zinit/zinit-autoload.zsh	ZC1040	3
+zinit/zinit-autoload.zsh	ZC1040	2
 zinit/zinit-autoload.zsh	ZC1043	2
 zinit/zinit-autoload.zsh	ZC1045	6
 zinit/zinit-autoload.zsh	ZC1046	6
@@ -1766,13 +1764,11 @@ zsh-utils/utility/utility.plugin.zsh	ZC1049	22
 zsh-utils/utility/utility.plugin.zsh	ZC1075	1
 zsh-utils/utility/utility.plugin.zsh	ZC1086	1
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1001	2
-zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1016	3
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1043	55
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1075	1
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1091	24
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1107	24
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1001	20
-zsh-vi-mode/zsh-vi-mode.zsh	ZC1016	9
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1030	10
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1037	19
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1040	2

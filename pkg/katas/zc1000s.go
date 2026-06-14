@@ -343,23 +343,9 @@ func init() {
 			"in interactive sessions or sourced scripts. Use `return` to exit the function.",
 		Severity: SeverityWarning,
 		Check:    checkZC1004,
-		Fix:      fixZC1004,
 	}
 	RegisterKata(ast.FunctionDefinitionNode, kata)
 	RegisterKata(ast.FunctionLiteralNode, kata)
-}
-
-// fixZC1004 rewrites `exit` to `return` at the command-name position
-// inside a function body. Arguments (the exit/return code) stay
-// unchanged — `exit 1` becomes `return 1` with the `1` byte-identical.
-// The violation's Line/Column already point at the command name.
-func fixZC1004(node ast.Node, v Violation, source []byte) []FixEdit {
-	return []FixEdit{{
-		Line:    v.Line,
-		Column:  v.Column,
-		Length:  len("exit"),
-		Replace: "return",
-	}}
 }
 
 func checkZC1004(node ast.Node) []Violation {
@@ -1208,7 +1194,6 @@ func checkZC1016(node ast.Node) []Violation {
 	}
 
 	hasS := false
-	sensitiveVars := []string{"password", "passwd", "pwd", "secret", "token", "key", "api_key"}
 
 	// Check flags
 	for _, arg := range cmd.Arguments {
@@ -1223,6 +1208,13 @@ func checkZC1016(node ast.Node) []Violation {
 	}
 
 	if hasS {
+		return nil
+	}
+
+	// `-s` (hide typed input) is meaningless when `read` takes its stdin
+	// from a file or here-string: there is no terminal echo to suppress.
+	// `read secret < file` and here-string forms read data, not a prompt.
+	if zc1016HasStdinRedirection(cmd.Arguments) {
 		return nil
 	}
 
@@ -1241,16 +1233,7 @@ func checkZC1016(node ast.Node) []Violation {
 		varName := strings.TrimSpace(parts[0])
 		varName = strings.Trim(varName, "'\"")
 
-		varLower := strings.ToLower(varName)
-		isSensitive := false
-		for _, s := range sensitiveVars {
-			if strings.Contains(varLower, s) {
-				isSensitive = true
-				break
-			}
-		}
-
-		if isSensitive {
+		if zc1016IsSensitiveName(varName) {
 			violations = append(violations, Violation{
 				KataID:  "ZC1016",
 				Message: "Use `read -s` to hide input when reading sensitive variable '" + varName + "'.",
@@ -1262,6 +1245,38 @@ func checkZC1016(node ast.Node) []Violation {
 	}
 
 	return violations
+}
+
+// zc1016SensitiveNames lists the whole variable names that name a
+// secret. Matching is whole-name (case-insensitive), so `monkey`,
+// `keyword`, and `keys` are not mistaken for a secret.
+var zc1016SensitiveNames = map[string]struct{}{
+	"password": {}, "passwd": {}, "secret": {}, "secret_key": {},
+	"token": {}, "auth_token": {}, "access_token": {},
+	"apikey": {}, "api_key": {}, "passphrase": {}, "credential": {},
+}
+
+// zc1016IsSensitiveName reports whether varName is, as a whole name, a
+// known secret variable. The match is exact on the lower-cased name
+// rather than a substring, to avoid flagging `monkey` (contains `key`)
+// or `keyword`.
+func zc1016IsSensitiveName(varName string) bool {
+	_, ok := zc1016SensitiveNames[strings.ToLower(varName)]
+	return ok
+}
+
+// zc1016HasStdinRedirection reports whether the read command's argument
+// list carries a stdin redirection (`<`, `<<<`, `<<`, `0<`). Such a
+// redirection is parsed into the argument list as a `<`-prefixed token,
+// so `-s` would have no terminal input to mask.
+func zc1016HasStdinRedirection(args []ast.Expression) bool {
+	for _, arg := range args {
+		s := strings.Trim(arg.String(), "\"'")
+		if s == "<" || s == "<<<" || s == "<<" || s == "0<" {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {
@@ -2253,6 +2268,13 @@ func checkZC1040(node ast.Node) []Violation {
 		// We are looking for string literals that look like globs (contain *, ?, etc)
 		// but do NOT contain (N) or (N-...) qualifiers.
 
+		// An array subscript (`$arr[@]`, `$arr[1]`) parses to an
+		// IndexExpression. Its `[` is a subscript, not a glob char-class,
+		// and it never triggers nomatch — skip it.
+		if _, ok := item.(*ast.IndexExpression); ok {
+			continue
+		}
+
 		val := getStringValue(item)
 
 		// If it is quoted, it is NOT a glob expansion.
@@ -2307,14 +2329,47 @@ func getStringValue(node ast.Node) string {
 }
 
 func isGlob(s string) bool {
-	// Simple check for common glob characters
-	return strings.ContainsAny(s, "*?[]")
+	// A `*` or `?` anywhere is a filename glob. A bare `[`/`]` is only a
+	// glob char-class when it is NOT an array subscript (`$name[...]`).
+	if strings.ContainsAny(s, "*?") {
+		return true
+	}
+	if strings.ContainsAny(s, "[]") {
+		return !isArraySubscriptZC1040(s)
+	}
+	return false
+}
+
+// isArraySubscriptZC1040 reports whether the `[` in s opens an array
+// subscript (`$name[...]`, `name[...]`) rather than a glob char-class.
+// A subscript bracket is preceded by a parameter/identifier name, never
+// by a glob metacharacter or a path separator.
+func isArraySubscriptZC1040(s string) bool {
+	idx := strings.IndexByte(s, '[')
+	if idx <= 0 {
+		return false
+	}
+	prev := s[idx-1]
+	return prev == '_' || prev == '}' ||
+		('a' <= prev && prev <= 'z') ||
+		('A' <= prev && prev <= 'Z') ||
+		('0' <= prev && prev <= '9')
 }
 
 func hasNullGlobQualifier(s string) bool {
-	// Check for (N) at the end. Zsh qualifiers are at the end.
-	// This is a naive check.
-	return strings.Contains(s, "(N)") || strings.Contains(s, "(N") // (N) or (N...)
+	// Zsh glob qualifiers sit in a trailing `(...)` group; nullglob is
+	// the `N` flag, which may appear with others in any order: `(N)`,
+	// `(@N)`, `(Nn)`, `(.N)`, `(N:t)`. Treat any qualifier group that
+	// contains an `N` as nullglob-enabled.
+	open := strings.LastIndexByte(s, '(')
+	if open < 0 {
+		return false
+	}
+	shut := strings.IndexByte(s[open:], ')')
+	if shut < 0 {
+		return false
+	}
+	return strings.ContainsRune(s[open:open+shut], 'N')
 }
 
 func init() {
@@ -4561,7 +4616,10 @@ func checkZC1065(node ast.Node) []Violation {
 			}
 		}
 	case *ast.DoubleBracketExpression:
-		// Check first expression
+		// Check the first element's own token for a preceding space.
+		// Recursing to the leftmost leaf instead misfires on an array
+		// subscript inside the condition (`[[ $arr[1] == x ]]`), whose
+		// leaf is the subscript `[` with no preceding space.
 		if len(n.Elements) > 0 {
 			firstExp := n.Elements[0]
 			if !firstExp.TokenLiteralNode().HasPrecedingSpace {
