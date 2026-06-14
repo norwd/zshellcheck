@@ -253,8 +253,10 @@ func TestFixIntegration_ZC1055_LeftEmpty(t *testing.T) {
 }
 
 func TestFixIntegration_ZC1017_PrintAddR(t *testing.T) {
-	src := `print "hello"` + "\n"
-	want := `print -r "hello"` + "\n"
+	// ZC1017 fires only when the string carries a backslash escape that
+	// `print` would interpret without `-r`.
+	src := `print "a\tb"` + "\n"
+	want := `print -r "a\tb"` + "\n"
 	if got := runFix(t, src); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -1083,8 +1085,10 @@ func TestFixIntegration_ZC1377_BashAliasesInEcho(t *testing.T) {
 }
 
 func TestFixIntegration_ZC1378_DirstackInPrint(t *testing.T) {
+	// ZC1378 renames the variable; ZC1017 does not add `-r` because the
+	// string has no backslash escape to interpret.
 	src := `print "$DIRSTACK"` + "\n"
-	want := `print -r "$dirstack"` + "\n"
+	want := `print "$dirstack"` + "\n"
 	if got := runFix(t, src); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

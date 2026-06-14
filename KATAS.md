@@ -1950,7 +1950,7 @@ Disable by adding `ZC1077` to `disabled_katas` in `.zshellcheckrc`.
 **Severity:** `warning`  
 **Auto-fix:** `yes`
 
-Using unquoted `$@` or `$*` splits arguments by IFS (usually space). Use `"$@"` to preserve the original argument grouping, or `"$*"` to join them into a single string.
+Unlike Bash, Zsh does not word-split `$@`/`$*` (SH_WORD_SPLIT is off by default), so element grouping is preserved. The real difference is that unquoted `$@`/`$*` drops empty elements: with `set -- a '' c`, `$@` yields `a c` while `"$@"` yields `a '' c`. Use `"$@"` to keep empty positional parameters, or `"$*"` to join all elements into a single string.
 
 Disable by adding `ZC1078` to `disabled_katas` in `.zshellcheckrc`.
 
@@ -2142,7 +2142,7 @@ Disable by adding `ZC1093` to `disabled_katas` in `.zshellcheckrc`.
 **Severity:** `style`  
 **Auto-fix:** `no`
 
-For simple string substitutions on variables, use Zsh parameter expansion `${var//pattern/replacement}` instead of piping through `sed`. It avoids spawning an external process.
+For simple string substitutions on a single variable, use Zsh parameter expansion `${var//pattern/replacement}` instead of feeding `sed` from `echo $var` or a `<<< $var` here-string. It avoids spawning an external process. A `sed` reading a multi-line pipe stream is not flagged — there is no variable for the expansion to operate on.
 
 Disable by adding `ZC1094` to `disabled_katas` in `.zshellcheckrc`.
 

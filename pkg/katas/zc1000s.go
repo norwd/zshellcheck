@@ -935,7 +935,12 @@ func checkZC1012(node ast.Node) []Violation {
 				s = strings.Trim(s, "()")
 
 				if len(s) > 0 && s[0] == '-' {
-					if strings.Contains(s, "r") {
+					// `-r` already governs backslash handling. The `-k`, `-q`,
+					// and `-z` modes read raw characters or the editor buffer
+					// and never process backslashes, so `-r` is a no-op for
+					// them — flagging `read -k 1 key` or `read -q` is a false
+					// positive (shellcheck SC2162 exempts the same forms).
+					if strings.ContainsAny(s, "rkqz") {
 						hasR = true
 						break
 					}
@@ -1329,15 +1334,24 @@ func checkZC1017(node ast.Node) []Violation {
 	if cmd, ok := node.(*ast.SimpleCommand); ok {
 		if name, ok := cmd.Name.(*ast.Identifier); ok && name.Value == "print" {
 			hasRFlag := false
+			hasEscape := false
 			for _, arg := range cmd.Arguments {
 				argStr := arg.String()
-				argStr = strings.Trim(argStr, "\"'")
 				if strings.HasPrefix(argStr, "-") && strings.Contains(argStr, "r") {
 					hasRFlag = true
 					break
 				}
+				if zc1017HasEscapeSequence(arg) {
+					hasEscape = true
+				}
 			}
-			if !hasRFlag {
+			// `-r` already suppresses escape processing. Without `-r`, only an
+			// argument that actually carries a backslash escape (`\t`, `\n`,
+			// `\e`, `\\`, …) is affected — `print -P "%F{green}…"` (prompt
+			// escapes, untouched by `-r`), `print -l -- $x`, and
+			// `print "${cmd}"` have no backslash and are not at risk. Fire
+			// only when a real escape sequence is present.
+			if !hasRFlag && hasEscape {
 				violations = append(violations, Violation{
 					KataID:  "ZC1017",
 					Message: "Use `print -r` to print strings literally.",
@@ -1350,6 +1364,25 @@ func checkZC1017(node ast.Node) []Violation {
 	}
 
 	return violations
+}
+
+// zc1017HasEscapeSequence reports whether the argument is a string literal
+// carrying a backslash escape that `print` would interpret without `-r`
+// (`\t`, `\n`, `\e`, `\\`, `\0NNN`, etc.). Bare words, flags, and
+// escape-free strings return false so the kata stays quiet on
+// `print -P "%F{green}…"`, `print -l -- $x`, and `print "${cmd}"`.
+func zc1017HasEscapeSequence(arg ast.Node) bool {
+	str, ok := arg.(*ast.StringLiteral)
+	if !ok {
+		return false
+	}
+	v := str.Value
+	for i := 0; i+1 < len(v); i++ {
+		if v[i] == '\\' {
+			return true
+		}
+	}
+	return false
 }
 
 // Issue #343: ZC1018 fires on the same input as the canonical
@@ -2019,6 +2052,13 @@ func checkZC1037(node ast.Node) []Violation {
 			}
 		}
 		if str, ok := arg.(*ast.StringLiteral); ok && strings.Contains(str.Value, "$") {
+			// A single-quoted string never expands `$` — it is a literal
+			// dollar sign, so `echo 'cost is $5'` has no expansion to
+			// preserve and `print -r --` offers no benefit. Only flag
+			// double-quoted (or unquoted) strings where the `$` is live.
+			if len(str.Value) > 0 && str.Value[0] == '\'' {
+				continue
+			}
 			return []Violation{
 				{
 					KataID:  "ZC1037",
@@ -3590,7 +3630,13 @@ func init() {
 	})
 }
 
-var rangeRegex = regexp.MustCompile(`\[[a-zA-Z0-9]-[a-zA-Z0-9]\]`)
+// rangeRegex matches a character range whose collation order is
+// locale-dependent: at least one endpoint must be alphabetic. Pure-digit
+// ranges like `[0-9]` or `[0-7]` are POSIX-portable (the digits `0`-`9`
+// are guaranteed contiguous and ordered in every locale), so they are not
+// flagged. Only an alphabetic endpoint (`[a-z]`, `[A-Z]`, `[a-Z]`) makes
+// the range sensitive to the active collation sequence.
+var rangeRegex = regexp.MustCompile(`\[([a-zA-Z]-[a-zA-Z0-9]|[a-zA-Z0-9]-[a-zA-Z])\]`)
 
 func checkZC1054(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
@@ -5497,8 +5543,9 @@ func init() {
 	RegisterKata(ast.SimpleCommandNode, Kata{
 		ID:    "ZC1078",
 		Title: "Quote `$@` and `$*` when passing arguments",
-		Description: "Using unquoted `$@` or `$*` splits arguments by IFS (usually space). " +
-			"Use `\"$@\"` to preserve the original argument grouping, or `\"$*\"` to join them into a single string.",
+		Description: "Unlike Bash, Zsh does not word-split `$@`/`$*` (SH_WORD_SPLIT is off by default), so element grouping is preserved. " +
+			"The real difference is that unquoted `$@`/`$*` drops empty elements: with `set -- a '' c`, `$@` yields `a c` while `\"$@\"` yields `a '' c`. " +
+			"Use `\"$@\"` to keep empty positional parameters, or `\"$*\"` to join all elements into a single string.",
 		Severity: SeverityWarning,
 		Check:    checkZC1078,
 		Fix:      fixZC1078,
@@ -5568,7 +5615,7 @@ func checkZC1078(node ast.Node) []Violation {
 		if s == "$@" || s == "$*" {
 			violations = append(violations, Violation{
 				KataID:  "ZC1078",
-				Message: "Unquoted " + s + " splits arguments. Use \"" + s + "\" to preserve structure.",
+				Message: "Unquoted " + s + " drops empty elements. Use \"" + s + "\" to preserve every positional parameter.",
 				Line:    arg.TokenLiteralNode().Line,
 				Column:  arg.TokenLiteralNode().Column,
 				Level:   SeverityWarning,
@@ -6953,36 +7000,119 @@ func checkZC1093(ast.Node) []Violation {
 }
 
 func init() {
-	RegisterKata(ast.SimpleCommandNode, Kata{
+	zc1094Kata := Kata{
 		ID:    "ZC1094",
 		Title: "Use parameter expansion instead of `sed` for simple substitutions",
-		Description: "For simple string substitutions on variables, use Zsh parameter expansion " +
-			"`${var//pattern/replacement}` instead of piping through `sed`. It avoids spawning an external process.",
+		Description: "For simple string substitutions on a single variable, use Zsh parameter expansion " +
+			"`${var//pattern/replacement}` instead of feeding `sed` from `echo $var` or a `<<< $var` " +
+			"here-string. It avoids spawning an external process. A `sed` reading a multi-line pipe " +
+			"stream is not flagged — there is no variable for the expansion to operate on.",
 		Severity: SeverityStyle,
 		Check:    checkZC1094,
-	})
+	}
+	RegisterKata(ast.SimpleCommandNode, zc1094Kata)
+	zc1094PipeKata := zc1094Kata
+	zc1094PipeKata.Check = checkZC1094Pipe
+	RegisterKata(ast.InfixExpressionNode, zc1094PipeKata)
 }
 
+// checkZC1094 fires only when `sed` reads from a single variable via a
+// here-string (`sed 's/…/…/' <<< $var`). In that case `${var//pat/rep}`
+// can replace the external process. A bare `sed 's/…/…/'` reading from a
+// pipe stream (`git branch | sed …`) has no variable to expand, so the
+// parameter-expansion rewrite is impossible — that case is intentionally
+// not flagged here. The `echo $var | sed …` pipeline form is handled by
+// checkZC1094Pipe on the pipe node.
 func checkZC1094(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok || CommandIdentifier(cmd) != "sed" || len(cmd.Arguments) != 1 {
+	if !ok || CommandIdentifier(cmd) != "sed" {
 		return nil
 	}
-	val := cmd.Arguments[0].String()
-	if val != "" && val[0] == '-' {
+	if !zc1094HereStringVar(cmd) {
 		return nil
 	}
-	if !zc1094IsSimpleSubst(val) {
+	return []Violation{zc1094Violation(cmd.Token.Line, cmd.Token.Column)}
+}
+
+// checkZC1094Pipe fires on `echo $var | sed 's/…/…/'` and
+// `print $var | sed 's/…/…/'`, where the sole upstream of the pipe is a
+// single variable that `${var//pat/rep}` can substitute directly.
+func checkZC1094Pipe(node ast.Node) []Violation {
+	infix, ok := node.(*ast.InfixExpression)
+	if !ok || infix.Operator != "|" {
 		return nil
 	}
-	return []Violation{{
+	right, ok := infix.Right.(*ast.SimpleCommand)
+	if !ok || CommandIdentifier(right) != "sed" || len(right.Arguments) != 1 {
+		return nil
+	}
+	if !zc1094IsSimpleSubstArg(right.Arguments[0]) {
+		return nil
+	}
+	if !zc1094LeftIsEchoVar(infix.Left) {
+		return nil
+	}
+	return []Violation{zc1094Violation(right.Token.Line, right.Token.Column)}
+}
+
+func zc1094Violation(line, col int) Violation {
+	return Violation{
 		KataID: "ZC1094",
 		Message: "Use `${var//pattern/replacement}` instead of piping through `sed` for simple substitutions. " +
 			"Parameter expansion avoids spawning an external process.",
-		Line:   cmd.Token.Line,
-		Column: cmd.Token.Column,
+		Line:   line,
+		Column: col,
 		Level:  SeverityStyle,
-	}}
+	}
+}
+
+// zc1094HereStringVar reports whether the sed command has a `s/…/…/`
+// argument and is fed a single variable through a `<<<` here-string.
+func zc1094HereStringVar(cmd *ast.SimpleCommand) bool {
+	hasSubst := false
+	hasHereString := false
+	hasVar := false
+	for _, arg := range cmd.Arguments {
+		s := arg.String()
+		if s != "" && s[0] == '-' {
+			return false
+		}
+		if strings.Contains(s, "<<<") {
+			hasHereString = true
+			continue
+		}
+		if ident, ok := arg.(*ast.Identifier); ok && ident.Token.Type == token.VARIABLE {
+			hasVar = true
+			continue
+		}
+		if zc1094IsSimpleSubstArg(arg) {
+			hasSubst = true
+		}
+	}
+	return hasSubst && hasHereString && hasVar
+}
+
+// zc1094LeftIsEchoVar reports whether the left side of the pipe is
+// `echo $var` or `print $var` — a single variable emitted to stdout.
+func zc1094LeftIsEchoVar(left ast.Node) bool {
+	cmd, ok := left.(*ast.SimpleCommand)
+	if !ok || len(cmd.Arguments) != 1 {
+		return false
+	}
+	name := CommandIdentifier(cmd)
+	if name != "echo" && name != "print" {
+		return false
+	}
+	ident, ok := cmd.Arguments[0].(*ast.Identifier)
+	return ok && ident.Token.Type == token.VARIABLE
+}
+
+func zc1094IsSimpleSubstArg(arg ast.Node) bool {
+	val := arg.String()
+	if val != "" && val[0] == '-' {
+		return false
+	}
+	return zc1094IsSimpleSubst(val)
 }
 
 // zc1094IsSimpleSubst reports whether v looks like a `s/pat/rep/`
@@ -7169,6 +7299,18 @@ func checkZC1098(node ast.Node) []Violation {
 
 	if cmd.Name != nil && cmd.Name.String() == "eval" {
 		for _, arg := range cmd.Arguments {
+			// A standalone parameter expansion that IS the whole eval
+			// argument (`eval $cmd`, `eval "$REPLY"`, `eval ${(e)x}`) is the
+			// var-as-command idiom: the variable holds the command string and
+			// is meant to be word-split into a command. Quoting it with `(q)`
+			// turns the entire value into one literal word, which breaks
+			// execution (`command not found: echo hi`). The `(q)` advice only
+			// applies when the variable is data embedded inside a larger
+			// literal command (`eval "rm $path"`), so skip the standalone case.
+			if zc1098IsStandaloneExpansion(arg) {
+				continue
+			}
+
 			// Check if the argument string contains '$' and NOT '(q)'
 			argStr := arg.String()
 			// Very rough heuristic. Real parsing inside the string would be better but complex.
@@ -7214,6 +7356,70 @@ func checkZC1098(node ast.Node) []Violation {
 	}
 
 	return nil
+}
+
+// zc1098IsStandaloneExpansion reports whether the eval argument is a single
+// parameter expansion with nothing else around it: a bare variable
+// (`$cmd`), a `"$VAR"` whose only content is one expansion, or a flagged
+// expansion such as `${(e)x}` parsed as an array access. These are the
+// var-as-command forms where `(q)` quoting would break execution.
+func zc1098IsStandaloneExpansion(arg ast.Node) bool {
+	switch n := arg.(type) {
+	case *ast.Identifier:
+		// `eval $cmd` — the parser tags a bare expansion as a VARIABLE.
+		return n.Token.Type == token.VARIABLE
+	case *ast.ArrayAccess:
+		// `eval ${(e)x}` and other single flagged/subscripted expansions.
+		return true
+	case *ast.StringLiteral:
+		return zc1098StringIsSingleExpansion(n.Value)
+	}
+	return false
+}
+
+// zc1098StringIsSingleExpansion reports whether the quoted string literal
+// holds exactly one parameter expansion and nothing else, e.g. `"$REPLY"`
+// or `"${opts}"`. A leading literal (`"rm $path"`) or a second token makes
+// it data-in-a-command, which still warrants the `(q)` advice.
+func zc1098StringIsSingleExpansion(value string) bool {
+	inner := value
+	if len(inner) >= 2 && (inner[0] == '"' || inner[0] == '\'') && inner[len(inner)-1] == inner[0] {
+		inner = inner[1 : len(inner)-1]
+	}
+	if len(inner) < 2 || inner[0] != '$' {
+		return false
+	}
+	if inner[1] == '{' {
+		return zc1098IsSingleBraceExpansion(inner)
+	}
+	return zc1098IsBareName(inner[1:])
+}
+
+// zc1098IsSingleBraceExpansion reports whether inner is exactly one
+// `${...}` expansion with no trailing text after the matching close brace
+// and no embedded whitespace.
+func zc1098IsSingleBraceExpansion(inner string) bool {
+	return strings.HasSuffix(inner, "}") &&
+		strings.IndexByte(inner[2:len(inner)-1], '}') == -1 &&
+		!strings.ContainsAny(inner, " \t")
+}
+
+// zc1098IsBareName reports whether s is a single run of identifier
+// characters with no spaces or extra sigils (the `name` after `$`).
+func zc1098IsBareName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if !zc1098IsNameByte(s[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func zc1098IsNameByte(c byte) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
 func containsFlag(s string) bool {

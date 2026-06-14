@@ -453,6 +453,21 @@ func TestCheckZC1012(t *testing.T) {
 			input:    `read -er line`, // heuristic support
 			expected: []katas.Violation{},
 		},
+		{
+			name:     "read -k reads raw chars so -r is a no-op",
+			input:    `read -k 3 key`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "read -q reads a single y/n char",
+			input:    `read -q "REPLY?ok"`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "read -z reads the editor buffer",
+			input:    `read -z buf`,
+			expected: []katas.Violation{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -634,7 +649,13 @@ func TestCheckZC1017(t *testing.T) {
 		expected []katas.Violation
 	}{
 		{
-			input: `print "hello"`,
+			// No backslash escape — nothing for `print` to interpret,
+			// so `-r` makes no difference and the kata stays quiet.
+			input:    `print "hello"`,
+			expected: []katas.Violation{},
+		},
+		{
+			input: `print "a\tb"`,
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1017",
@@ -645,7 +666,21 @@ func TestCheckZC1017(t *testing.T) {
 			},
 		},
 		{
-			input:    `print -r "hello"`,
+			input:    `print -r "a\tb"`,
+			expected: []katas.Violation{},
+		},
+		{
+			// Prompt escapes are expanded by `-P`; `-r` does not suppress
+			// them and the content carries no backslash escape.
+			input:    `print -P "%F{green}done%f"`,
+			expected: []katas.Violation{},
+		},
+		{
+			input:    `print -l -- $usage`,
+			expected: []katas.Violation{},
+		},
+		{
+			input:    `print "${cmd}"`,
 			expected: []katas.Violation{},
 		},
 	}
@@ -1156,6 +1191,11 @@ func TestZC1037(t *testing.T) {
 		{
 			name:     "valid print",
 			input:    `print -r -- "$var"`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "single-quoted dollar is literal",
+			input:    `echo 'cost is $5'`,
 			expected: []katas.Violation{},
 		},
 		{
@@ -2149,6 +2189,28 @@ func TestZC1054(t *testing.T) {
 			name:     "command with no args",
 			input:    `ls`,
 			expected: []katas.Violation{},
+		},
+		{
+			name:     "digit range is locale-invariant",
+			input:    `grep -o '[0-9]*'`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "octal digit range is locale-invariant",
+			input:    `grep -o '[0-7]'`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:  "alphabetic range is collation-sensitive",
+			input: `grep -o '[a-z]*'`,
+			expected: []katas.Violation{
+				{
+					KataID:  "ZC1054",
+					Message: "Ranges like `[a-z]` are locale-dependent. Use POSIX classes like `[[:lower:]]` or `[[:digit:]]`.",
+					Line:    1,
+					Column:  9,
+				},
+			},
 		},
 	}
 
@@ -3414,7 +3476,7 @@ func TestZC1078(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1078",
-					Message: "Unquoted $@ splits arguments. Use \"$@\" to preserve structure.",
+					Message: "Unquoted $@ drops empty elements. Use \"$@\" to preserve every positional parameter.",
 					Line:    1,
 					Column:  5,
 				},
@@ -3426,7 +3488,7 @@ func TestZC1078(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1078",
-					Message: "Unquoted $* splits arguments. Use \"$*\" to preserve structure.",
+					Message: "Unquoted $* drops empty elements. Use \"$*\" to preserve every positional parameter.",
 					Line:    1,
 					Column:  5,
 				},
@@ -3438,7 +3500,7 @@ func TestZC1078(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1078",
-					Message: "Unquoted $@ splits arguments. Use \"$@\" to preserve structure.",
+					Message: "Unquoted $@ drops empty elements. Use \"$@\" to preserve every positional parameter.",
 					Line:    1,
 					Column:  10,
 				},
@@ -4491,20 +4553,30 @@ func TestZC1094(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid simple sed substitution",
-			input: `sed 's/foo/bar/'`,
+			name:     "bare sed reads a stream not a variable",
+			input:    `sed 's/foo/bar/'`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "sed below a non-echo pipe has no variable to expand",
+			input:    `git branch | sed 's/foo/bar/'`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:  "echo of a variable into sed",
+			input: `echo $v | sed 's/foo/bar/'`,
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1094",
 					Message: "Use `${var//pattern/replacement}` instead of piping through `sed` for simple substitutions. Parameter expansion avoids spawning an external process.",
 					Line:    1,
-					Column:  1,
+					Column:  11,
 				},
 			},
 		},
 		{
-			name:  "invalid sed global substitution",
-			input: `sed 's/foo/bar/g'`,
+			name:  "here-string of a variable into sed",
+			input: `sed 's/foo/bar/' <<< $v`,
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1094",
@@ -4703,6 +4775,21 @@ func TestZC1098(t *testing.T) {
 		{
 			name:     "eval without variables",
 			input:    `eval "echo hello"`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "eval of a bare variable command string",
+			input:    `eval $cmd`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "eval of a quoted standalone variable",
+			input:    `eval "$REPLY"`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "eval of a single flagged expansion",
+			input:    `eval ${(e)x}`,
 			expected: []katas.Violation{},
 		},
 		{

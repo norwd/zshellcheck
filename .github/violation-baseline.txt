@@ -1,7 +1,7 @@
 # Violation baseline. Regenerate with scripts/violation-corpus-sweep.sh --update-baseline
 # Snapshot of kata findings on the pinned, zero-parser-error corpora. Any drift is reviewed.
 # Format: <relpath>\t<ZCID>\t<count>
-agkozak-prompt/agkozak-zsh-prompt.plugin.zsh	ZC1017	9
+agkozak-prompt/agkozak-zsh-prompt.plugin.zsh	ZC1017	1
 agkozak-prompt/agkozak-zsh-prompt.plugin.zsh	ZC1043	1
 agkozak-prompt/agkozak-zsh-prompt.plugin.zsh	ZC1075	28
 agkozak-prompt/agkozak-zsh-prompt.plugin.zsh	ZC1083	1
@@ -11,7 +11,6 @@ agkozak-prompt/agkozak-zsh-prompt.plugin.zsh	ZC1337	1
 agkozak-prompt/agkozak-zsh-prompt.plugin.zsh	ZC1604	2
 agkozak-prompt/lib/async.zsh	ZC1001	5
 agkozak-prompt/lib/async.zsh	ZC1010	1
-agkozak-prompt/lib/async.zsh	ZC1017	5
 agkozak-prompt/lib/async.zsh	ZC1043	2
 agkozak-prompt/lib/async.zsh	ZC1046	1
 agkozak-prompt/lib/async.zsh	ZC1065	1
@@ -30,7 +29,6 @@ antidote/antidote.zsh	ZC1001	11
 antidote/antidote.zsh	ZC1004	1
 antidote/antidote.zsh	ZC1010	2
 antidote/antidote.zsh	ZC1011	3
-antidote/antidote.zsh	ZC1017	6
 antidote/antidote.zsh	ZC1030	1
 antidote/antidote.zsh	ZC1037	1
 antidote/antidote.zsh	ZC1043	12
@@ -42,9 +40,7 @@ antidote/antidote.zsh	ZC1073	2
 antidote/antidote.zsh	ZC1075	48
 antidote/antidote.zsh	ZC1091	14
 antidote/antidote.zsh	ZC1092	1
-antidote/antidote.zsh	ZC1094	1
 antidote/antidote.zsh	ZC1097	1
-antidote/antidote.zsh	ZC1098	3
 antidote/antidote.zsh	ZC1107	14
 antidote/antidote.zsh	ZC1114	1
 antidote/antidote.zsh	ZC1125	1
@@ -65,7 +61,7 @@ antidote/tests/bin/init_fixtures.zsh	ZC1097	3
 antidote/tests/bin/init_fixtures.zsh	ZC1231	1
 antidote/tests/bin/init_fixtures.zsh	ZC1293	1
 antidote/tests/bin/init_fixtures.zsh	ZC1986	2
-antidote/tests/bin/test_fzf_opts_manual.zsh	ZC1017	2
+antidote/tests/bin/test_fzf_opts_manual.zsh	ZC1017	1
 antidote/tests/bin/test_fzf_opts_manual.zsh	ZC1075	2
 antidote/tests/__init__.zsh	ZC1031	1
 antidote/tests/testdata/real/.zsh_plugins.zsh	ZC1001	1
@@ -98,14 +94,12 @@ atuin/crates/atuin/src/shell/atuin.zsh	ZC1010	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1030	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1041	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1043	3
-atuin/crates/atuin/src/shell/atuin.zsh	ZC1054	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1067	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1075	4
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1076	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1078	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1082	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1092	1
-atuin/crates/atuin/src/shell/atuin.zsh	ZC1094	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1097	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1118	1
 atuin/crates/atuin/src/shell/atuin.zsh	ZC1120	1
@@ -198,7 +192,6 @@ bullet-train/bullet-train.zsh-theme	ZC1083	1
 bullet-train/bullet-train.zsh-theme	ZC1086	1
 bullet-train/bullet-train.zsh-theme	ZC1091	5
 bullet-train/bullet-train.zsh-theme	ZC1092	15
-bullet-train/bullet-train.zsh-theme	ZC1094	1
 bullet-train/bullet-train.zsh-theme	ZC1097	1
 bullet-train/bullet-train.zsh-theme	ZC1098	2
 bullet-train/bullet-train.zsh-theme	ZC1107	6
@@ -225,7 +218,7 @@ fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh	ZC1128	1
 fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh	ZC1160	1
 fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh	ZC1877	1
 fast-syntax-highlighting/share/free_theme.zsh	ZC1075	61
-fast-syntax-highlighting/test/parse.zsh	ZC1017	5
+fast-syntax-highlighting/test/parse.zsh	ZC1017	1
 fast-syntax-highlighting/test/parse.zsh	ZC1045	1
 fast-syntax-highlighting/test/parse.zsh	ZC1048	4
 fast-syntax-highlighting/test/parse.zsh	ZC1076	1
@@ -234,7 +227,6 @@ fast-syntax-highlighting/test/to-parse.zsh	ZC1043	2
 fast-syntax-highlighting/test/to-parse.zsh	ZC1046	2
 fast-syntax-highlighting/test/to-parse.zsh	ZC1073	3
 fast-syntax-highlighting/test/to-parse.zsh	ZC1075	32
-fast-syntax-highlighting/test/to-parse.zsh	ZC1098	1
 fast-syntax-highlighting/test/to-parse.zsh	ZC1830	1
 forgit/forgit.plugin.zsh	ZC1091	1
 forgit/forgit.plugin.zsh	ZC1107	1
@@ -250,7 +242,7 @@ F-Sy-H/F-Sy-H.plugin.zsh	ZC1091	3
 F-Sy-H/F-Sy-H.plugin.zsh	ZC1107	3
 F-Sy-H/F-Sy-H.plugin.zsh	ZC1128	1
 F-Sy-H/share/free_theme.zsh	ZC1075	61
-F-Sy-H/share/parse/parse.zsh	ZC1017	5
+F-Sy-H/share/parse/parse.zsh	ZC1017	1
 F-Sy-H/share/parse/parse.zsh	ZC1045	1
 F-Sy-H/share/parse/parse.zsh	ZC1075	1
 F-Sy-H/share/parse/parse.zsh	ZC1076	1
@@ -259,7 +251,6 @@ F-Sy-H/share/parse/to-parse.zsh	ZC1043	2
 F-Sy-H/share/parse/to-parse.zsh	ZC1046	2
 F-Sy-H/share/parse/to-parse.zsh	ZC1073	3
 F-Sy-H/share/parse/to-parse.zsh	ZC1075	32
-F-Sy-H/share/parse/to-parse.zsh	ZC1098	1
 F-Sy-H/share/parse/to-parse.zsh	ZC1830	1
 fzf/shell/completion.zsh	ZC1003	3
 fzf/shell/completion.zsh	ZC1010	13
@@ -269,9 +260,8 @@ fzf/shell/completion.zsh	ZC1049	1
 fzf/shell/completion.zsh	ZC1064	1
 fzf/shell/completion.zsh	ZC1074	1
 fzf/shell/completion.zsh	ZC1075	11
-fzf/shell/completion.zsh	ZC1094	1
 fzf/shell/completion.zsh	ZC1097	1
-fzf/shell/completion.zsh	ZC1098	4
+fzf/shell/completion.zsh	ZC1098	3
 fzf/shell/completion.zsh	ZC1100	1
 fzf/shell/completion.zsh	ZC1107	3
 fzf/shell/completion.zsh	ZC1256	1
@@ -290,13 +280,11 @@ fzf/shell/key-bindings.zsh	ZC1075	2
 fzf/shell/key-bindings.zsh	ZC1083	2
 fzf/shell/key-bindings.zsh	ZC1092	2
 fzf/shell/key-bindings.zsh	ZC1097	2
-fzf/shell/key-bindings.zsh	ZC1098	1
 fzf/shell/key-bindings.zsh	ZC1118	1
 fzf/shell/key-bindings.zsh	ZC1355	1
 fzf/shell/key-bindings.zsh	ZC1867	1
 fzf-tab/fzf-tab.zsh	ZC1001	30
-fzf-tab/fzf-tab.zsh	ZC1012	1
-fzf-tab/fzf-tab.zsh	ZC1017	4
+fzf-tab/fzf-tab.zsh	ZC1017	1
 fzf-tab/fzf-tab.zsh	ZC1030	2
 fzf-tab/fzf-tab.zsh	ZC1037	1
 fzf-tab/fzf-tab.zsh	ZC1043	1
@@ -307,7 +295,6 @@ fzf-tab/fzf-tab.zsh	ZC1075	8
 fzf-tab/fzf-tab.zsh	ZC1086	2
 fzf-tab/fzf-tab.zsh	ZC1091	1
 fzf-tab/fzf-tab.zsh	ZC1092	3
-fzf-tab/fzf-tab.zsh	ZC1098	1
 fzf-tab/fzf-tab.zsh	ZC1107	1
 fzf-tab/lib/zsh-ls-colors/ls-colors.zsh	ZC1001	16
 fzf-tab/lib/zsh-ls-colors/ls-colors.zsh	ZC1045	1
@@ -321,7 +308,6 @@ fzf-tab/test/runtests.zsh	ZC1075	1
 fzf-tab/test/ztst.zsh	ZC1001	3
 fzf-tab/test/ztst.zsh	ZC1004	1
 fzf-tab/test/ztst.zsh	ZC1006	1
-fzf-tab/test/ztst.zsh	ZC1017	6
 fzf-tab/test/ztst.zsh	ZC1020	1
 fzf-tab/test/ztst.zsh	ZC1030	1
 fzf-tab/test/ztst.zsh	ZC1036	1
@@ -336,7 +322,6 @@ fzf-tab/test/ztst.zsh	ZC1075	25
 fzf-tab/test/ztst.zsh	ZC1078	1
 fzf-tab/test/ztst.zsh	ZC1091	4
 fzf-tab/test/ztst.zsh	ZC1092	1
-fzf-tab/test/ztst.zsh	ZC1098	1
 fzf-tab/test/ztst.zsh	ZC1107	4
 fzf-tab/test/ztst.zsh	ZC1136	3
 fzf-tab/test/ztst.zsh	ZC1293	1
@@ -370,7 +355,6 @@ fzf-zsh-plugin/fzf-zsh-plugin.plugin.zsh	ZC1271	1
 fzf-zsh-plugin/fzf-zsh-plugin.plugin.zsh	ZC1275	1
 fzf-zsh-plugin/fzf-zsh-plugin.plugin.zsh	ZC1591	1
 geometry/geometry.zsh	ZC1001	1
-geometry/geometry.zsh	ZC1017	1
 geometry/geometry.zsh	ZC1043	1
 geometry/geometry.zsh	ZC1045	5
 geometry/geometry.zsh	ZC1075	9
@@ -395,13 +379,12 @@ gitstatus/gitstatus.plugin.zsh	ZC1043	3
 gitstatus/gitstatus.plugin.zsh	ZC1046	1
 gitstatus/gitstatus.plugin.zsh	ZC1075	64
 gitstatus/gitstatus.plugin.zsh	ZC1086	11
-gitstatus/gitstatus.plugin.zsh	ZC1098	1
 gitstatus/gitstatus.plugin.zsh	ZC1167	1
 gitstatus/gitstatus.plugin.zsh	ZC1176	3
 gitstatus/gitstatus.prompt.zsh	ZC1086	1
 gitstatus/gitstatus.prompt.zsh	ZC1967	1
 history-search-multi-word/history-search-multi-word.plugin.zsh	ZC1076	1
-history-search-multi-word/test/parse.zsh	ZC1017	5
+history-search-multi-word/test/parse.zsh	ZC1017	1
 history-search-multi-word/test/parse.zsh	ZC1045	1
 history-search-multi-word/test/parse.zsh	ZC1048	2
 history-search-multi-word/test/parse.zsh	ZC1076	1
@@ -410,7 +393,6 @@ history-search-multi-word/test/to-parse.zsh	ZC1043	2
 history-search-multi-word/test/to-parse.zsh	ZC1046	2
 history-search-multi-word/test/to-parse.zsh	ZC1073	3
 history-search-multi-word/test/to-parse.zsh	ZC1075	32
-history-search-multi-word/test/to-parse.zsh	ZC1098	1
 history-search-multi-word/test/to-parse.zsh	ZC1830	1
 mcfly/dev.zsh	ZC1002	1
 mcfly/dev.zsh	ZC1015	1
@@ -458,7 +440,6 @@ prezto-contrib/clipboard/init.zsh	ZC1643	1
 prezto-contrib/direnv/init.zsh	ZC1046	1
 prezto-contrib/dotnet-completion/init.zsh	ZC1010	1
 prezto-contrib/dotnet-completion/init.zsh	ZC1043	1
-prezto-contrib/elapsed-time/init.zsh	ZC1017	3
 prezto-contrib/elapsed-time/init.zsh	ZC1086	2
 prezto-contrib/elapsed-time/init.zsh	ZC1517	3
 prezto-contrib/elixir/alias.zsh	ZC1043	1
@@ -482,14 +463,12 @@ prezto-contrib/todo-txt/init.zsh	ZC1049	10
 prezto-contrib/zoxide/init.zsh	ZC1046	1
 prezto-contrib/zypper/init.zsh	ZC1049	21
 prezto/init.zsh	ZC1011	3
-prezto/init.zsh	ZC1017	2
 prezto/init.zsh	ZC1030	1
 prezto/init.zsh	ZC1037	1
 prezto/init.zsh	ZC1045	5
 prezto/init.zsh	ZC1086	5
 prezto/init.zsh	ZC1092	1
 prezto/modules/command-not-found/init.zsh	ZC1010	2
-prezto/modules/completion/init.zsh	ZC1054	2
 prezto/modules/completion/init.zsh	ZC1075	3
 prezto/modules/completion/init.zsh	ZC1128	1
 prezto/modules/completion/init.zsh	ZC1643	1
@@ -509,7 +488,6 @@ prezto/modules/docker/init.zsh	ZC1092	3
 prezto/modules/docker/init.zsh	ZC1098	2
 prezto/modules/docker/init.zsh	ZC1170	1
 prezto/modules/dpkg/init.zsh	ZC1049	13
-prezto/modules/editor/init.zsh	ZC1017	2
 prezto/modules/editor/init.zsh	ZC1086	16
 prezto/modules/editor/init.zsh	ZC1091	1
 prezto/modules/editor/init.zsh	ZC1107	1
@@ -517,7 +495,6 @@ prezto/modules/emacs/init.zsh	ZC1049	4
 prezto/modules/environment/init.zsh	ZC1875	1
 prezto/modules/environment/init.zsh	ZC1946	1
 prezto/modules/environment/init.zsh	ZC1995	1
-prezto/modules/fasd/init.zsh	ZC1017	1
 prezto/modules/fasd/init.zsh	ZC1045	1
 prezto/modules/fasd/init.zsh	ZC1049	1
 prezto/modules/fasd/init.zsh	ZC1086	1
@@ -531,7 +508,6 @@ prezto/modules/gpg/init.zsh	ZC1098	1
 prezto/modules/gpg/init.zsh	ZC1125	1
 prezto/modules/gpg/init.zsh	ZC1273	1
 prezto/modules/gpg/init.zsh	ZC1502	1
-prezto/modules/helper/init.zsh	ZC1017	1
 prezto/modules/helper/init.zsh	ZC1076	1
 prezto/modules/helper/init.zsh	ZC1086	9
 prezto/modules/history/init.zsh	ZC1049	1
@@ -591,7 +567,6 @@ prezto/modules/utility/init.zsh	ZC1789	1
 prezto/modules/yum/init.zsh	ZC1049	10
 purer/async.zsh	ZC1001	5
 purer/async.zsh	ZC1004	1
-purer/async.zsh	ZC1017	5
 purer/async.zsh	ZC1043	4
 purer/async.zsh	ZC1046	1
 purer/async.zsh	ZC1075	26
@@ -602,7 +577,7 @@ purer/async.zsh	ZC1134	1
 purer/async.zsh	ZC1176	1
 purer/pure.zsh	ZC1001	2
 purer/pure.zsh	ZC1006	1
-purer/pure.zsh	ZC1017	5
+purer/pure.zsh	ZC1017	3
 purer/pure.zsh	ZC1020	1
 purer/pure.zsh	ZC1036	1
 purer/pure.zsh	ZC1043	9
@@ -614,7 +589,6 @@ purer/pure.zsh	ZC1107	2
 purer/pure.zsh	ZC1293	1
 spaceship/async.zsh	ZC1001	5
 spaceship/async.zsh	ZC1010	1
-spaceship/async.zsh	ZC1017	5
 spaceship/async.zsh	ZC1043	2
 spaceship/async.zsh	ZC1046	1
 spaceship/async.zsh	ZC1065	1
@@ -628,7 +602,6 @@ spaceship/lib/cache.zsh	ZC1037	1
 spaceship/lib/cache.zsh	ZC1043	1
 spaceship/lib/cache.zsh	ZC1092	1
 spaceship/lib/cache.zsh	ZC1118	1
-spaceship/lib/cli.zsh	ZC1017	1
 spaceship/lib/cli.zsh	ZC1030	10
 spaceship/lib/cli.zsh	ZC1037	3
 spaceship/lib/cli.zsh	ZC1040	1
@@ -645,7 +618,6 @@ spaceship/lib/cli.zsh	ZC1181	2
 spaceship/lib/cli.zsh	ZC1288	1
 spaceship/lib/cli.zsh	ZC1334	1
 spaceship/lib/cli.zsh	ZC1517	1
-spaceship/lib/core.zsh	ZC1017	1
 spaceship/lib/core.zsh	ZC1043	2
 spaceship/lib/core.zsh	ZC1075	4
 spaceship/lib/core.zsh	ZC1091	1
@@ -669,7 +641,6 @@ spaceship/lib/section.zsh	ZC1092	2
 spaceship/lib/section.zsh	ZC1118	2
 spaceship/lib/utils.zsh	ZC1001	1
 spaceship/lib/utils.zsh	ZC1010	1
-spaceship/lib/utils.zsh	ZC1017	1
 spaceship/lib/utils.zsh	ZC1030	2
 spaceship/lib/utils.zsh	ZC1037	3
 spaceship/lib/utils.zsh	ZC1045	3
@@ -680,7 +651,6 @@ spaceship/lib/utils.zsh	ZC1097	1
 spaceship/lib/utils.zsh	ZC1517	1
 spaceship/lib/worker.zsh	ZC1043	2
 spaceship/sections/ansible.zsh	ZC1045	3
-spaceship/sections/ansible.zsh	ZC1054	2
 spaceship/sections/ansible.zsh	ZC1110	1
 spaceship/sections/async.zsh	ZC1073	1
 spaceship/sections/aws.zsh	ZC1045	1
@@ -765,13 +735,10 @@ spaceship/sections/jobs.zsh	ZC1043	2
 spaceship/sections/jobs.zsh	ZC1091	2
 spaceship/sections/jobs.zsh	ZC1107	2
 spaceship/sections/julia.zsh	ZC1045	2
-spaceship/sections/julia.zsh	ZC1054	2
 spaceship/sections/kotlin.zsh	ZC1045	1
-spaceship/sections/kotlin.zsh	ZC1054	2
 spaceship/sections/kotlin.zsh	ZC1110	1
 spaceship/sections/kubectl_context.zsh	ZC1045	2
 spaceship/sections/kubectl_version.zsh	ZC1045	2
-spaceship/sections/kubectl_version.zsh	ZC1094	1
 spaceship/sections/kubectl.zsh	ZC1045	4
 spaceship/sections/lua.zsh	ZC1045	2
 spaceship/sections/nix_shell.zsh	ZC1043	2
@@ -789,7 +756,6 @@ spaceship/sections/package.zsh	ZC1125	1
 spaceship/sections/perl.zsh	ZC1045	2
 spaceship/sections/php.zsh	ZC1045	2
 spaceship/sections/pulumi.zsh	ZC1045	2
-spaceship/sections/pulumi.zsh	ZC1094	1
 spaceship/sections/pulumi.zsh	ZC1109	1
 spaceship/sections/pulumi.zsh	ZC1284	1
 spaceship/sections/purescript.zsh	ZC1045	2
@@ -810,11 +776,9 @@ spaceship/sections/rust.zsh	ZC1092	1
 spaceship/sections/rust.zsh	ZC1109	2
 spaceship/sections/rust.zsh	ZC1284	2
 spaceship/sections/scala.zsh	ZC1045	2
-spaceship/sections/scala.zsh	ZC1054	2
 spaceship/sections/sudo.zsh	ZC1047	1
 spaceship/sections/swiftenv.zsh	ZC1010	1
 spaceship/sections/swiftenv.zsh	ZC1053	1
-spaceship/sections/swiftenv.zsh	ZC1094	2
 spaceship/sections/swiftenv.zsh	ZC1273	1
 spaceship/sections/swift.zsh	ZC1045	1
 spaceship/sections/swift.zsh	ZC1110	1
@@ -831,12 +795,10 @@ spaceship/sections/xcenv.zsh	ZC1010	2
 spaceship/sections/xcenv.zsh	ZC1045	1
 spaceship/sections/xcenv.zsh	ZC1053	1
 spaceship/sections/xcenv.zsh	ZC1075	2
-spaceship/sections/xcenv.zsh	ZC1094	2
 spaceship/sections/xcenv.zsh	ZC1273	1
 spaceship/sections/xcode.zsh	ZC1045	1
 spaceship/sections/zig.zsh	ZC1045	2
 spaceship/spaceship.zsh	ZC1010	2
-spaceship/spaceship.zsh	ZC1017	3
 spaceship/spaceship.zsh	ZC1043	1
 spaceship/spaceship.zsh	ZC1517	1
 spaceship/tests/ansible.test.zsh	ZC1037	1
@@ -1116,7 +1078,6 @@ starship/src/init/starship.zsh	ZC1043	3
 starship/src/init/starship.zsh	ZC1967	1
 typewritten/async.zsh	ZC1001	5
 typewritten/async.zsh	ZC1010	1
-typewritten/async.zsh	ZC1017	5
 typewritten/async.zsh	ZC1043	2
 typewritten/async.zsh	ZC1046	1
 typewritten/async.zsh	ZC1065	1
@@ -1148,7 +1109,6 @@ typewritten/lib/git.zsh	ZC1107	2
 typewritten/lib/git.zsh	ZC1274	1
 typewritten/lib/git.zsh	ZC1339	1
 typewritten/tests/smoke.zsh	ZC1004	1
-typewritten/tests/smoke.zsh	ZC1017	2
 typewritten/tests/smoke.zsh	ZC1043	3
 typewritten/tests/smoke.zsh	ZC1059	1
 typewritten/tests/smoke.zsh	ZC1170	1
@@ -1188,13 +1148,11 @@ zaw/sources/cdr.zsh	ZC1086	4
 zaw/sources/command-output.zsh	ZC1075	2
 zaw/sources/command-output.zsh	ZC1076	1
 zaw/sources/command-output.zsh	ZC1086	1
-zaw/sources/commands.zsh	ZC1017	1
 zaw/sources/commands.zsh	ZC1049	1
 zaw/sources/commands.zsh	ZC1075	1
 zaw/sources/commands.zsh	ZC1086	1
 zaw/sources/commands.zsh	ZC1284	2
 zaw/sources/fasd.zsh	ZC1086	3
-zaw/sources/functions.zsh	ZC1017	1
 zaw/sources/functions.zsh	ZC1075	1
 zaw/sources/functions.zsh	ZC1086	1
 zaw/sources/git-branches.zsh	ZC1011	1
@@ -1247,7 +1205,6 @@ zaw/sources/process.zsh	ZC1123	1
 zaw/sources/programs.zsh	ZC1086	1
 zaw/sources/programs.zsh	ZC1284	1
 zaw/sources/screens.zsh	ZC1012	1
-zaw/sources/screens.zsh	ZC1054	1
 zaw/sources/screens.zsh	ZC1086	2
 zaw/sources/screens.zsh	ZC1099	1
 zaw/sources/screens.zsh	ZC1361	1
@@ -1266,16 +1223,13 @@ zaw/sources/tmux.zsh	ZC1086	3
 zaw/sources/tmux.zsh	ZC1099	1
 zaw/sources/widgets.zsh	ZC1086	1
 zaw/sources/widgets.zsh	ZC1284	1
-zaw/zaw-launcher.zsh	ZC1017	2
 zaw/zaw-launcher.zsh	ZC1031	1
 zaw/zaw-launcher.zsh	ZC1046	1
 zaw/zaw-launcher.zsh	ZC1055	1
 zaw/zaw-launcher.zsh	ZC1086	1
-zaw/zaw-launcher.zsh	ZC1098	1
 zaw/zaw-launcher.zsh	ZC1176	1
 zaw/zaw-launcher.zsh	ZC1520	1
 zaw/zaw.zsh	ZC1010	1
-zaw/zaw.zsh	ZC1017	1
 zaw/zaw.zsh	ZC1030	3
 zaw/zaw.zsh	ZC1037	3
 zaw/zaw.zsh	ZC1046	2
@@ -1288,7 +1242,6 @@ zaw/zaw.zsh	ZC1098	2
 zaw/zaw.zsh	ZC1107	2
 zaw/zaw.zsh	ZC1176	1
 zcolors/zcolors.plugin.zsh	ZC1031	1
-zcomet/zcomet.zsh	ZC1017	3
 zcomet/zcomet.zsh	ZC1043	18
 zcomet/zcomet.zsh	ZC1065	2
 zcomet/zcomet.zsh	ZC1068	1
@@ -1309,14 +1262,12 @@ zephyr/plugins/completion/completion.plugin.zsh	ZC1046	1
 zephyr/plugins/completion/completion.plugin.zsh	ZC1059	1
 zephyr/plugins/completion/completion.plugin.zsh	ZC1075	5
 zephyr/plugins/completion/completion.plugin.zsh	ZC1086	3
-zephyr/plugins/completion/completion.plugin.zsh	ZC1098	1
 zephyr/plugins/completion/completion.plugin.zsh	ZC1128	1
 zephyr/plugins/completion/completion.plugin.zsh	ZC1686	1
 zephyr/plugins/completion/completion.plugin.zsh	ZC1845	1
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1001	1
-zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1017	6
+zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1017	1
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1030	6
-zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1054	2
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1071	1
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1075	6
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1086	6
@@ -1334,7 +1285,6 @@ zephyr/plugins/directory/directory.plugin.zsh	ZC1107	1
 zephyr/plugins/directory/directory.plugin.zsh	ZC1771	1
 zephyr/plugins/directory/directory.plugin.zsh	ZC1838	1
 zephyr/plugins/editor/editor.plugin.zsh	ZC1001	1
-zephyr/plugins/editor/editor.plugin.zsh	ZC1017	1
 zephyr/plugins/editor/editor.plugin.zsh	ZC1037	1
 zephyr/plugins/editor/editor.plugin.zsh	ZC1075	1
 zephyr/plugins/editor/editor.plugin.zsh	ZC1086	13
@@ -1394,14 +1344,11 @@ zgen/zgen.zsh	ZC1046	3
 zgen/zgen.zsh	ZC1059	2
 zgen/zgen.zsh	ZC1075	3
 zgen/zgen.zsh	ZC1097	7
-zgen/zgen.zsh	ZC1098	3
+zgen/zgen.zsh	ZC1098	1
 zgen/zgen.zsh	ZC1099	1
 zgen/zgen.zsh	ZC1231	1
 zgen/zgen.zsh	ZC1830	1
-zhooks/zhooks.plugin.zsh	ZC1017	1
 zhooks/zhooks.plugin.zsh	ZC1075	2
-zimfw/zimfw.zsh	ZC1012	2
-zimfw/zimfw.zsh	ZC1017	52
 zimfw/zimfw.zsh	ZC1040	1
 zimfw/zimfw.zsh	ZC1043	23
 zimfw/zimfw.zsh	ZC1045	3
@@ -1420,18 +1367,16 @@ zinit/docker/init.zsh	ZC1258	1
 zinit/docker/utils.zsh	ZC1040	1
 zinit/docker/utils.zsh	ZC1047	1
 zinit/docker/utils.zsh	ZC1080	1
-zinit/share/git-process-output.zsh	ZC1017	3
+zinit/share/git-process-output.zsh	ZC1017	2
 zinit/share/git-process-output.zsh	ZC1043	1
 zinit/share/git-process-output.zsh	ZC1045	2
 zinit/share/git-process-output.zsh	ZC1046	2
 zinit/share/git-process-output.zsh	ZC1075	3
-zinit/share/git-process-output.zsh	ZC1098	2
 zinit/share/rpm2cpio.zsh	ZC1005	2
 zinit/share/rpm2cpio.zsh	ZC1045	1
 zinit/share/rpm2cpio.zsh	ZC1075	2
 zinit/share/rpm2cpio.zsh	ZC1271	2
 zinit/zinit-additional.zsh	ZC1001	2
-zinit/zinit-additional.zsh	ZC1017	1
 zinit/zinit-additional.zsh	ZC1043	1
 zinit/zinit-additional.zsh	ZC1045	1
 zinit/zinit-additional.zsh	ZC1046	3
@@ -1442,9 +1387,9 @@ zinit/zinit-additional.zsh	ZC1877	1
 zinit/zinit-additional.zsh	ZC1916	1
 zinit/zinit-autoload.zsh	ZC1001	12
 zinit/zinit-autoload.zsh	ZC1002	2
-zinit/zinit-autoload.zsh	ZC1012	2
+zinit/zinit-autoload.zsh	ZC1012	1
 zinit/zinit-autoload.zsh	ZC1015	2
-zinit/zinit-autoload.zsh	ZC1017	2
+zinit/zinit-autoload.zsh	ZC1017	1
 zinit/zinit-autoload.zsh	ZC1040	3
 zinit/zinit-autoload.zsh	ZC1043	2
 zinit/zinit-autoload.zsh	ZC1045	6
@@ -1456,7 +1401,7 @@ zinit/zinit-autoload.zsh	ZC1073	3
 zinit/zinit-autoload.zsh	ZC1075	43
 zinit/zinit-autoload.zsh	ZC1083	2
 zinit/zinit-autoload.zsh	ZC1091	32
-zinit/zinit-autoload.zsh	ZC1098	4
+zinit/zinit-autoload.zsh	ZC1098	3
 zinit/zinit-autoload.zsh	ZC1107	32
 zinit/zinit-autoload.zsh	ZC1111	1
 zinit/zinit-autoload.zsh	ZC1133	1
@@ -1487,7 +1432,7 @@ zinit/zinit-install.zsh	ZC1075	84
 zinit/zinit-install.zsh	ZC1083	2
 zinit/zinit-install.zsh	ZC1091	22
 zinit/zinit-install.zsh	ZC1092	3
-zinit/zinit-install.zsh	ZC1098	13
+zinit/zinit-install.zsh	ZC1098	9
 zinit/zinit-install.zsh	ZC1099	1
 zinit/zinit-install.zsh	ZC1107	22
 zinit/zinit-install.zsh	ZC1139	1
@@ -1510,7 +1455,7 @@ zinit/zinit-side.zsh	ZC1877	2
 zinit/zinit.zsh	ZC1001	60
 zinit/zinit.zsh	ZC1002	1
 zinit/zinit.zsh	ZC1015	1
-zinit/zinit.zsh	ZC1017	8
+zinit/zinit.zsh	ZC1017	1
 zinit/zinit.zsh	ZC1043	7
 zinit/zinit.zsh	ZC1045	4
 zinit/zinit.zsh	ZC1046	13
@@ -1520,13 +1465,12 @@ zinit/zinit.zsh	ZC1075	84
 zinit/zinit.zsh	ZC1076	2
 zinit/zinit.zsh	ZC1091	25
 zinit/zinit.zsh	ZC1097	1
-zinit/zinit.zsh	ZC1098	10
+zinit/zinit.zsh	ZC1098	5
 zinit/zinit.zsh	ZC1107	25
 zinit/zinit.zsh	ZC1288	1
 zinit/zinit.zsh	ZC1414	3
 zinit/zinit.zsh	ZC1604	1
 znap/scripts/init.zsh	ZC1001	1
-znap/scripts/init.zsh	ZC1017	5
 znap/scripts/init.zsh	ZC1031	1
 znap/scripts/init.zsh	ZC1075	5
 znap/scripts/init.zsh	ZC1637	1
@@ -1575,12 +1519,10 @@ zsh-abbr/tests/index.ztr.zsh	ZC1075	6
 zsh-abbr/tests/index.ztr.zsh	ZC1078	1
 zsh-abbr/tests/index.ztr.zsh	ZC1092	1
 zsh-abbr/tests/index.ztr.zsh	ZC1097	1
-zsh-abbr/tests/index.ztr.zsh	ZC1098	1
 zsh-abbr/tests/index.ztr.zsh	ZC1128	1
 zsh-abbr/tests/_rename.ztr.zsh	ZC1075	28
 zsh-abbr/tests/_tmpdir.ztr.zsh	ZC1075	2
 zsh-abbr/zsh-abbr.zsh	ZC1001	25
-zsh-abbr/zsh-abbr.zsh	ZC1017	1
 zsh-abbr/zsh-abbr.zsh	ZC1043	41
 zsh-abbr/zsh-abbr.zsh	ZC1046	2
 zsh-abbr/zsh-abbr.zsh	ZC1073	1
@@ -1594,7 +1536,6 @@ zsh-abbr/zsh-abbr.zsh	ZC1502	1
 zsh-abbr/zsh-abbr.zsh	ZC1602	1
 zsh-async/async_test.zsh	ZC1001	65
 zsh-async/async_test.zsh	ZC1004	4
-zsh-async/async_test.zsh	ZC1017	13
 zsh-async/async_test.zsh	ZC1043	12
 zsh-async/async_test.zsh	ZC1048	1
 zsh-async/async_test.zsh	ZC1075	8
@@ -1603,7 +1544,6 @@ zsh-async/async_test.zsh	ZC1149	1
 zsh-async/async_test.zsh	ZC1869	1
 zsh-async/async.zsh	ZC1001	5
 zsh-async/async.zsh	ZC1010	1
-zsh-async/async.zsh	ZC1017	5
 zsh-async/async.zsh	ZC1043	2
 zsh-async/async.zsh	ZC1046	1
 zsh-async/async.zsh	ZC1065	1
@@ -1614,7 +1554,6 @@ zsh-async/async.zsh	ZC1176	1
 zsh-async/async.zsh	ZC1509	2
 zsh-async/test.zsh	ZC1001	8
 zsh-async/test.zsh	ZC1004	3
-zsh-async/test.zsh	ZC1017	9
 zsh-async/test.zsh	ZC1040	1
 zsh-async/test.zsh	ZC1041	2
 zsh-async/test.zsh	ZC1043	8
@@ -1623,7 +1562,6 @@ zsh-async/test.zsh	ZC1075	19
 zsh-async/test.zsh	ZC1078	1
 zsh-async/test.zsh	ZC1080	1
 zsh-async/test.zsh	ZC1097	2
-zsh-async/test.zsh	ZC1098	2
 zsh-async/test.zsh	ZC1477	2
 zsh-async/test.zsh	ZC1509	3
 zsh-autocomplete/run-tests.zsh	ZC1011	1
@@ -1645,7 +1583,6 @@ zsh-autoenv/autoenv.zsh	ZC1076	2
 zsh-autoenv/autoenv.zsh	ZC1091	2
 zsh-autoenv/autoenv.zsh	ZC1092	22
 zsh-autoenv/autoenv.zsh	ZC1097	1
-zsh-autoenv/autoenv.zsh	ZC1098	1
 zsh-autoenv/autoenv.zsh	ZC1107	2
 zsh-autoenv/autoenv.zsh	ZC1109	1
 zsh-autoenv/autoenv.zsh	ZC1118	2
@@ -1680,7 +1617,6 @@ zsh-better-npm-completion/zsh-better-npm-completion.plugin.zsh	ZC1043	4
 zsh-better-npm-completion/zsh-better-npm-completion.plugin.zsh	ZC1045	4
 zsh-better-npm-completion/zsh-better-npm-completion.plugin.zsh	ZC1075	1
 zsh-better-npm-completion/zsh-better-npm-completion.plugin.zsh	ZC1092	4
-zsh-better-npm-completion/zsh-better-npm-completion.plugin.zsh	ZC1094	2
 zsh-better-npm-completion/zsh-better-npm-completion.plugin.zsh	ZC1284	1
 zsh-better-npm-completion/zsh-better-npm-completion.plugin.zsh	ZC1306	1
 zsh-better-npm-completion/zsh-better-npm-completion.plugin.zsh	ZC1308	1
@@ -1700,7 +1636,6 @@ zsh-defer/zsh-defer.plugin.zsh	ZC1001	2
 zsh-defer/zsh-defer.plugin.zsh	ZC1046	1
 zsh-defer/zsh-defer.plugin.zsh	ZC1075	5
 zsh-defer/zsh-defer.plugin.zsh	ZC1086	5
-zsh-defer/zsh-defer.plugin.zsh	ZC1098	1
 zsh-defer/zsh-defer.plugin.zsh	ZC1176	1
 zsh-dircolors-solarized/zsh-dircolors-solarized.zsh	ZC1010	1
 zsh-dircolors-solarized/zsh-dircolors-solarized.zsh	ZC1030	2
@@ -1738,8 +1673,6 @@ zsh-histdb/histdb-interactive.zsh	ZC1045	5
 zsh-histdb/histdb-interactive.zsh	ZC1073	1
 zsh-histdb/sqlite-history.zsh	ZC1005	1
 zsh-histdb/sqlite-history.zsh	ZC1011	1
-zsh-histdb/sqlite-history.zsh	ZC1012	1
-zsh-histdb/sqlite-history.zsh	ZC1017	1
 zsh-histdb/sqlite-history.zsh	ZC1030	10
 zsh-histdb/sqlite-history.zsh	ZC1037	6
 zsh-histdb/sqlite-history.zsh	ZC1043	4
@@ -1757,7 +1690,6 @@ zsh-histdb/sqlite-history.zsh	ZC1271	1
 zsh-histdb/sqlite-history.zsh	ZC1288	2
 zsh-histdb/sqlite-history.zsh	ZC1637	1
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1001	3
-zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1012	1
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1030	1
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1037	1
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1043	17
@@ -1808,11 +1740,10 @@ zsh-nvm/zsh-nvm.plugin.zsh	ZC1036	1
 zsh-nvm/zsh-nvm.plugin.zsh	ZC1037	6
 zsh-nvm/zsh-nvm.plugin.zsh	ZC1045	8
 zsh-nvm/zsh-nvm.plugin.zsh	ZC1046	2
-zsh-nvm/zsh-nvm.plugin.zsh	ZC1054	2
 zsh-nvm/zsh-nvm.plugin.zsh	ZC1064	1
 zsh-nvm/zsh-nvm.plugin.zsh	ZC1076	1
 zsh-nvm/zsh-nvm.plugin.zsh	ZC1092	18
-zsh-nvm/zsh-nvm.plugin.zsh	ZC1098	2
+zsh-nvm/zsh-nvm.plugin.zsh	ZC1098	1
 zsh-nvm/zsh-nvm.plugin.zsh	ZC1111	1
 zsh-nvm/zsh-nvm.plugin.zsh	ZC1126	1
 zsh-nvm/zsh-nvm.plugin.zsh	ZC1231	1
@@ -1835,14 +1766,12 @@ zsh-utils/utility/utility.plugin.zsh	ZC1049	22
 zsh-utils/utility/utility.plugin.zsh	ZC1075	1
 zsh-utils/utility/utility.plugin.zsh	ZC1086	1
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1001	2
-zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1012	3
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1016	3
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1043	55
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1075	1
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1091	24
 zsh-vimode-visual/zsh-vimode-visual.zsh	ZC1107	24
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1001	20
-zsh-vi-mode/zsh-vi-mode.zsh	ZC1012	9
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1016	9
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1030	10
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1037	19
@@ -1860,7 +1789,7 @@ zsh-vi-mode/zsh-vi-mode.zsh	ZC1080	1
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1086	71
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1091	2
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1092	23
-zsh-vi-mode/zsh-vi-mode.zsh	ZC1098	8
+zsh-vi-mode/zsh-vi-mode.zsh	ZC1098	4
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1105	1
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1107	2
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1110	1
@@ -1872,8 +1801,6 @@ zsh-vi-mode/zsh-vi-mode.zsh	ZC1191	5
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1477	2
 zsh-z/zsh-z.plugin.zsh	ZC1001	1
 zsh-z/zsh-z.plugin.zsh	ZC1004	2
-zsh-z/zsh-z.plugin.zsh	ZC1012	1
-zsh-z/zsh-z.plugin.zsh	ZC1017	19
 zsh-z/zsh-z.plugin.zsh	ZC1043	4
 zsh-z/zsh-z.plugin.zsh	ZC1044	1
 zsh-z/zsh-z.plugin.zsh	ZC1049	1
