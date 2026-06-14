@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-06-14
+
+### Removed
+- Two auto-fixes that silently changed runtime behaviour. The detections remain; only the destructive rewrite is gone.
+  - ZC1128 no longer rewrites `touch file` to `> file`. The redirection truncates an existing file, so the rewrite could destroy data inside a create-if-missing guard.
+  - ZC1004 no longer rewrites `exit` to `return`. Inside a `die`-style helper the swap inverts fail-fast, letting the script continue instead of terminating.
+
+### Fixed
+- Parser: four statement-level constructs that parsed without error but built a wrong AST, so the orphaned fragment swallowed the following command and left it unlinted.
+  - A redirection trailing a brace-group statement (`{ … } 2>/dev/null`).
+  - A process substitution as the first argument (`diff <(a) <(b)`, `source <(cmd)`). This also fixed a ZC1604 false positive on substitution arguments.
+  - A bare `X=` at end of line swallowing the next line as an assignment right-hand side.
+  - The Zsh-only `repeat <count> …` and `foreach <name> (<list>) … end` loops, which previously had no grammar.
+- Katas: fourteen false positives narrowed, each confirmed against Zsh 5.9 and each keeping its true positive — ZC1001, ZC1012, ZC1016, ZC1017, ZC1037, ZC1040, ZC1054, ZC1071, ZC1078, ZC1083, ZC1094, ZC1098, ZC1604, ZC1715, ZC1818, ZC1856, ZC1909.
+- ZC1502 message corrected: the flagged variable is not always the search pattern.
+
 ## [1.2.3] - 2026-06-14
 
 ### Fixed
