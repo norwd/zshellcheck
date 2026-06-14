@@ -216,3 +216,34 @@ func TestParseProcessSubstitutionFirstArg(t *testing.T) {
 		}
 	}
 }
+
+// The Zsh-only loops `repeat <count> …` and `foreach <name> (<list>) …
+// end` had no grammar, so `repeat`/`foreach` lexed as plain commands and
+// the `do`/`done`/`end`/`}` body markers orphaned. Each case is one
+// statement (the loop) plus any trailing command, and `zsh -n` clean.
+func TestParseRepeatAndForeachLoops(t *testing.T) {
+	cases := map[string]int{
+		"repeat 3; do print a; done\n":                                       1,
+		"repeat 3 do print a; done\n":                                        1,
+		"repeat 3 { print a }\n":                                             1,
+		"repeat $n print a\n":                                                1,
+		"repeat 2; do print a; done\nprint after\n":                          2,
+		"foreach f (a b)\n  rm $f\nend\n":                                    1,
+		"foreach x (1 2 3); print $x; end\n":                                 1,
+		"foreach f (*.txt)\n  rm $f\nend\nprint after\n":                     2,
+		"foreach x (1 2)\n  if [[ -n $x ]]; then\n    print $x\n  fi\nend\n": 1,
+		// `end` stays a valid identifier outside foreach.
+		"end() { print x }\nend\n": 2,
+		"local end=5\n":            1,
+	}
+	for src, want := range cases {
+		p := New(lexer.New(src))
+		prog := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Errorf("unexpected errors for %q: %v", src, p.Errors())
+		}
+		if len(prog.Statements) != want {
+			t.Errorf("want %d statements for %q, got %d", want, src, len(prog.Statements))
+		}
+	}
+}
