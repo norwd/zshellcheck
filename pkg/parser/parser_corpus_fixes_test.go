@@ -217,6 +217,32 @@ func TestParseProcessSubstitutionFirstArg(t *testing.T) {
 	}
 }
 
+// A bare `X=` at end of line is a standalone empty assignment. Zsh does
+// not continue an assignment RHS across an unescaped newline, so the
+// following line is a separate statement — the `=` infix used to swallow
+// the next line's command (`X = print`) and orphan its arguments,
+// leaving them unlinted. Each input is `zsh -n` clean and two statements.
+func TestParseEmptyAssignmentNewline(t *testing.T) {
+	cases := []string{
+		"X=\nprint $A\n",
+		"RPROMPT=\nprint $A\n",
+		"local x=\nprint $y\n",
+		// The RHS still attaches on the same line and across a `\` join.
+		"X=value\nprint $A\n",
+		"X=\\\nvalue\nprint $A\n",
+	}
+	for _, src := range cases {
+		p := New(lexer.New(src))
+		prog := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Errorf("unexpected errors for %q: %v", src, p.Errors())
+		}
+		if len(prog.Statements) != 2 {
+			t.Errorf("want 2 statements for %q, got %d (the empty assignment swallowed the next line)", src, len(prog.Statements))
+		}
+	}
+}
+
 // The Zsh-only loops `repeat <count> …` and `foreach <name> (<list>) …
 // end` had no grammar, so `repeat`/`foreach` lexed as plain commands and
 // the `do`/`done`/`end`/`}` body markers orphaned. Each case is one

@@ -145,7 +145,7 @@ autosuggestions/src/util.zsh	ZC1355	1
 autosuggestions/src/widgets.zsh	ZC1043	1
 autosuggestions/src/widgets.zsh	ZC1046	1
 autosuggestions/src/widgets.zsh	ZC1073	6
-autosuggestions/src/widgets.zsh	ZC1078	2
+autosuggestions/src/widgets.zsh	ZC1078	5
 autosuggestions/src/widgets.zsh	ZC1098	1
 autosuggestions/src/widgets.zsh	ZC1191	1
 autosuggestions/zsh-autosuggestions.zsh	ZC1001	2
@@ -158,7 +158,7 @@ autosuggestions/zsh-autosuggestions.zsh	ZC1046	4
 autosuggestions/zsh-autosuggestions.zsh	ZC1068	1
 autosuggestions/zsh-autosuggestions.zsh	ZC1073	6
 autosuggestions/zsh-autosuggestions.zsh	ZC1075	20
-autosuggestions/zsh-autosuggestions.zsh	ZC1078	3
+autosuggestions/zsh-autosuggestions.zsh	ZC1078	6
 autosuggestions/zsh-autosuggestions.zsh	ZC1086	1
 autosuggestions/zsh-autosuggestions.zsh	ZC1091	1
 autosuggestions/zsh-autosuggestions.zsh	ZC1092	2
@@ -254,7 +254,7 @@ F-Sy-H/share/parse/to-parse.zsh	ZC1075	32
 F-Sy-H/share/parse/to-parse.zsh	ZC1830	1
 fzf/shell/completion.zsh	ZC1003	3
 fzf/shell/completion.zsh	ZC1010	13
-fzf/shell/completion.zsh	ZC1043	3
+fzf/shell/completion.zsh	ZC1043	4
 fzf/shell/completion.zsh	ZC1046	4
 fzf/shell/completion.zsh	ZC1049	1
 fzf/shell/completion.zsh	ZC1064	1
@@ -357,7 +357,7 @@ fzf-zsh-plugin/fzf-zsh-plugin.plugin.zsh	ZC1591	1
 geometry/geometry.zsh	ZC1001	1
 geometry/geometry.zsh	ZC1043	1
 geometry/geometry.zsh	ZC1045	5
-geometry/geometry.zsh	ZC1075	9
+geometry/geometry.zsh	ZC1075	11
 geometry/geometry.zsh	ZC1091	1
 geometry/geometry.zsh	ZC1097	1
 geometry/geometry.zsh	ZC1107	1
@@ -580,10 +580,10 @@ purer/pure.zsh	ZC1006	1
 purer/pure.zsh	ZC1017	3
 purer/pure.zsh	ZC1020	1
 purer/pure.zsh	ZC1036	1
-purer/pure.zsh	ZC1043	9
+purer/pure.zsh	ZC1043	11
 purer/pure.zsh	ZC1055	1
 purer/pure.zsh	ZC1073	1
-purer/pure.zsh	ZC1075	7
+purer/pure.zsh	ZC1075	6
 purer/pure.zsh	ZC1091	2
 purer/pure.zsh	ZC1107	2
 purer/pure.zsh	ZC1293	1
@@ -1456,7 +1456,7 @@ zinit/zinit.zsh	ZC1001	60
 zinit/zinit.zsh	ZC1002	1
 zinit/zinit.zsh	ZC1015	1
 zinit/zinit.zsh	ZC1017	1
-zinit/zinit.zsh	ZC1043	7
+zinit/zinit.zsh	ZC1043	6
 zinit/zinit.zsh	ZC1045	4
 zinit/zinit.zsh	ZC1046	13
 zinit/zinit.zsh	ZC1064	1
@@ -1523,10 +1523,10 @@ zsh-abbr/tests/index.ztr.zsh	ZC1128	1
 zsh-abbr/tests/_rename.ztr.zsh	ZC1075	28
 zsh-abbr/tests/_tmpdir.ztr.zsh	ZC1075	2
 zsh-abbr/zsh-abbr.zsh	ZC1001	25
-zsh-abbr/zsh-abbr.zsh	ZC1043	41
+zsh-abbr/zsh-abbr.zsh	ZC1043	45
 zsh-abbr/zsh-abbr.zsh	ZC1046	2
 zsh-abbr/zsh-abbr.zsh	ZC1073	1
-zsh-abbr/zsh-abbr.zsh	ZC1075	63
+zsh-abbr/zsh-abbr.zsh	ZC1075	65
 zsh-abbr/zsh-abbr.zsh	ZC1078	1
 zsh-abbr/zsh-abbr.zsh	ZC1086	3
 zsh-abbr/zsh-abbr.zsh	ZC1098	1
@@ -1556,7 +1556,7 @@ zsh-async/test.zsh	ZC1001	8
 zsh-async/test.zsh	ZC1004	3
 zsh-async/test.zsh	ZC1040	1
 zsh-async/test.zsh	ZC1041	2
-zsh-async/test.zsh	ZC1043	8
+zsh-async/test.zsh	ZC1043	9
 zsh-async/test.zsh	ZC1046	2
 zsh-async/test.zsh	ZC1075	19
 zsh-async/test.zsh	ZC1078	1
@@ -1692,7 +1692,7 @@ zsh-histdb/sqlite-history.zsh	ZC1637	1
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1001	3
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1030	1
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1037	1
-zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1043	17
+zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1043	21
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1046	3
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1075	8
 zsh-history-substring-search/zsh-history-substring-search.zsh	ZC1076	3
@@ -1784,7 +1784,7 @@ zsh-vi-mode/zsh-vi-mode.zsh	ZC1059	1
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1065	2
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1071	2
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1073	12
-zsh-vi-mode/zsh-vi-mode.zsh	ZC1075	141
+zsh-vi-mode/zsh-vi-mode.zsh	ZC1075	143
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1080	1
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1086	71
 zsh-vi-mode/zsh-vi-mode.zsh	ZC1091	2
