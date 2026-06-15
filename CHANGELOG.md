@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-06-16
+
+### Fixed
+- ZC1075 no longer flags a concatenated path-style assignment right-hand side (`x=${a}/${b}`, `arr[k]=$H/$z`). The right-hand side split at the glued `/`, orphaning the tail into a bogus command that mis-flagged the trailing expansion.
+- ZC1285 no longer flags `sort <file>` with the `${(o)array}` suggestion. Sorting a file's lines cannot be replaced by the in-shell array flag; the idiom only applies to the pipe form.
+
 ## [1.3.0] - 2026-06-16
 
 ### Added
