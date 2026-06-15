@@ -1709,28 +1709,15 @@ func checkZC1030(node ast.Node) []Violation {
 		return nil
 	}
 
-	if cmd.Name.TokenLiteral() != "echo" {
+	if cmd.Name == nil || cmd.Name.TokenLiteral() != "echo" {
 		return nil
 	}
 
-	// Defer to ZC1037 if any argument is a variable.
-	for _, arg := range cmd.Arguments {
-		if ident, ok := arg.(*ast.Identifier); ok {
-			if ident.Token.Type == "VARIABLE" {
-				return nil
-			}
-		}
-	}
-
-	return []Violation{
-		{
-			KataID:  "ZC1030",
-			Message: "Use `printf` for more reliable and portable string formatting instead of `echo`.",
-			Line:    cmd.Token.Line,
-			Column:  cmd.Token.Column,
-			Level:   SeverityStyle,
-		},
-	}
+	// The `echo` replacement advice is consolidated under ZC1037
+	// (`print -r --`, the idiomatic Zsh builtin, which carries the
+	// auto-fix). Emitting a second `printf` suggestion on the same line
+	// only produced a divergent double finding, so defer entirely.
+	return nil
 }
 
 func init() {
@@ -2046,7 +2033,7 @@ func init() {
 
 func checkZC1037(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || cmd.Name == nil {
 		return nil
 	}
 
@@ -2054,39 +2041,20 @@ func checkZC1037(node ast.Node) []Violation {
 		return nil
 	}
 
-	for _, arg := range cmd.Arguments {
-		if ident, ok := arg.(*ast.Identifier); ok && ident.Token.Type == token.VARIABLE {
-			return []Violation{
-				{
-					KataID:  "ZC1037",
-					Message: "Use 'print -r --' instead of 'echo' to reliably print variable expansions.",
-					Line:    cmd.Token.Line,
-					Column:  cmd.Token.Column,
-					Level:   SeverityStyle,
-				},
-			}
-		}
-		if str, ok := arg.(*ast.StringLiteral); ok && strings.Contains(str.Value, "$") {
-			// A single-quoted string never expands `$` — it is a literal
-			// dollar sign, so `echo 'cost is $5'` has no expansion to
-			// preserve and `print -r --` offers no benefit. Only flag
-			// double-quoted (or unquoted) strings where the `$` is live.
-			if len(str.Value) > 0 && str.Value[0] == '\'' {
-				continue
-			}
-			return []Violation{
-				{
-					KataID:  "ZC1037",
-					Message: "Use 'print -r --' instead of 'echo' to reliably print variable expansions.",
-					Line:    cmd.Token.Line,
-					Column:  cmd.Token.Column,
-					Level:   SeverityStyle,
-				},
-			}
-		}
+	// ZC1037 is the single canonical `echo` → `print -r --` recommendation
+	// for Zsh: `print -r --` is the idiomatic, option-safe replacement.
+	// It carries the auto-fix and fires on every `echo`. ZC1030 (printf)
+	// and ZC1092 (generic "prefer print") defer to it so a single `echo`
+	// no longer stacks two or three divergent suggestions on one line.
+	return []Violation{
+		{
+			KataID:  "ZC1037",
+			Message: "Use `print -r --` instead of `echo`. `echo` behaviour varies with options and escape handling; `print -r --` is the reliable Zsh builtin.",
+			Line:    cmd.Token.Line,
+			Column:  cmd.Token.Column,
+			Level:   SeverityStyle,
+		},
 	}
-
-	return nil
 }
 
 func init() {
@@ -7049,29 +7017,12 @@ func checkZC1092(node ast.Node) []Violation {
 		return nil
 	}
 
-	if cmd.Name == nil {
-		return nil
-	}
-
-	if cmd.Name.String() == "echo" {
-		// Check if it's just a simple echo or if flags are involved
-		// If flags are used (like -n, -e), print is definitely better.
-		// Even without flags, print is idiomatic Zsh.
-
-		// We can be slightly lenient and only warn if flags are present OR if it contains backslashes?
-		// The prompt suggests "Prefer 'print' over 'echo'". Let's be strict for now as it's "Platinum Standard".
-
-		msg := "Prefer `print` over `echo`. `echo` behavior varies. `print` is the Zsh builtin. Especially with flags, `print -n` or `print -r` is more reliable."
-
-		return []Violation{{
-			KataID:  "ZC1092",
-			Message: msg,
-			Line:    cmd.Token.Line,
-			Column:  cmd.Token.Column,
-			Level:   SeverityWarning,
-		}}
-	}
-
+	// The `echo` → `print` advice is consolidated under ZC1037
+	// (`print -r --`, the canonical Zsh replacement carrying the
+	// auto-fix). ZC1092's generic "prefer print" Warning fired on every
+	// `echo` on top of ZC1037/ZC1030 — a redundant second/third finding
+	// with the same intent. Defer entirely; the auto-fix lives on ZC1037.
+	_ = cmd
 	return nil
 }
 
