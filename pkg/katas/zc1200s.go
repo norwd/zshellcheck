@@ -4969,13 +4969,14 @@ func checkZC1285(node ast.Node) []Violation {
 	if cmd.Arguments[0].String() == "" || cmd.Arguments[0].String()[0] == '-' {
 		return nil
 	}
-	return []Violation{{
-		KataID:  "ZC1285",
-		Message: "Use Zsh `${(o)array}` for sorting instead of piping to `sort`. The `(o)` flag sorts in-shell.",
-		Line:    cmd.Token.Line,
-		Column:  cmd.Token.Column,
-		Level:   SeverityStyle,
-	}}
+	// `sort <arg>` with a single non-flag argument sorts the lines of a
+	// FILE named by that argument (`sort log.txt`, `sort "$f"`). The
+	// `${(o)array}` flag sorts an in-shell array, not a file, so it cannot
+	// replace this — flagging it gives wrong advice on the most common,
+	// valid use of `sort`. The idiom only replaces the pipe form
+	// (`print -l -- $array | sort`), which this per-command check cannot
+	// see; detecting it needs pipeline context. Do not flag the file form.
+	return nil
 }
 
 func init() {
