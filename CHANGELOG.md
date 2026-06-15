@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-16
+
+### Added
+- `-list-rules` prints every kata (ID, severity, title) and exits.
+- `-explain ZC####` prints one kata's full description and exits. Case-insensitive.
+
+### Fixed
+- ZC1075 no longer flags `${VAR:-word}`, `${VAR:=word}`, or `${VAR:+word}` default-value expansions. They always supply a value and never elide, so the canonical `: ${VAR:=default}` idiom is no longer warned. The message no longer mislabels a scalar expansion as an array element.
+- ZC1107 no longer double-flags `[[ ... -gt ... ]]` arithmetic comparisons. That double-bracket form is owned by ZC1091; ZC1107 keeps the `[ ... ]` and `test` builtin form. Every arithmetic comparison is now reported once.
+- Documentation drift: the auto-fix badge count, the INSTALL roadmap anchors, the SECURITY supported-versions table, the info-tier severity example, and drift-prone inline kata counts.
+
 ## [1.2.6] - 2026-06-15
 
 ### Fixed
