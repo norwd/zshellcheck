@@ -1,7 +1,7 @@
 # Codecov configuration — OpenSSF gold-tier label-green floor (95.0%).
 #
 # Public truth: https://app.codecov.io/gh/afadesigns/zshellcheck
-# Spec sync:    .claude/rules/quality-gates.md (gate definition)
+# Spec sync:    the project quality-gates definition
 # Validate:     curl --data-binary @codecov.yml https://codecov.io/validate
 #
 # Hierarchy: repo YAML deep-merges with team / global YAML.
