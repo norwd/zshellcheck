@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-06-15
+
+### Fixed
+- Parser: nested compound commands now consume their own terminator, so an inner `fi`, `done`, or `esac` is never mistaken for the enclosing compound's closer. Affects `if`, `for`, `while`, `until`, `repeat`, and `select` when nested inside another loop or conditional.
+- Parser: a `( … )` subshell on the right of a pipeline (`cmd | ( … )`) no longer swallows the following statement when its body ends in a compound command.
+- Parser: `return` takes its optional value only on the same logical line, so a bare `return` no longer absorbs the next statement as its value.
+
 ## [1.2.4] - 2026-06-14
 
 ### Removed

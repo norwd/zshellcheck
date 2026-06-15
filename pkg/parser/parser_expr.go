@@ -591,8 +591,21 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 				if stmt != nil {
 					statements = append(statements, stmt)
 				}
+				// A finishCompound'd inner statement (`if … fi`, a loop,
+				// a case) already advanced curToken onto its own
+				// terminator — here the subshell's `)`. The unconditional
+				// nextToken below would then step PAST `)` and the loop
+				// would keep swallowing the enclosing block. Honor the
+				// signal: clear it and let the loop re-test for `)`.
+				if p.consumedBraceTerminator {
+					p.consumedBraceTerminator = false
+					continue
+				}
 				p.nextToken()
 			}
+			// This group owns its `)`; drop any stale terminator signal so
+			// it does not leak to the enclosing parser.
+			p.consumedBraceTerminator = false
 			return &ast.GroupedExpression{Token: tok, Expression: &ast.BlockStatement{Statements: statements}}
 		}
 	}

@@ -301,3 +301,82 @@ func TestParseRepeatAndForeachLoops(t *testing.T) {
 		}
 	}
 }
+
+// Nested compound commands each consume their own closing keyword
+// (`fi`, `done`, `esac`), so an inner closer is never mistaken for the
+// outer compound's terminator. Without finishCompound / finishLoopTail
+// an inner `done` was taken as the outer loop's `done`, orphaning the
+// real outer `done` to statement-head as a second bogus statement.
+func TestParseNestedCompoundClosers(t *testing.T) {
+	cases := []string{
+		"while x; do for i in a; do echo; done; done\n",
+		"for i in a; do while x; do echo; done; done\n",
+		"while a; do for i in x; do while b; do echo; done; done; done\n",
+		"select o in a b; do for i in x; do echo; done; done\n",
+		"repeat 3; do for i in a; do echo; done; done\n",
+		"if x; then for i in a; do echo; done; fi\n",
+		"while x; do if a; then b; fi; done\n",
+		"for i in a; do case $i in x) :;; esac; done\n",
+	}
+	for _, src := range cases {
+		p := New(lexer.New(src))
+		prog := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Errorf("unexpected errors for %q: %v", src, p.Errors())
+		}
+		if len(prog.Statements) != 1 {
+			t.Errorf("want 1 compound statement for %q, got %d (an inner closer leaked)", src, len(prog.Statements))
+		}
+	}
+}
+
+// A pipeline whose right side is a `( … )` subshell containing a
+// compound is parsed through parseGroupedExpression's hand-rolled loop.
+// A finishCompound'd inner `if` advances curToken onto the subshell's
+// `)`; the loop's unconditional advance then stepped PAST `)` and kept
+// swallowing the enclosing block, dropping the following statement. zaw's
+// bookmark sources hit this via `: >>| file` (the stray `|` forms a
+// pipeline) feeding a subshell whose body ends in `if … fi`.
+func TestParsePipeIntoSubshellWithCompound(t *testing.T) {
+	cases := map[string]int{
+		"echo x | (\n  if a; then b; fi\n)\nf() { y }\n":             2,
+		"echo x | (\n  for i in a; do echo $i; done\n)\nf() { y }\n": 2,
+		"echo x | (\n  case $v in a) :;; esac\n)\nf() { y }\n":       2,
+		"echo x | (\n  if a; then b; else c; fi\n)\necho after\n":    2,
+	}
+	for src, want := range cases {
+		p := New(lexer.New(src))
+		prog := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Errorf("unexpected errors for %q: %v", src, p.Errors())
+		}
+		if len(prog.Statements) != want {
+			t.Errorf("want %d statements for %q, got %d (the subshell swallowed the following statement)", want, src, len(prog.Statements))
+		}
+	}
+}
+
+// `return` takes its optional value only on the same logical line. A
+// newline ends the statement, so the next line is a separate statement —
+// the enclosing block's `fi` / `}` or the following command. Without the
+// same-line guard, bare `return` swallowed the next line as its value
+// (`return⏎echo x` captured `echo`, `return⏎}` captured `}`).
+func TestParseReturnValueSameLineOnly(t *testing.T) {
+	twoStmt := []string{
+		"return\necho x\n",
+		"return 1\necho x\n",
+	}
+	for _, src := range twoStmt {
+		p := New(lexer.New(src))
+		prog := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Errorf("unexpected errors for %q: %v", src, p.Errors())
+		}
+		if len(prog.Statements) != 2 {
+			t.Errorf("want 2 statements for %q, got %d (return swallowed the next line)", src, len(prog.Statements))
+		}
+	}
+	// `return` immediately before a closer must not absorb it.
+	parseSourceClean(t, "f() {\n  if x; then return; fi\n}\n")
+	parseSourceClean(t, "f() {\n  return\n}\n")
+}
