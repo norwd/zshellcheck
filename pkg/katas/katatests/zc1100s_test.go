@@ -353,9 +353,12 @@ func TestZC1107(t *testing.T) {
 			want: 1,
 		},
 		{
-			name: "Invalid -gt in [[ ]]",
+			// `[[ … -gt … ]]` arithmetic is owned by ZC1091 (same
+			// suggestion + fix); ZC1107 must not double-flag the
+			// double-bracket form, only the `[ … ]` / test builtin form.
+			name: "double-bracket arithmetic is ZC1091, not ZC1107",
 			src:  "if [[ $a -gt 5 ]]; then echo yes; fi",
-			want: 1,
+			want: 0,
 		},
 		{
 			name: "Invalid -le",
