@@ -53,20 +53,25 @@ func (p *Parser) parseSimpleStatement() (ast.Statement, bool) {
 func (p *Parser) parsePipelineHeadStatement() (ast.Statement, bool) {
 	switch p.curToken.Type {
 	case token.If:
+		// parseIfStatement's then…fi form consumes its own `fi` and any
+		// trailing pipeline tail via finishCompound; the brace-form and
+		// no-then shortcut still need the external tail drain.
 		stmt := p.parseIfStatement()
-		p.consumePipelineTail()
+		if !p.consumedBraceTerminator {
+			p.consumePipelineTail()
+		}
 		return stmt, true
 	case token.FOR:
 		stmt := p.parseForLoopStatement()
-		p.consumePipelineTail()
+		p.finishLoopTail()
 		return stmt, true
 	case token.WHILE:
 		stmt := p.parseWhileLoopStatement()
-		p.consumePipelineTail()
+		p.finishLoopTail()
 		return stmt, true
 	case token.REPEAT:
 		stmt := p.parseRepeatLoopStatement()
-		p.consumePipelineTail()
+		p.finishLoopTail()
 		return stmt, true
 	case token.FOREACH:
 		stmt := p.parseForeachLoopStatement()
@@ -74,7 +79,7 @@ func (p *Parser) parsePipelineHeadStatement() (ast.Statement, bool) {
 		return stmt, true
 	case token.SELECT:
 		stmt := p.parseSelectStatement()
-		p.consumePipelineTail()
+		p.finishLoopTail()
 		return stmt, true
 	case token.CASE:
 		stmt := p.parseCaseStatement()
@@ -461,6 +466,43 @@ func (p *Parser) consumePipelineTail() {
 	}
 }
 
+// finishCompound is called with curToken ON a compound command's closing
+// keyword (`fi` / `done` / `esac`). It consumes that closer and any
+// trailing pipeline or logical tail (`fi | cat`, `done && x`), then sets
+// consumedBraceTerminator so the enclosing parseBlockStatement skips its
+// own post-statement advance. Without this the parser left curToken on
+// the closer and relied on the caller to advance — but in a nested
+// compound the inner closer was mistaken for the outer compound's
+// terminator, orphaning the outer closer to statement-head (issue #1362).
+func (p *Parser) finishCompound() {
+	if p.peekTokenIs(token.PIPE) || p.peekTokenIs(token.AND) || p.peekTokenIs(token.OR) {
+		// A tail leaves curToken on the LAST token of the tail
+		// (`fi | cat` → on `cat`); the caller advances past it normally,
+		// so the consumed-terminator signal must NOT be set.
+		p.consumePipelineTail()
+		return
+	}
+	// Consume just the closer: curToken now sits on the following
+	// statement head / separator, which the caller must not skip.
+	p.nextToken()
+	p.consumedBraceTerminator = true
+}
+
+// finishLoopTail completes a `do … done` loop after its body parse.
+// When curToken rests on the loop's own `done`, consume it (and any
+// trailing pipeline tail) via finishCompound so a nested inner `done`
+// is not mistaken for an outer loop's terminator, which would orphan
+// the outer `done` to statement-head (issue #1362). The brace-form and
+// short-form bodies leave curToken elsewhere and already advanced, so
+// they only need the ordinary trailing-pipeline drain.
+func (p *Parser) finishLoopTail() {
+	if p.curTokenIs(token.DONE) {
+		p.finishCompound()
+		return
+	}
+	p.consumePipelineTail()
+}
+
 // parsePipelineStartingWithExpression parses a statement whose head
 // is a command-producing expression (backtick or `$(…)`) and then
 // folds any trailing pipeline / logical chain onto it. The generic
@@ -807,9 +849,16 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 
 func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	stmt := &ast.ReturnStatement{Token: p.curToken}
-	p.nextToken()
-	stmt.ReturnValue = p.parseExpression(LOWEST)
-
+	// `return` takes its optional value only on the same logical line.
+	// A newline or a delimiter (`;`, `}`, a closer keyword) ends the
+	// statement, so the next line is a separate statement — the
+	// enclosing block's `fi` / `}` or the following command. Without
+	// this guard `return` swallowed the next statement as its value
+	// (`return⏎echo x` captured `echo`, `return⏎}` captured `}`).
+	if p.peekOnSameLogicalLine() && !p.isCommandDelimiter(p.peekToken) {
+		p.nextToken()
+		stmt.ReturnValue = p.parseExpression(LOWEST)
+	}
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
@@ -941,6 +990,7 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 		p.peekError(token.Fi)
 		return nil
 	}
+	p.finishCompound()
 	return stmt
 }
 
@@ -1081,6 +1131,12 @@ func (p *Parser) parseBlockStatement(terminators ...token.Type) *ast.BlockStatem
 			}
 		}
 		if curIsTerm {
+			// A consumed-terminator signal from the last body statement
+			// (a finishCompound'd `if`, a brace-form close) applied only
+			// to that statement's own terminator. Clear it before
+			// leaving so it does not leak to the enclosing parser, which
+			// handles this block's terminator itself.
+			p.consumedBraceTerminator = false
 			break
 		}
 
