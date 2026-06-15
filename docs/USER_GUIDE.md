@@ -2,7 +2,7 @@
 
 This guide covers configuration, usage, and troubleshooting for ZShellCheck.
 
-ZShellCheck implements 1000 katas — checks that cover syntax errors, security issues, performance pitfalls, and Zsh idioms.
+ZShellCheck implements a comprehensive set of katas — checks that cover syntax errors, security issues, performance pitfalls, and Zsh idioms.
 The full list lives in [KATAS.md](../KATAS.md).
 
 ## Contents
@@ -38,6 +38,8 @@ Files with `.go`, `.md`, `.json`, `.yml`, `.yaml`, or `.txt` extensions are skip
 | `-fix` | off | Apply auto-fixes in place for katas that declare one. Deterministic rewrites only. |
 | `-diff` | off | Preview the fixes as a unified diff instead of writing them. Implies dry-run. |
 | `-dry-run` | off | With `-fix`, report what would change without modifying files. |
+| `-list-rules` | — | Print every kata (ID, severity, title) and exit. |
+| `-explain <ZC####>` | — | Print one kata's full description and exit. Case-insensitive. |
 | `-version` | — | Print the version and exit. |
 | `-h`, `--help` | — | Print usage and exit. |
 
@@ -65,6 +67,10 @@ zshellcheck -diff ./scripts
 
 # Apply auto-fixes in place
 zshellcheck -fix ./scripts
+
+# List every kata, or explain one by ID
+zshellcheck -list-rules
+zshellcheck -explain ZC1001
 ```
 
 ### Auto-fixes
@@ -101,7 +107,7 @@ The canonical rubric:
 | --- | --- | --- | --- |
 | `error` | `SeverityError` | Code is broken or crashes under Zsh; output is wrong. | `ZC2000` — `kubectl taint nodes …:NoExecute` |
 | `warning` | `SeverityWarning` | Dangerous behaviour: data loss, security risk, or silent subtle bug. | `ZC1136` — `rm -rf $var` without guard |
-| `info` | `SeverityInfo` | Works, but brittle or non-portable. Heads-up, not a must-fix. | `ZC1075` — implicit word-splitting reliance |
+| `info` | `SeverityInfo` | Works, but brittle or non-portable. Heads-up, not a must-fix. | `ZC1005` — `which` vs `whence` |
 | `style` | `SeverityStyle` | Convention or idiomatic Zsh. Cosmetic. | `ZC1030` — `echo` vs `print -r --` |
 
 ### Filter by severity

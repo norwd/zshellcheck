@@ -4,10 +4,10 @@
 
 | Version | Supported |
 | --- | --- |
-| `v1.0.x` (latest minor) | Yes |
-| `< v1.0.0` | No |
+| Latest minor release | Yes |
+| Older releases | No |
 
-Only the latest `v1.0.x` release receives security fixes.
+Only the latest minor release receives security fixes.
 Upgrade to the latest tag before reporting; fixes land as new patch releases, not as backports.
 
 ## Reporting a vulnerability

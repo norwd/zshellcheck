@@ -5341,6 +5341,29 @@ func zc1075IsBareExpansion(v string) bool {
 	return i == len(v)
 }
 
+// zc1075HasDefaultModifier reports whether the ArrayAccess subject name
+// carries a `:-`, `:=`, or `:+` value-providing modifier. Such a
+// `${VAR:-word}` / `${VAR:=word}` / `${VAR:+word}` expansion supplies a
+// value and so never elides to nothing — flagging it is a false
+// positive on the canonical `: ${VAR:=default}` idiom. The parser folds
+// the modifier into the subject identifier and truncates the `:=` / `:+`
+// operand, leaving a trailing `:`. Path modifiers (`:h`, `:t`, `:r`)
+// keep their letter and are intentionally not matched — they can still
+// elide.
+func zc1075HasDefaultModifier(left ast.Expression) bool {
+	ident, ok := left.(*ast.Identifier)
+	if !ok {
+		return false
+	}
+	name := ident.Value
+	if strings.HasSuffix(name, ":") {
+		return true
+	}
+	return strings.Contains(name, ":-") ||
+		strings.Contains(name, ":=") ||
+		strings.Contains(name, ":+")
+}
+
 func checkZC1075(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
 	if !ok {
@@ -5379,11 +5402,25 @@ func checkZC1075(node ast.Node) []Violation {
 					Level:   SeverityWarning,
 				})
 			}
-		} else if _, ok := arg.(*ast.ArrayAccess); ok {
-			// An empty array element is elided when the access is unquoted.
+		} else if aa, ok := arg.(*ast.ArrayAccess); ok {
+			// A `:-word` / `:=word` / `:+word` default-value expansion
+			// always yields a value, so it never elides — flagging it
+			// warns against the canonical `: ${VAR:=default}` idiom.
+			// Path modifiers (`:h`, `:t`, `:r`) still can elide, so keep
+			// flagging those.
+			if zc1075HasDefaultModifier(aa.Left) {
+				continue
+			}
+			// Distinguish a true array element (`${arr[i]}`, Index set)
+			// from a plain scalar / positional (`${V}`, Index nil) so the
+			// message does not mislabel a scalar as an array element.
+			msg := "Quote this expansion. An unquoted empty or unset value is elided, dropping the word."
+			if aa.Index != nil {
+				msg = "Quote this array element. An unquoted empty value is elided, dropping the word."
+			}
 			violations = append(violations, Violation{
 				KataID:  "ZC1075",
-				Message: "Quote this array element. An unquoted empty value is elided, dropping the word.",
+				Message: msg,
 				Line:    arg.TokenLiteralNode().Line,
 				Column:  arg.TokenLiteralNode().Column,
 				Level:   SeverityWarning,

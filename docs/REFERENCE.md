@@ -67,7 +67,7 @@ Bus factor: 2.
 | Focus | `sh` and `bash` (POSIX) | `zsh` (native) |
 | Language | Haskell | Go |
 | Philosophy | Portability | Zsh power |
-| Checks | ~500 | 1000 |
+| Checks | ~500 | See [KATAS.md](../KATAS.md) |
 | Output | Text, JSON, GCC, TTY | Text, JSON, SARIF |
 | Severity | error, warning, info, style | error, warning, info, style |
 | Auto-fix | Partial | First-class — `-fix`, `-diff`, `-dry-run`. The fix-enabled count appears in [KATAS.md](../KATAS.md). |

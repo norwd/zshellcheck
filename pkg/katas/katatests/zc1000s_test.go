@@ -3414,6 +3414,38 @@ func TestZC1075(t *testing.T) {
 				},
 			},
 		},
+		{
+			// `:=` default provides a value, so the expansion never
+			// elides — the canonical `: ${VAR:=default}` idiom.
+			name:     "assign-default modifier does not elide",
+			input:    `: ${VAR:=default}`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "minus-default modifier does not elide",
+			input:    `echo ${V:-fallback}`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "plus-alternate modifier is not flagged",
+			input:    `echo ${V:+set}`,
+			expected: []katas.Violation{},
+		},
+		{
+			// A path modifier (`:h`) can still produce an empty word, so
+			// it stays flagged — and a scalar is not mislabelled as an
+			// array element.
+			name:  "path modifier scalar is flagged as expansion",
+			input: `echo ${V:h}`,
+			expected: []katas.Violation{
+				{
+					KataID:  "ZC1075",
+					Message: "Quote this expansion. An unquoted empty or unset value is elided, dropping the word.",
+					Line:    1,
+					Column:  6,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

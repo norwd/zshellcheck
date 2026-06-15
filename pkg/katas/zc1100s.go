@@ -294,15 +294,10 @@ func checkZC1106(node ast.Node) []Violation {
 }
 
 func init() {
-	RegisterKata(ast.DoubleBracketExpressionNode, Kata{
-		ID:          "ZC1107",
-		Title:       "Use (( ... )) for arithmetic conditions",
-		Description: "Use `(( ... ))` for arithmetic comparisons instead of `[[ ... -gt ... ]]`. The double parenthesis syntax supports standard math operators (`>`, `<`, `==`, `!=`) and is optimized.",
-		Severity:    SeverityStyle,
-		Check:       checkZC1107DoubleBracket,
-		Fix:         fixZC1091,
-	})
-
+	// ZC1107 covers the `[ … -eq … ]` / `test` builtin form. The
+	// `[[ … -gt … ]]` double-bracket arithmetic comparison is owned by
+	// ZC1091 (same suggestion, same fix); registering it here too made
+	// every `[[ … -gt … ]]` emit two style findings under different IDs.
 	RegisterKata(ast.SimpleCommandNode, Kata{
 		ID:          "ZC1107",
 		Title:       "Use (( ... )) for arithmetic conditions",
@@ -312,37 +307,11 @@ func init() {
 	})
 }
 
-func checkZC1107DoubleBracket(node ast.Node) []Violation {
-	dbe := node.(*ast.DoubleBracketExpression)
-	var violations []Violation
-
-	// Helper to check infix expressions recursively
-	check := func(n ast.Node) bool {
-		if infix, ok := n.(*ast.InfixExpression); ok {
-			switch infix.Operator {
-			case "-eq", "-ne", "-lt", "-le", "-gt", "-ge":
-				violations = append(violations, Violation{
-					KataID:  "ZC1107",
-					Message: "Prefer `(( ... ))` for arithmetic comparisons (e.g., `(( a > b ))`) over `[[ ... ]]` with flags like `" + infix.Operator + "`.",
-					Line:    infix.TokenLiteralNode().Line,
-					Column:  infix.TokenLiteralNode().Column,
-					Level:   SeverityStyle,
-				})
-			}
-		}
-		return true
-	}
-
-	// Walk the elements of the double bracket expression
-	for _, el := range dbe.Elements {
-		ast.Walk(el, check)
-	}
-
-	return violations
-}
-
 func checkZC1107SimpleCommand(node ast.Node) []Violation {
-	cmd := node.(*ast.SimpleCommand)
+	cmd, ok := node.(*ast.SimpleCommand)
+	if !ok || cmd.Name == nil {
+		return nil
+	}
 
 	// Check if command is "[" or "test"
 	cmdName := cmd.Name.TokenLiteral()
