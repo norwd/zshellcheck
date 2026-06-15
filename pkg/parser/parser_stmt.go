@@ -1460,6 +1460,21 @@ func (p *Parser) parseShortFormForLoop(stmt *ast.ForLoopStatement) *ast.ForLoopS
 		stmt.Body = p.parseBlockStatement(token.DONE)
 		return stmt
 	}
+	if p.peekTokenIs(token.LBRACE) {
+		// Brace body `for x ( list ) { body }`. The brace group leaves
+		// curToken on its own `}`; consume it and signal a consumed
+		// terminator so an enclosing brace block (`if cond { for … { … } }`)
+		// does not mistake the loop's `}` for its own and close early,
+		// orphaning the trailing `else` / statement. Mirrors the `while`
+		// and `repeat` brace forms.
+		p.nextToken() // onto {
+		stmt.Body = wrapForLoopBody(stmt.Token, p.parseStatement())
+		if p.curTokenIs(token.RBRACE) {
+			p.nextToken()
+			p.consumedBraceTerminator = true
+		}
+		return stmt
+	}
 	p.nextToken()
 	stmt.Body = wrapForLoopBody(stmt.Token, p.parseStatement())
 	return stmt

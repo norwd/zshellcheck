@@ -380,3 +380,29 @@ func TestParseReturnValueSameLineOnly(t *testing.T) {
 	parseSourceClean(t, "f() {\n  if x; then return; fi\n}\n")
 	parseSourceClean(t, "f() {\n  return\n}\n")
 }
+
+// The Zsh short-form `for x ( list ) { body }` brace loop must consume
+// its own `}`. Previously it left curToken on the brace, so an enclosing
+// brace block (`if (( c )) { for p ( … ) { … } } else { … }`, the zinit
+// autoload path) mistook the loop's `}` for its own and closed early,
+// orphaning the trailing `else` and the rest of the block.
+func TestParseShortFormForBraceTerminator(t *testing.T) {
+	// A brace-group `{ … }` as the body of `&& { … }` inside the loop
+	// (`for p ( … ) { [[ … ]] && { … } }`) is a separate, still-open
+	// terminator leak in parseBraceGroupStatement and is not covered here.
+	cases := map[string]int{
+		"for p ( a b ) { echo $p }\nz\n":                   2,
+		"if (( c )) { for p ( x ) { a } } else { b }\nz\n": 2,
+		"if [[ c ]] { for p ( x ) { a } } else { b }\nz\n": 2,
+	}
+	for src, want := range cases {
+		p := New(lexer.New(src))
+		prog := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Errorf("unexpected errors for %q: %v", src, p.Errors())
+		}
+		if len(prog.Statements) != want {
+			t.Errorf("want %d statements for %q, got %d (the brace-form for orphaned the enclosing close)", want, src, len(prog.Statements))
+		}
+	}
+}

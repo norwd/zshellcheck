@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-06-15
+
+### Fixed
+- Parser: the Zsh short-form `for x ( list ) { body }` brace loop consumes its own closing `}`. Nested inside another brace block (`if (( c )) { for p ( … ) { … } } else { … }`), it no longer closes the enclosing block early and orphans the trailing `else`.
+
 ## [1.2.5] - 2026-06-15
 
 ### Fixed
