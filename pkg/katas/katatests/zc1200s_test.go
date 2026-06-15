@@ -3092,16 +3092,17 @@ func TestZC1285(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "sort with single file argument",
-			input: `sort data.txt`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1285",
-					Message: "Use Zsh `${(o)array}` for sorting instead of piping to `sort`. The `(o)` flag sorts in-shell.",
-					Line:    1,
-					Column:  1,
-				},
-			},
+			// `sort <file>` sorts a file's lines; `${(o)array}` sorts an
+			// in-shell array, not a file, so it cannot replace this.
+			// Flagging the file form gave wrong advice — not flagged.
+			name:     "sort with single file argument is not flagged",
+			input:    `sort data.txt`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "sort of a quoted file path is not flagged",
+			input:    `sort "$logfile"`,
+			expected: []katas.Violation{},
 		},
 	}
 
