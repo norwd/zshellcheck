@@ -9,7 +9,7 @@ Verify the install with `zshellcheck -version`.
 The full CLI reference lives in [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 > **Roadmap.** `brew install zshellcheck` (homebrew-core), AUR `zshellcheck-bin`, and an `.app`-free Cask are scheduled.
-> See [ROADMAP.md → Distribution channels](ROADMAP.md#version-1x---beyond-the-milestone).
+> See [ROADMAP.md → Distribution channels](ROADMAP.md#version-1x--beyond-the-milestone).
 
 ---
 
@@ -178,7 +178,7 @@ sudo apk del zshellcheck
 ### Arch, Manjaro, EndeavourOS — AUR
 
 The `zshellcheck-bin` AUR package is in flight.
-See [ROADMAP.md → Distribution channels](ROADMAP.md#version-1x---beyond-the-milestone).
+See [ROADMAP.md → Distribution channels](ROADMAP.md#version-1x--beyond-the-milestone).
 Until it lands, use the universal installer below.
 
 ### Universal: automated installer
