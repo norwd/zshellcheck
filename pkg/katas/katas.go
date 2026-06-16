@@ -31,12 +31,35 @@ type Violation struct {
 // FixEdit is a single text replacement applied by the auto-fixer.
 // Coordinates are 1-based; Length is the number of bytes of source to
 // replace starting at Line:Column. Replace may be empty (deletion) and
-// may span multiple lines.
+// may span multiple lines. KataID records the kata that produced the edit
+// so the CLI can withhold behavior-changing (unsafe) fixes by default.
 type FixEdit struct {
 	Line    int
 	Column  int
 	Length  int
 	Replace string
+	KataID  string
+}
+
+// safeFixKatas lists the katas whose auto-fix is purely syntactic and
+// value-preserving — applying it cannot change runtime behavior or drop a
+// comment. Every other fix may alter behavior (a command or flag swap, a
+// scope or glob-qualifier change) and is applied only under -unsafe-fixes.
+var safeFixKatas = map[string]bool{
+	"ZC1001": true, // $arr[i] -> ${arr[i]}
+	"ZC1002": true, // `cmd` -> $(cmd)
+	"ZC1073": true, // drop redundant $ inside (( … ))
+	"ZC1086": true, // function f { } -> f() { }
+	"ZC1411": true, // enable -n name -> disable name
+	"ZC1502": true, // insert `--` end-of-options guard
+	"ZC1637": true, // readonly x -> typeset -r x
+	"ZC1643": true, // $(cat f) -> $(<f)
+}
+
+// IsSafeFix reports whether the kata's auto-fix is value-preserving and so
+// applied by `-fix` without `-unsafe-fixes`.
+func (kr *KatasRegistry) IsSafeFix(id string) bool {
+	return safeFixKatas[id]
 }
 
 // Kata represents a single linting rule. Fix is optional; when non-nil
@@ -143,7 +166,16 @@ func (kr *KatasRegistry) FixesFor(node ast.Node, v Violation, source []byte) []F
 	if !ok || kata.Fix == nil {
 		return nil
 	}
-	return kata.Fix(node, v, source)
+	return stampKataID(kata.Fix(node, v, source), kata.ID)
+}
+
+// stampKataID records the producing kata on each edit so the CLI can
+// filter behavior-changing fixes without re-deriving their origin.
+func stampKataID(edits []FixEdit, id string) []FixEdit {
+	for i := range edits {
+		edits[i].KataID = id
+	}
+	return edits
 }
 
 // CheckAndFix runs Check for every kata registered against the node
@@ -176,7 +208,7 @@ func (kr *KatasRegistry) CheckAndFix(node ast.Node, disabledKatas []string, sour
 				vs[i].Level = kata.Severity
 			}
 			if kata.Fix != nil {
-				edits = append(edits, kata.Fix(node, vs[i], source)...)
+				edits = append(edits, stampKataID(kata.Fix(node, vs[i], source), kata.ID)...)
 			}
 		}
 		violations = append(violations, vs...)

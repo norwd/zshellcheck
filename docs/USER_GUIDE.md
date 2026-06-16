@@ -36,7 +36,8 @@ Files with `.go`, `.md`, `.json`, `.yml`, `.yaml`, or `.txt` extensions are skip
 | `-verbose` | off | Emit full kata descriptions in text output. |
 | `-no-color` | off | Disable ANSI colours. Implied when stdout is not a TTY. |
 | `-cpuprofile <path>` | — | Write a Go pprof CPU profile to `<path>` for benchmarking. |
-| `-fix` | off | Apply auto-fixes in place for katas that declare one. Deterministic rewrites only. |
+| `-fix` | off | Apply auto-fixes in place. Safe (value-preserving) fixes only, unless `-unsafe-fixes` is set. |
+| `-unsafe-fixes` | off | Also apply fixes that may change runtime behavior — command and flag swaps, scope changes, glob qualifiers. |
 | `-diff` | off | Preview the fixes as a unified diff instead of writing them. Implies dry-run. |
 | `-dry-run` | off | With `-fix`, report what would change without modifying files. |
 | `-list-rules` | — | Print every kata (ID, severity, title) and exit. |
@@ -78,7 +79,14 @@ zshellcheck -explain ZC1001
 
 Katas with a deterministic, reversible rewrite ship a `Fix` implementation.
 A finding from such a kata is tagged with a trailing `[*]` in the text report, and the run ends with a `[*] N fixable with the -fix option.` summary, so you can see at a glance how much the fixer resolves before touching anything.
-Run `zshellcheck -fix <path>` to apply rewrites in place, or `zshellcheck -diff <path>` to preview the unified diff.
+
+Fixes come in two tiers, following the model Ruff popularised.
+A **safe** fix is value-preserving: applying it cannot change runtime behavior or drop a comment, for example `` `cmd` `` to `$(cmd)` or `$arr[i]` to `${arr[i]}`.
+An **unsafe** fix may change behavior — a command or flag swap (`which` to `whence`, `netstat` to `ss`), a scope change (adding `local`), or a glob qualifier.
+`-fix` applies only safe fixes by default; pass `-unsafe-fixes` to apply the rest.
+The report counts each tier separately so you can apply the mechanical fixes confidently and review the behavior-changing ones by hand.
+
+Run `zshellcheck -fix <path>` to apply the safe rewrites in place, `zshellcheck -fix -unsafe-fixes <path>` to apply every fix, or `zshellcheck -diff <path>` to preview the unified diff.
 The fixer rewrites only the exact span the kata points at — arguments, quoting, and surrounding whitespace are preserved byte-for-byte.
 
 Silenced violations (via `.zshellcheckrc` or inline `# noka` directives) keep their fixes silenced too.
@@ -90,10 +98,11 @@ Combine flags freely:
 
 | Combination | Effect |
 | --- | --- |
-| `-fix` | Apply rewrites to disk. |
+| `-fix` | Apply safe rewrites to disk. |
+| `-fix -unsafe-fixes` | Apply every rewrite, including behavior-changing ones. |
 | `-diff` | Print a unified diff. Source unchanged. |
 | `-fix -dry-run` | Report which files would change without writing. |
-| `-fix -severity warning` | Apply every available rewrite; suppress style-level findings from the human-facing report. |
+| `-fix -severity warning` | Apply safe rewrites; suppress style-level findings from the human-facing report. |
 | `-no-banner -fix` | Apply rewrites without the startup banner — useful in CI. |
 
 [KATAS.md](../KATAS.md) lists every kata with an explicit `Auto-fix: yes/no` line, and the summary table reports the current count.

@@ -11,7 +11,7 @@ import (
 
 func TestCollectEdits_FileWideDisableDirective(t *testing.T) {
 	src := "result=`which git`\n# noka: ZC1002\n"
-	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), nil)
+	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), nil, true)
 	for _, e := range edits {
 		_ = e
 	}
@@ -19,7 +19,7 @@ func TestCollectEdits_FileWideDisableDirective(t *testing.T) {
 
 func TestCollectEdits_PerLineDisable(t *testing.T) {
 	src := "result=`which git` # noka: ZC1002\n"
-	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), nil)
+	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), nil, true)
 	for _, e := range edits {
 		_ = e
 	}
@@ -27,7 +27,7 @@ func TestCollectEdits_PerLineDisable(t *testing.T) {
 
 func TestCollectEdits_ExternalDisable(t *testing.T) {
 	src := "result=`which git`\n"
-	edits := collectEdits(src, katas.Registry, []string{"ZC1002"}, config.DefaultConfig(), nil)
+	edits := collectEdits(src, katas.Registry, []string{"ZC1002"}, config.DefaultConfig(), nil, true)
 	for _, e := range edits {
 		_ = e
 	}
@@ -35,7 +35,7 @@ func TestCollectEdits_ExternalDisable(t *testing.T) {
 
 func TestCollectEdits_SeverityFilterError(t *testing.T) {
 	src := "result=`which git`\n"
-	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), []katas.Severity{katas.SeverityError})
+	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), []katas.Severity{katas.SeverityError}, true)
 	for _, e := range edits {
 		_ = e
 	}
@@ -43,7 +43,7 @@ func TestCollectEdits_SeverityFilterError(t *testing.T) {
 
 func TestCollectEdits_SeverityFilterStyle(t *testing.T) {
 	src := "result=`which git`\n"
-	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), []katas.Severity{katas.SeverityStyle})
+	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), []katas.Severity{katas.SeverityStyle}, true)
 	for _, e := range edits {
 		_ = e
 	}
@@ -51,7 +51,7 @@ func TestCollectEdits_SeverityFilterStyle(t *testing.T) {
 
 func TestCollectEdits_NestedFix(t *testing.T) {
 	src := "result=`which git`\necho $arr[1]\n"
-	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), nil)
+	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), nil, true)
 	for _, e := range edits {
 		_ = e
 	}
@@ -59,7 +59,7 @@ func TestCollectEdits_NestedFix(t *testing.T) {
 
 func TestCollectEdits_CleanSource(t *testing.T) {
 	src := "echo hello\n"
-	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), nil)
+	edits := collectEdits(src, katas.Registry, nil, config.DefaultConfig(), nil, true)
 	for _, e := range edits {
 		_ = e
 	}

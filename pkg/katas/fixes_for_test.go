@@ -73,3 +73,17 @@ func TestIsFixable(t *testing.T) {
 		t.Error("unknown kata should not be fixable")
 	}
 }
+
+func TestIsSafeFix(t *testing.T) {
+	// ZC1001 is in the value-preserving safe set; ZC1037 (echo->print)
+	// changes behavior and is unsafe.
+	if !Registry.IsSafeFix("ZC1001") {
+		t.Error("ZC1001 should be a safe fix")
+	}
+	if Registry.IsSafeFix("ZC1037") {
+		t.Error("ZC1037 should not be a safe fix")
+	}
+	if Registry.IsSafeFix("ZC_UNKNOWN") {
+		t.Error("unknown kata should not be a safe fix")
+	}
+}

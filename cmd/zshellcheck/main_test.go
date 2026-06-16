@@ -441,7 +441,7 @@ func TestCollectEdits_ParseError(t *testing.T) {
 	src := "if true; then echo \"unterminated\n"
 	registry := katas.Registry
 	cfg := config.DefaultConfig()
-	edits := collectEdits(src, registry, nil, cfg, nil)
+	edits := collectEdits(src, registry, nil, cfg, nil, true)
 	if edits != nil {
 		t.Errorf("expected nil edits on parse error, got %d", len(edits))
 	}
@@ -455,7 +455,7 @@ func TestCollectEdits_FileWideDirective(t *testing.T) {
 	src := "x=`date`\n# noka: ZC1002\n"
 	registry := katas.Registry
 	cfg := config.DefaultConfig()
-	edits := collectEdits(src, registry, nil, cfg, nil)
+	edits := collectEdits(src, registry, nil, cfg, nil, true)
 	for _, e := range edits {
 		_ = e
 	}
@@ -465,7 +465,7 @@ func TestApplyFixesUntilStable_Idempotent(t *testing.T) {
 	src := "#!/bin/zsh\necho hello\n"
 	cfg := config.DefaultConfig()
 	registry := katas.Registry
-	out, n, err := applyFixesUntilStable(src, nil, registry, nil, cfg, nil, 5)
+	out, n, err := applyFixesUntilStable(src, nil, registry, nil, cfg, nil, 5, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -481,11 +481,11 @@ func TestApplyFixesUntilStable_RewritesBackticks(t *testing.T) {
 	src := "x=`which git`\n"
 	cfg := config.DefaultConfig()
 	registry := katas.Registry
-	initial := collectEdits(src, registry, nil, cfg, nil)
+	initial := collectEdits(src, registry, nil, cfg, nil, true)
 	if len(initial) == 0 {
 		t.Skip("no auto-fix katas fired on the input; coverage path not exercised")
 	}
-	out, n, err := applyFixesUntilStable(src, initial, registry, nil, cfg, nil, 5)
+	out, n, err := applyFixesUntilStable(src, initial, registry, nil, cfg, nil, 5, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -508,8 +508,8 @@ func TestApplyFixesUntilStable_NeverBreaksParse(t *testing.T) {
 		"(( $reply[x] )) && return\n",
 		"if [ $commands[oc] ]; then :; fi\n",
 	} {
-		initial := collectEdits(src, registry, nil, cfg, nil)
-		out, _, err := applyFixesUntilStable(src, initial, registry, nil, cfg, nil, 5)
+		initial := collectEdits(src, registry, nil, cfg, nil, true)
+		out, _, err := applyFixesUntilStable(src, initial, registry, nil, cfg, nil, 5, true)
 		if err != nil {
 			t.Fatalf("unexpected error for %q: %v", src, err)
 		}
@@ -526,7 +526,7 @@ func TestApplyFixesUntilStable_ArithSubscript(t *testing.T) {
 	cfg := config.DefaultConfig()
 	registry := katas.Registry
 	src := "(( $reply[x] )) && return\n"
-	out, _, err := applyFixesUntilStable(src, collectEdits(src, registry, nil, cfg, nil), registry, nil, cfg, nil, 5)
+	out, _, err := applyFixesUntilStable(src, collectEdits(src, registry, nil, cfg, nil, true), registry, nil, cfg, nil, 5, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -540,8 +540,8 @@ func TestApplyFixesUntilStable_NullglobIdempotent(t *testing.T) {
 	cfg := config.DefaultConfig()
 	registry := katas.Registry
 	src := "for f in *.txt; do print -r -- $f; done\n"
-	once, _, _ := applyFixesUntilStable(src, collectEdits(src, registry, nil, cfg, nil), registry, nil, cfg, nil, 5)
-	twice, _, _ := applyFixesUntilStable(once, collectEdits(once, registry, nil, cfg, nil), registry, nil, cfg, nil, 5)
+	once, _, _ := applyFixesUntilStable(src, collectEdits(src, registry, nil, cfg, nil, true), registry, nil, cfg, nil, 5, true)
+	twice, _, _ := applyFixesUntilStable(once, collectEdits(once, registry, nil, cfg, nil, true), registry, nil, cfg, nil, 5, true)
 	if once != twice {
 		t.Errorf("ZC1040 fix not idempotent:\n once:  %q\n twice: %q", once, twice)
 	}
@@ -667,6 +667,38 @@ func TestFinalExitCode_FixableFooter(t *testing.T) {
 	}
 	if code := finalExitCode(0, "text", opts); code != 0 {
 		t.Errorf("want exit 0 with no violations, got %d", code)
+	}
+}
+
+func TestRun_UnsafeFixesGate(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte("x=`which git`\nnetstat -a\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	old := os.Args
+	defer func() { os.Args = old }()
+
+	// Default -fix applies only the safe backtick rewrite; the unsafe
+	// netstat->ss swap is withheld.
+	safe := write("safe.zsh")
+	resetFlags()
+	os.Args = []string{"zshellcheck", "-fix", "-no-banner", safe}
+	_ = run()
+	if b, _ := os.ReadFile(safe); strings.Contains(string(b), "`which git`") || !strings.Contains(string(b), "netstat") {
+		t.Errorf("safe -fix wrong: %q", b)
+	}
+
+	// -unsafe-fixes also applies the netstat->ss swap.
+	unsafe := write("unsafe.zsh")
+	resetFlags()
+	os.Args = []string{"zshellcheck", "-fix", "-unsafe-fixes", "-no-banner", unsafe}
+	_ = run()
+	if b, _ := os.ReadFile(unsafe); strings.Contains(string(b), "netstat") {
+		t.Errorf("unsafe -fix should swap netstat: %q", b)
 	}
 }
 

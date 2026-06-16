@@ -37,6 +37,7 @@ type runFlags struct {
 	fixMode        *bool
 	diffMode       *bool
 	dryRun         *bool
+	unsafeFixes    *bool
 	listRules      *bool
 	explain        *string
 	statistics     *bool
@@ -81,7 +82,7 @@ func run() int {
 	if code != 0 {
 		return code
 	}
-	fixOpts := buildFixOpts(*flags.fixMode, *flags.diffMode, *flags.dryRun)
+	fixOpts := buildFixOpts(*flags.fixMode, *flags.diffMode, *flags.dryRun, *flags.unsafeFixes)
 	if *flags.statistics {
 		fixOpts.statistics = map[string]int{}
 	}
@@ -135,6 +136,7 @@ func registerRunFlags() runFlags {
 		fixMode:        flag.Bool("fix", false, "Apply auto-fixes in place for katas that ship a deterministic rewrite."),
 		diffMode:       flag.Bool("diff", false, "Print a unified diff of the fixes instead of writing them."),
 		dryRun:         flag.Bool("dry-run", false, "With -fix, report what would change without modifying files."),
+		unsafeFixes:    flag.Bool("unsafe-fixes", false, "Also apply fixes that may change runtime behavior (off by default)."),
 		listRules:      flag.Bool("list-rules", false, "Print every kata (ID, severity, title) and exit."),
 		explain:        flag.String("explain", "", "Print the full description of a kata by ID (e.g. ZC1001) and exit."),
 		statistics:     flag.Bool("statistics", false, "Print a per-kata count of findings instead of individual reports."),
@@ -252,11 +254,12 @@ func parseSeverityFilter(filter string) ([]katas.Severity, int) {
 	return out, 0
 }
 
-func buildFixOpts(fixMode, diffMode, dryRun bool) fixOptions {
+func buildFixOpts(fixMode, diffMode, dryRun, unsafeFixes bool) fixOptions {
 	opts := fixOptions{
 		enabled:   fixMode || diffMode,
 		diff:      diffMode,
 		dryRun:    dryRun,
+		unsafe:    unsafeFixes,
 		maxPasses: 5,
 	}
 	if opts.diff {
@@ -267,6 +270,7 @@ func buildFixOpts(fixMode, diffMode, dryRun bool) fixOptions {
 		opts.stats = &fixStats{}
 	}
 	opts.fixable = new(int)
+	opts.unsafeFixable = new(int)
 	return opts
 }
 
@@ -319,10 +323,15 @@ func finalExitCode(total int, format string, fixOpts fixOptions) int {
 	}
 	if format == "text" {
 		fmt.Fprintf(os.Stderr, "\nFound %d violations.\n", total)
-		// Point at the auto-fixable subset, unless fixes are already
+		// Point at the auto-fixable subsets, unless fixes are already
 		// being applied or previewed this run.
-		if !fixOpts.enabled && fixOpts.fixable != nil && *fixOpts.fixable > 0 {
-			fmt.Fprintf(os.Stderr, "[*] %d fixable with the `-fix` option.\n", *fixOpts.fixable)
+		if !fixOpts.enabled {
+			if fixOpts.fixable != nil && *fixOpts.fixable > 0 {
+				fmt.Fprintf(os.Stderr, "[*] %d fixable with the `-fix` option.\n", *fixOpts.fixable)
+			}
+			if fixOpts.unsafeFixable != nil && *fixOpts.unsafeFixable > 0 {
+				fmt.Fprintf(os.Stderr, "    %d more fixable with `-fix -unsafe-fixes`.\n", *fixOpts.unsafeFixable)
+			}
 		}
 	}
 	return 1
@@ -368,9 +377,14 @@ type fixOptions struct {
 	// formats so they are emitted once as a single JSON / SARIF document.
 	// nil for the text format, which streams per file.
 	collector *[]reporter.FileViolations
-	// fixable counts findings across the run whose kata ships an auto-fix,
-	// for the `[*] N fixable` hint shown after a text report.
-	fixable *int
+	// unsafe applies fixes that may change runtime behavior. When false,
+	// only value-preserving (safe) fixes are applied.
+	unsafe bool
+	// fixable counts findings with a safe auto-fix; unsafeFixable counts
+	// those whose only fix may change behavior. Both feed the post-report
+	// `[*] N fixable` / `M with -unsafe-fixes` hints.
+	fixable       *int
+	unsafeFixable *int
 	// statistics, when non-nil, switches output to a per-kata count table:
 	// individual findings are suppressed and tallied here instead.
 	statistics map[string]int
@@ -393,7 +407,7 @@ type fixStats struct {
 // `result=`which git“ first becomes `result=$(which git)` (ZC1002),
 // which a second pass then rewrites to `result=$(whence git)`
 // (ZC1005). A single pass would leave the inner stale.
-func applyFixesUntilStable(src string, initialEdits []katas.FixEdit, registry *katas.KatasRegistry, disabled []string, cfg config.Config, allowedSeverities []katas.Severity, maxPasses int) (string, int, error) {
+func applyFixesUntilStable(src string, initialEdits []katas.FixEdit, registry *katas.KatasRegistry, disabled []string, cfg config.Config, allowedSeverities []katas.Severity, maxPasses int, unsafe bool) (string, int, error) {
 	if maxPasses < 1 {
 		maxPasses = 5
 	}
@@ -426,7 +440,7 @@ func applyFixesUntilStable(src string, initialEdits []katas.FixEdit, registry *k
 		totalEdits += applied
 		current = next
 		// Re-collect edits from the new source.
-		edits = collectEdits(current, registry, disabled, cfg, allowedSeverities)
+		edits = collectEdits(current, registry, disabled, cfg, allowedSeverities, unsafe)
 	}
 	return current, totalEdits, nil
 }
@@ -472,7 +486,7 @@ func applySafeEdits(base string, edits []katas.FixEdit) (string, int) {
 // collectEdits parses src and returns the auto-fix edits the registry
 // would emit for it under the given disabled / severity filters.
 // Used by the multi-pass loop in applyFixesUntilStable.
-func collectEdits(src string, registry *katas.KatasRegistry, disabled []string, cfg config.Config, allowedSeverities []katas.Severity) []katas.FixEdit {
+func collectEdits(src string, registry *katas.KatasRegistry, disabled []string, cfg config.Config, allowedSeverities []katas.Severity, unsafe bool) []katas.FixEdit {
 	l := lexer.New(src)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -523,7 +537,7 @@ func collectEdits(src string, registry *katas.KatasRegistry, disabled []string, 
 		}
 		edits = filtered
 	}
-	return edits
+	return applicableEdits(edits, registry, unsafe)
 }
 
 func processPath(path string, out, errOut io.Writer, cfg config.Config, registry *katas.KatasRegistry, format string, allowedSeverities []katas.Severity, fixOpts fixOptions) int {
@@ -653,7 +667,23 @@ func applySeverityFilter(violations []katas.Violation, edits []katas.FixEdit, al
 	return filtered, edits
 }
 
+// applicableEdits drops behavior-changing (unsafe) fixes unless the run
+// opted into them with -unsafe-fixes.
+func applicableEdits(edits []katas.FixEdit, registry *katas.KatasRegistry, unsafe bool) []katas.FixEdit {
+	if unsafe {
+		return edits
+	}
+	kept := edits[:0]
+	for _, e := range edits {
+		if registry.IsSafeFix(e.KataID) {
+			kept = append(kept, e)
+		}
+	}
+	return kept
+}
+
 func applyFixIfEnabled(filename string, data []byte, registry *katas.KatasRegistry, disabled []string, cfg config.Config, allowed []katas.Severity, edits []katas.FixEdit, violations []katas.Violation, fixOpts fixOptions, out, errOut io.Writer) {
+	edits = applicableEdits(edits, registry, fixOpts.unsafe)
 	if !fixOpts.enabled || len(edits) == 0 || len(violations) == 0 {
 		return
 	}
@@ -679,7 +709,7 @@ func emitFixDiff(filename string, data []byte, edits []katas.FixEdit, out, errOu
 }
 
 func applyFixInPlace(filename string, data []byte, registry *katas.KatasRegistry, disabled []string, cfg config.Config, allowed []katas.Severity, edits []katas.FixEdit, fixOpts fixOptions, errOut io.Writer) {
-	fixed, totalEdits, perr := applyFixesUntilStable(string(data), edits, registry, disabled, cfg, allowed, fixOpts.maxPasses)
+	fixed, totalEdits, perr := applyFixesUntilStable(string(data), edits, registry, disabled, cfg, allowed, fixOpts.maxPasses, fixOpts.unsafe)
 	if perr != nil {
 		fmt.Fprintf(errOut, "fix: apply failed for %s: %s\n", filename, perr)
 		return
@@ -720,15 +750,25 @@ func emitReport(filename string, out, errOut io.Writer, format string, cfg confi
 		*fixOpts.collector = append(*fixOpts.collector, reporter.FileViolations{Filename: filename, Violations: violations})
 		return
 	}
+	// `[*]` marks the fixes the current command would apply: safe-only, or
+	// every fix under -unsafe-fixes. Findings whose only fix is unsafe are
+	// counted separately so the footer can point at -unsafe-fixes.
+	marked := registry.IsSafeFix
+	if fixOpts.unsafe {
+		marked = registry.IsFixable
+	}
 	if fixOpts.fixable != nil {
 		for _, v := range violations {
-			if registry.IsFixable(v.KataID) {
+			switch {
+			case marked(v.KataID):
 				*fixOpts.fixable++
+			case registry.IsFixable(v.KataID) && fixOpts.unsafeFixable != nil:
+				*fixOpts.unsafeFixable++
 			}
 		}
 	}
 	r := reporter.NewTextReporter(out, filename, string(data), cfg)
-	r.MarkFixable(registry.IsFixable)
+	r.MarkFixable(marked)
 	if err := r.Report(violations); err != nil {
 		fmt.Fprintf(errOut, "Error reporting violations: %s\n", err)
 	}
