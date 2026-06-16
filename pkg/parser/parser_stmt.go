@@ -290,7 +290,22 @@ func (p *Parser) peekStartsSimpleCommand() bool {
 	if p.peekTokenIs(token.DEC) || p.peekTokenIs(token.INC) {
 		return true
 	}
+	if p.peekStartsRedirection() {
+		return true
+	}
 	return p.peekTokenIs(token.PIPE) || p.peekTokenIs(token.AND) || p.peekTokenIs(token.OR)
+}
+
+// peekStartsRedirection reports whether the peek token opens a
+// redirection that immediately follows the command name (`cmd >out`,
+// `cmd >& fd`). Routing these through the simple-command path lets its
+// redirection loop gather the whole chain — including a trailing
+// FD-prefixed redirect (`cmd >/dev/null 2>&1`) — instead of the
+// expression path consuming one redirect and orphaning the rest.
+func (p *Parser) peekStartsRedirection() bool {
+	return p.peekTokenIs(token.GT) || p.peekTokenIs(token.GTGT) ||
+		p.peekTokenIs(token.LT) || p.peekTokenIs(token.LTLT) ||
+		p.peekTokenIs(token.GTAMP) || p.peekTokenIs(token.LTAMP)
 }
 
 func (p *Parser) peekStartsArgPrefix() bool {
@@ -512,7 +527,14 @@ func (p *Parser) finishLoopTail() {
 // IDENT path would produce for `cmd | other`.
 func (p *Parser) parsePipelineStartingWithExpression() ast.Statement {
 	tok := p.curToken
-	expr := p.parseExpression(LOWEST)
+	// Parse the head at LOGICAL, not LOWEST: a LOWEST parse swallows a
+	// trailing `&&`/`||` as an infix whose right operand is a single
+	// primary (`$cmd && echo`), stranding the rest of that command's
+	// words (`hello` in `$cmd && echo hello`) as a separate statement.
+	// Stopping at LOGICAL leaves the connector for the loop below, which
+	// parses each right-hand side through parseCommandPipeline so its
+	// arguments are gathered.
+	expr := p.parseExpression(LOGICAL)
 	if expr == nil {
 		return nil
 	}
@@ -1058,19 +1080,35 @@ func (p *Parser) parseBraceFormElifChain() ast.Statement {
 	return head
 }
 
+// blockTerminatorMatch reports whether curToken closes a block whose
+// terminator set is terminators. Two position-specific exceptions apply:
+// a leading `{` in an empty block is a brace-group condition
+// (`if { cmd }; then …`), not the brace-form body opener; and a `}` that
+// closed a `${…}` expansion is the lexer-flagged inner brace, not the
+// block's own close (`cmd ${X} }`).
+func (p *Parser) blockTerminatorMatch(terminators []token.Type, empty bool) bool {
+	for _, t := range terminators {
+		if !p.curTokenIs(t) {
+			continue
+		}
+		if t == token.LBRACE && empty {
+			return false
+		}
+		if t == token.RBRACE && p.curToken.ClosesDollarBrace {
+			return false
+		}
+		return true
+	}
+	return false
+}
+
 func (p *Parser) parseBlockStatement(terminators ...token.Type) *ast.BlockStatement {
 	block := &ast.BlockStatement{Token: p.curToken}
 	block.Statements = []ast.Statement{}
 
 	for !p.curTokenIs(token.EOF) {
-		isTerm := p.curIsForeachEnd()
-		for _, t := range terminators {
-			if p.curTokenIs(t) {
-				isTerm = true
-				break
-			}
-		}
-		if isTerm {
+		if p.curIsForeachEnd() ||
+			p.blockTerminatorMatch(terminators, len(block.Statements) == 0) {
 			break
 		}
 
@@ -1116,21 +1154,7 @@ func (p *Parser) parseBlockStatement(terminators ...token.Type) *ast.BlockStatem
 		// on block keywords. Advancing unconditionally here would
 		// step past it and the outer if/loop/case would then see
 		// EOF and report "expected FI got EOF".
-		curIsTerm := p.curIsForeachEnd()
-		for _, t := range terminators {
-			if p.curTokenIs(t) {
-				// An RBRACE that closed a `${…}` is not the block's
-				// terminator — `cmd ${X} }` leaves curToken on the
-				// `${X}`'s `}` while the brace-block close is the
-				// next RBRACE. The lexer flags the inner one.
-				if t == token.RBRACE && p.curToken.ClosesDollarBrace {
-					break
-				}
-				curIsTerm = true
-				break
-			}
-		}
-		if curIsTerm {
+		if p.curIsForeachEnd() || p.blockTerminatorMatch(terminators, false) {
 			// A consumed-terminator signal from the last body statement
 			// (a finishCompound'd `if`, a brace-form close) applied only
 			// to that statement's own terminator. Clear it before

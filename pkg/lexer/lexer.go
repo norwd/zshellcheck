@@ -562,6 +562,12 @@ func (l *Lexer) readAmpersandLead() token.Token {
 	switch l.peekChar() {
 	case '&':
 		return l.readFusedToken(token.AND)
+	case '>':
+		// `&>file` redirects both stdout and stderr — the same operator as
+		// `>&` (GTAMP). Emit GTAMP so the existing redirection handling
+		// applies; otherwise `&` lexed as a background operator and the
+		// `>` orphaned (`if { … } &>/dev/null; then …` then desynced).
+		return l.readFusedToken(token.GTAMP)
 	case '|', '!':
 		return l.readFusedToken(token.AMPERSAND)
 	case '=':
