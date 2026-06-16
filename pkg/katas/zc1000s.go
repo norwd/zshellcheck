@@ -5328,6 +5328,22 @@ func zc1075IsBareExpansion(v string) bool {
 // operand, leaving a trailing `:`. Path modifiers (`:h`, `:t`, `:r`)
 // keep their letter and are intentionally not matched — they can still
 // elide.
+// zc1075HasSplitFlag reports whether a `${(flags)name}` flag group
+// contains a word-splitting flag — `f` (lines), `s`/`0`/`z`/`w` (string,
+// null, shell, word split), `@` (array), `k`/`v` (assoc keys/values),
+// `p` (print escapes for s/f). Such an expansion deliberately yields
+// multiple words; quoting it would collapse them, so it is not an
+// elision hazard. Only the leading flag characters (before any
+// `:delimiter:` section) are inspected so a delimiter's contents do not
+// produce a spurious match.
+func zc1075HasSplitFlag(flags string) bool {
+	head := flags
+	if i := strings.IndexByte(head, ':'); i >= 0 {
+		head = head[:i]
+	}
+	return strings.ContainsAny(head, "fs0zwpkv@")
+}
+
 func zc1075HasDefaultModifier(left ast.Expression) bool {
 	ident, ok := left.(*ast.Identifier)
 	if !ok {
@@ -5387,6 +5403,13 @@ func checkZC1075(node ast.Node) []Violation {
 			// Path modifiers (`:h`, `:t`, `:r`) still can elide, so keep
 			// flagging those.
 			if zc1075HasDefaultModifier(aa.Left) {
+				continue
+			}
+			// A word-splitting parameter flag (`${(f)x}`, `${(s:,:)x}`,
+			// `${(@)arr}`, `${(kv)map}`) is meant to expand to multiple
+			// words; quoting it would join them and defeat the idiom, so
+			// it is not an elision hazard.
+			if zc1075HasSplitFlag(aa.Flags) {
 				continue
 			}
 			// Distinguish a true array element (`${arr[i]}`, Index set)

@@ -684,7 +684,7 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 
 func (p *Parser) parseArrayAccess() ast.Expression {
 	exp := &ast.ArrayAccess{Token: p.curToken}
-	p.consumeArrayAccessFlags()
+	exp.Flags = p.consumeArrayAccessFlags()
 	hasLengthOp := p.consumeLengthOp()
 	p.consumePreflags()
 
@@ -740,17 +740,20 @@ func (p *Parser) parseArrayAccess() ast.Expression {
 // consumeArrayAccessFlags drains the optional `(flags)` group between
 // `${` and the subject, used by Zsh parameter-expansion flag tuples
 // like `${(j:,:)arr}`.
-func (p *Parser) consumeArrayAccessFlags() {
+func (p *Parser) consumeArrayAccessFlags() string {
 	if !p.peekTokenIs(token.LPAREN) {
-		return
+		return ""
 	}
 	p.nextToken()
+	var sb strings.Builder
 	for !p.peekTokenIs(token.RPAREN) && !p.peekTokenIs(token.EOF) {
 		p.nextToken()
+		sb.WriteString(p.curToken.Literal)
 	}
 	if p.peekTokenIs(token.RPAREN) {
 		p.nextToken()
 	}
+	return sb.String()
 }
 
 // consumeLengthOp consumes the `#` length operator if present.

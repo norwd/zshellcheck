@@ -3436,6 +3436,19 @@ func TestZC1075(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
+			// Word-splitting parameter flags (`${(f)x}`, `${(@)arr}`,
+			// `${(s:,:)x}`) deliberately yield multiple words; quoting
+			// would join them, so they are not elision hazards.
+			name:     "split-producing parameter flag is not flagged",
+			input:    `print -l -- ${(f)lines}`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "array flag is not flagged",
+			input:    `print -- ${(@)arr}`,
+			expected: []katas.Violation{},
+		},
+		{
 			// A path modifier (`:h`) can still produce an empty word, so
 			// it stays flagged — and a scalar is not mislabelled as an
 			// array element.

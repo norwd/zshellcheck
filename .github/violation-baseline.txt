@@ -114,7 +114,7 @@ autosuggestions/src/strategies/completion.zsh	ZC1001	1
 autosuggestions/src/strategies/completion.zsh	ZC1037	1
 autosuggestions/src/strategies/completion.zsh	ZC1043	1
 autosuggestions/src/strategies/completion.zsh	ZC1068	1
-autosuggestions/src/strategies/completion.zsh	ZC1075	6
+autosuggestions/src/strategies/completion.zsh	ZC1075	5
 autosuggestions/src/strategies/completion.zsh	ZC1086	1
 autosuggestions/src/strategies/completion.zsh	ZC1133	1
 autosuggestions/src/strategies/completion.zsh	ZC1520	1
@@ -137,7 +137,7 @@ autosuggestions/zsh-autosuggestions.zsh	ZC1045	2
 autosuggestions/zsh-autosuggestions.zsh	ZC1046	4
 autosuggestions/zsh-autosuggestions.zsh	ZC1068	1
 autosuggestions/zsh-autosuggestions.zsh	ZC1073	6
-autosuggestions/zsh-autosuggestions.zsh	ZC1075	20
+autosuggestions/zsh-autosuggestions.zsh	ZC1075	19
 autosuggestions/zsh-autosuggestions.zsh	ZC1078	6
 autosuggestions/zsh-autosuggestions.zsh	ZC1086	1
 autosuggestions/zsh-autosuggestions.zsh	ZC1091	1
@@ -282,7 +282,7 @@ fzf-tab/test/ztst.zsh	ZC1051	8
 fzf-tab/test/ztst.zsh	ZC1059	1
 fzf-tab/test/ztst.zsh	ZC1065	1
 fzf-tab/test/ztst.zsh	ZC1073	1
-fzf-tab/test/ztst.zsh	ZC1075	23
+fzf-tab/test/ztst.zsh	ZC1075	22
 fzf-tab/test/ztst.zsh	ZC1078	1
 fzf-tab/test/ztst.zsh	ZC1091	4
 fzf-tab/test/ztst.zsh	ZC1136	3
@@ -413,7 +413,7 @@ prezto/init.zsh	ZC1037	1
 prezto/init.zsh	ZC1045	5
 prezto/init.zsh	ZC1086	5
 prezto/modules/command-not-found/init.zsh	ZC1010	2
-prezto/modules/completion/init.zsh	ZC1075	3
+prezto/modules/completion/init.zsh	ZC1075	2
 prezto/modules/completion/init.zsh	ZC1128	1
 prezto/modules/completion/init.zsh	ZC1643	1
 prezto/modules/completion/init.zsh	ZC1686	1
@@ -520,7 +520,7 @@ purer/pure.zsh	ZC1036	1
 purer/pure.zsh	ZC1043	11
 purer/pure.zsh	ZC1055	1
 purer/pure.zsh	ZC1073	1
-purer/pure.zsh	ZC1075	5
+purer/pure.zsh	ZC1075	4
 purer/pure.zsh	ZC1091	2
 purer/pure.zsh	ZC1293	1
 spaceship/async.zsh	ZC1001	5
@@ -1040,11 +1040,9 @@ zaw/sources/cdr.zsh	ZC1086	4
 zaw/sources/command-output.zsh	ZC1076	1
 zaw/sources/command-output.zsh	ZC1086	1
 zaw/sources/commands.zsh	ZC1049	1
-zaw/sources/commands.zsh	ZC1075	1
 zaw/sources/commands.zsh	ZC1086	1
 zaw/sources/commands.zsh	ZC1284	2
 zaw/sources/fasd.zsh	ZC1086	3
-zaw/sources/functions.zsh	ZC1075	1
 zaw/sources/functions.zsh	ZC1086	1
 zaw/sources/git-branches.zsh	ZC1011	1
 zaw/sources/git-branches.zsh	ZC1045	1
@@ -1070,7 +1068,6 @@ zaw/sources/git-status.zsh	ZC1011	1
 zaw/sources/git-status.zsh	ZC1045	7
 zaw/sources/git-status.zsh	ZC1086	7
 zaw/sources/history.zsh	ZC1086	1
-zaw/sources/locate.zsh	ZC1075	1
 zaw/sources/locate.zsh	ZC1076	1
 zaw/sources/locate.zsh	ZC1086	1
 zaw/sources/locate.zsh	ZC1565	1
@@ -1091,7 +1088,6 @@ zaw/sources/screens.zsh	ZC1012	1
 zaw/sources/screens.zsh	ZC1086	2
 zaw/sources/screens.zsh	ZC1099	1
 zaw/sources/screens.zsh	ZC1361	1
-zaw/sources/searcher.zsh	ZC1075	1
 zaw/sources/searcher.zsh	ZC1076	1
 zaw/sources/searcher.zsh	ZC1086	2
 zaw/sources/ssh-hosts.zsh	ZC1001	6
@@ -1135,7 +1131,6 @@ zephyr/lib/bootstrap.zsh	ZC1076	1
 zephyr/lib/bootstrap.zsh	ZC1086	1
 zephyr/plugins/color/color.plugin.zsh	ZC1001	2
 zephyr/plugins/color/color.plugin.zsh	ZC1049	5
-zephyr/plugins/color/color.plugin.zsh	ZC1075	1
 zephyr/plugins/color/color.plugin.zsh	ZC1083	1
 zephyr/plugins/completion/completion.plugin.zsh	ZC1046	1
 zephyr/plugins/completion/completion.plugin.zsh	ZC1059	1
@@ -1148,7 +1143,7 @@ zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1001	1
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1017	1
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1037	6
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1071	1
-zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1075	5
+zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1075	4
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1086	6
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1176	1
 zephyr/plugins/compstyle/compstyle.plugin.zsh	ZC1591	1
@@ -1243,7 +1238,6 @@ zinit/share/git-process-output.zsh	ZC1046	2
 zinit/share/git-process-output.zsh	ZC1075	3
 zinit/share/rpm2cpio.zsh	ZC1005	2
 zinit/share/rpm2cpio.zsh	ZC1045	1
-zinit/share/rpm2cpio.zsh	ZC1075	2
 zinit/share/rpm2cpio.zsh	ZC1271	2
 zinit/zinit-additional.zsh	ZC1001	2
 zinit/zinit-additional.zsh	ZC1043	1
@@ -1267,7 +1261,7 @@ zinit/zinit-autoload.zsh	ZC1049	7
 zinit/zinit-autoload.zsh	ZC1053	1
 zinit/zinit-autoload.zsh	ZC1064	1
 zinit/zinit-autoload.zsh	ZC1073	3
-zinit/zinit-autoload.zsh	ZC1075	43
+zinit/zinit-autoload.zsh	ZC1075	41
 zinit/zinit-autoload.zsh	ZC1083	2
 zinit/zinit-autoload.zsh	ZC1091	32
 zinit/zinit-autoload.zsh	ZC1098	3
@@ -1295,7 +1289,7 @@ zinit/zinit-install.zsh	ZC1053	1
 zinit/zinit-install.zsh	ZC1064	5
 zinit/zinit-install.zsh	ZC1071	2
 zinit/zinit-install.zsh	ZC1073	1
-zinit/zinit-install.zsh	ZC1075	81
+zinit/zinit-install.zsh	ZC1075	79
 zinit/zinit-install.zsh	ZC1083	2
 zinit/zinit-install.zsh	ZC1091	22
 zinit/zinit-install.zsh	ZC1098	9
@@ -1323,7 +1317,7 @@ zinit/zinit.zsh	ZC1045	4
 zinit/zinit.zsh	ZC1046	13
 zinit/zinit.zsh	ZC1064	1
 zinit/zinit.zsh	ZC1071	3
-zinit/zinit.zsh	ZC1075	80
+zinit/zinit.zsh	ZC1075	73
 zinit/zinit.zsh	ZC1076	2
 zinit/zinit.zsh	ZC1091	25
 zinit/zinit.zsh	ZC1097	1
