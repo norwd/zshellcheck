@@ -600,7 +600,7 @@ func (p *Parser) absorbGluedRhsTail() {
 }
 
 // peekStartsExpansion reports whether the next token opens a `$`
-// expansion (`${…}`, `$(…)`, `$name`, `` `…` ``).
+// expansion (`${…}`, `$(…)`, `$name`, “ `…` “).
 func (p *Parser) peekStartsExpansion() bool {
 	switch p.peekToken.Type {
 	case token.DollarLbrace, token.VARIABLE, token.DOLLAR_LPAREN, token.BACKTICK:
