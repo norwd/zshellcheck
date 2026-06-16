@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-06-16
+
+### Fixed
+- An orphan compound closer (`fi`, `done`, `esac`) at the top level of a script is now reported as a parse error instead of being silently accepted.
+- `&>file` is lexed as the combined stdout-and-stderr redirect. It was split into a background `&` and an orphaned `>`, which desynced the surrounding parse (for example a leading `if { … } &>/dev/null; then`).
+- A command followed only by redirects parses as one statement. A redirect chain such as `cmd >/dev/null 2>&1`, `cmd >> log`, `cmd >& fd`, or `cmd <& 3` no longer orphans its target word into a bogus second statement.
+- An expression-led pipeline (`$cmd && echo hello`) gathers the right-hand command's arguments instead of stranding them as a separate statement.
+- A leading brace-group condition (`if { cmd }; then …; fi`) is no longer mistaken for the brace-form body opener.
+
 ## [1.3.2] - 2026-06-16
 
 ### Changed
