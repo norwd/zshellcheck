@@ -47,8 +47,8 @@ func printUsage(out io.Writer, fset *flag.FlagSet, showBanner bool) {
 		},
 		{
 			title: "AUTO-FIX",
-			names: []string{"fix", "diff", "dry-run"},
-			blurb: "Apply or preview deterministic rewrites.",
+			names: []string{"fix", "unsafe-fixes", "diff", "dry-run"},
+			blurb: "Apply or preview deterministic rewrites. -fix is safe-only by default.",
 		},
 		{
 			title: "DIAGNOSTICS",
@@ -80,7 +80,8 @@ func printUsage(out io.Writer, fset *flag.FlagSet, showBanner bool) {
 		{"Triage by frequency: per-kata counts", "zshellcheck -statistics ./scripts"},
 		{"Emit SARIF for GitHub Code Scanning", "zshellcheck -format sarif ./scripts > zshellcheck.sarif"},
 		{"Preview every available auto-fix as a diff", "zshellcheck -diff path/to/script.zsh"},
-		{"Apply auto-fixes in place", "zshellcheck -fix path/to/script.zsh"},
+		{"Apply auto-fixes in place (safe only)", "zshellcheck -fix path/to/script.zsh"},
+		{"Also apply behavior-changing fixes", "zshellcheck -fix -unsafe-fixes path/to/script.zsh"},
 		{"CI-friendly run (no banner, errors only)", "zshellcheck -no-banner -severity error ./scripts"},
 	}
 	for _, ex := range examples {

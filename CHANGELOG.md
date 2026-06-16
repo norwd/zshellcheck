@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-06-16
+
+### Added
+- `-unsafe-fixes` applies fixes that may change runtime behavior. Without it, `-fix` now applies only safe (value-preserving) fixes.
+- The text report counts the two fix tiers separately: `[*] N fixable with the -fix option.` followed by `M more fixable with -fix -unsafe-fixes.`
+
+### Changed
+- `-fix` is safe-by-default. Each auto-fix is classified safe or unsafe: a safe fix cannot change runtime behavior or drop a comment (for example `` `cmd` `` to `$(cmd)`, `$arr[i]` to `${arr[i]}`); an unsafe fix may (a command or flag swap such as `which` to `whence` or `netstat` to `ss`, a scope change, a glob qualifier). `-fix` previously applied every fix, including behavior-changing ones; it now withholds those unless `-unsafe-fixes` is passed.
+
 ## [1.4.0] - 2026-06-16
 
 ### Added

@@ -114,14 +114,14 @@ func TestParseSeverityFilterEmpty(t *testing.T) {
 }
 
 func TestBuildFixOptsAllOff(t *testing.T) {
-	got := buildFixOpts(false, false, false)
-	if got.enabled || got.diff || got.dryRun {
+	got := buildFixOpts(false, false, false, false)
+	if got.enabled || got.diff || got.dryRun || got.unsafe {
 		t.Errorf("expected all-off, got %+v", got)
 	}
 }
 
 func TestBuildFixOptsFix(t *testing.T) {
-	got := buildFixOpts(true, false, false)
+	got := buildFixOpts(true, false, false, false)
 	if !got.enabled || got.diff || got.dryRun {
 		t.Errorf("expected enabled-only, got %+v", got)
 	}
@@ -131,16 +131,23 @@ func TestBuildFixOptsFix(t *testing.T) {
 }
 
 func TestBuildFixOptsDiff(t *testing.T) {
-	got := buildFixOpts(false, true, false)
+	got := buildFixOpts(false, true, false, false)
 	if !got.enabled || !got.diff || !got.dryRun {
 		t.Errorf("expected diff implies dry-run + enabled, got %+v", got)
 	}
 }
 
 func TestBuildFixOptsDryRun(t *testing.T) {
-	got := buildFixOpts(true, false, true)
+	got := buildFixOpts(true, false, true, false)
 	if !got.enabled || got.diff || !got.dryRun {
 		t.Errorf("expected fix+dry-run, got %+v", got)
+	}
+}
+
+func TestBuildFixOptsUnsafe(t *testing.T) {
+	got := buildFixOpts(true, false, false, true)
+	if !got.unsafe {
+		t.Errorf("expected unsafe set, got %+v", got)
 	}
 }
 
