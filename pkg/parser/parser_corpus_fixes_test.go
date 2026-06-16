@@ -414,13 +414,15 @@ func TestParseShortFormForBraceTerminator(t *testing.T) {
 // The whole RHS now stays one statement.
 func TestParseConcatenatedAssignmentRHS(t *testing.T) {
 	cases := map[string]int{
-		"x=${a}/${b}\n":             1,
-		"_zpaths[${z}]=${H}/${z}\n": 1,
-		"t=${A}/${B}/${C}\n":        1,
-		"x=${a}/${b}\necho after\n": 2,
-		"x=$a\n":                    1,
-		"x=$(date)\n":               1,
-		"x=(a b c)\n":               1,
+		"x=${a}/${b}\n":              1,
+		"_zpaths[${z}]=${H}/${z}\n":  1,
+		"t=${A}/${B}/${C}\n":         1,
+		"ztarget=${ZIM_HOME}/init\n": 1,
+		"x=${a}/sub/file\n":          1,
+		"x=${a}/${b}\necho after\n":  2,
+		"x=$a\n":                     1,
+		"x=$(date)\n":                1,
+		"x=(a b c)\n":                1,
 	}
 	for src, want := range cases {
 		p := New(lexer.New(src))
