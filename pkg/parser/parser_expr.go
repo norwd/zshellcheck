@@ -578,28 +578,35 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 func (p *Parser) absorbGluedRhsTail() {
 	for !p.peekToken.HasPrecedingSpace {
 		switch {
-		case p.peekTokenIs(token.SLASH):
-			p.nextToken() // onto '/'
-			if p.peekToken.HasPrecedingSpace {
-				return
-			}
-			switch p.peekToken.Type {
-			case token.DollarLbrace, token.VARIABLE, token.DOLLAR_LPAREN, token.BACKTICK:
-				p.nextToken()
-				_ = p.parseExpression(LOWEST)
-			case token.IDENT, token.INT, token.MINUS, token.DOT:
-				p.nextToken()
-			}
 		case (p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.VARIABLE)) &&
 			strings.HasPrefix(p.peekToken.Literal, "/"):
 			// The lexer glues a `/segment` onto a single word token
 			// (`${DIR}/init` → `${ DIR }` then IDENT `/init`). Absorb that
-			// glued path tail so it is not orphaned into a second
-			// statement.
+			// glued path tail so it is not orphaned into a second statement.
 			p.nextToken()
+		case p.peekTokenIs(token.SLASH):
+			// A standalone `/` before an expansion (`${a}/${b}`). Consume
+			// the slash; if a glued expansion follows, consume that too.
+			p.nextToken() // onto '/'
+			if p.peekToken.HasPrecedingSpace || !p.peekStartsExpansion() {
+				return
+			}
+			p.nextToken()
+			_ = p.parseExpression(LOWEST)
 		default:
 			return
 		}
+	}
+}
+
+// peekStartsExpansion reports whether the next token opens a `$`
+// expansion (`${…}`, `$(…)`, `$name`, `` `…` ``).
+func (p *Parser) peekStartsExpansion() bool {
+	switch p.peekToken.Type {
+	case token.DollarLbrace, token.VARIABLE, token.DOLLAR_LPAREN, token.BACKTICK:
+		return true
+	default:
+		return false
 	}
 }
 

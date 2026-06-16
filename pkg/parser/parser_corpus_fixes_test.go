@@ -435,3 +435,22 @@ func TestParseConcatenatedAssignmentRHS(t *testing.T) {
 		}
 	}
 }
+
+// Exercise every branch of the glued assignment-RHS absorber and its
+// peekStartsExpansion helper.
+func TestAbsorbGluedRhsTailBranches(t *testing.T) {
+	cases := []string{
+		"x=${a}/${b}\n",      // SLASH then ${…} expansion
+		"x=${a}/$b\n",        // SLASH then $var expansion
+		"x=${a}/$(c)\n",      // SLASH then $(…) expansion
+		"x=${a}/init\n",      // glued IDENT tail
+		"x=${a}/${b}/${c}\n", // multiple SLASH expansions
+		"x=${a}/ rest\n",     // SLASH then space — stop
+		"x=${a}/;\n",         // SLASH then non-expansion — stop
+		"x=${a}\n",           // no tail — default return
+	}
+	for _, src := range cases {
+		p := New(lexer.New(src))
+		p.ParseProgram() // must not panic; covers the absorber branches
+	}
+}
