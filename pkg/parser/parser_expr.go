@@ -576,18 +576,37 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 // each slash it consumes one glued segment (an identifier, integer, or
 // expansion, whose closer parseExpression resolves).
 func (p *Parser) absorbGluedRhsTail() {
-	for !p.peekToken.HasPrecedingSpace && p.peekTokenIs(token.SLASH) {
-		p.nextToken() // onto '/'
-		if p.peekToken.HasPrecedingSpace {
-			return
-		}
-		switch p.peekToken.Type {
-		case token.DollarLbrace, token.VARIABLE, token.DOLLAR_LPAREN, token.BACKTICK:
+	for !p.peekToken.HasPrecedingSpace {
+		switch {
+		case (p.peekTokenIs(token.IDENT) || p.peekTokenIs(token.VARIABLE)) &&
+			strings.HasPrefix(p.peekToken.Literal, "/"):
+			// The lexer glues a `/segment` onto a single word token
+			// (`${DIR}/init` → `${ DIR }` then IDENT `/init`). Absorb that
+			// glued path tail so it is not orphaned into a second statement.
+			p.nextToken()
+		case p.peekTokenIs(token.SLASH):
+			// A standalone `/` before an expansion (`${a}/${b}`). Consume
+			// the slash; if a glued expansion follows, consume that too.
+			p.nextToken() // onto '/'
+			if p.peekToken.HasPrecedingSpace || !p.peekStartsExpansion() {
+				return
+			}
 			p.nextToken()
 			_ = p.parseExpression(LOWEST)
-		case token.IDENT, token.INT, token.MINUS, token.DOT:
-			p.nextToken()
+		default:
+			return
 		}
+	}
+}
+
+// peekStartsExpansion reports whether the next token opens a `$`
+// expansion (`${…}`, `$(…)`, `$name`, “ `…` “).
+func (p *Parser) peekStartsExpansion() bool {
+	switch p.peekToken.Type {
+	case token.DollarLbrace, token.VARIABLE, token.DOLLAR_LPAREN, token.BACKTICK:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -684,7 +703,7 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 
 func (p *Parser) parseArrayAccess() ast.Expression {
 	exp := &ast.ArrayAccess{Token: p.curToken}
-	p.consumeArrayAccessFlags()
+	exp.Flags = p.consumeArrayAccessFlags()
 	hasLengthOp := p.consumeLengthOp()
 	p.consumePreflags()
 
@@ -740,17 +759,20 @@ func (p *Parser) parseArrayAccess() ast.Expression {
 // consumeArrayAccessFlags drains the optional `(flags)` group between
 // `${` and the subject, used by Zsh parameter-expansion flag tuples
 // like `${(j:,:)arr}`.
-func (p *Parser) consumeArrayAccessFlags() {
+func (p *Parser) consumeArrayAccessFlags() string {
 	if !p.peekTokenIs(token.LPAREN) {
-		return
+		return ""
 	}
 	p.nextToken()
+	var sb strings.Builder
 	for !p.peekTokenIs(token.RPAREN) && !p.peekTokenIs(token.EOF) {
 		p.nextToken()
+		sb.WriteString(p.curToken.Literal)
 	}
 	if p.peekTokenIs(token.RPAREN) {
 		p.nextToken()
 	}
+	return sb.String()
 }
 
 // consumeLengthOp consumes the `#` length operator if present.

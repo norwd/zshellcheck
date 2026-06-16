@@ -367,7 +367,14 @@ func TestCheckZC1010(t *testing.T) {
 		expected []katas.Violation
 	}{
 		{
-			input: `[ 1 -eq 1 ]`,
+			// An arithmetic comparison defers to ZC1003 (`(( … ))`), not
+			// ZC1010 (`[[ … ]]`), so ZC1010 does not fire here.
+			input:    `[ 1 -eq 1 ]`,
+			expected: []katas.Violation{},
+		},
+		{
+			// A non-arithmetic test still gets the `[[ … ]]` advice.
+			input: `[ -f file ]`,
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1010",
@@ -1014,16 +1021,11 @@ func TestCheckZC1030(t *testing.T) {
 		expected []katas.Violation
 	}{
 		{
-			name:  "echo with a simple string",
-			input: `echo "hello"`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1030",
-					Message: "Use `printf` for more reliable and portable string formatting instead of `echo`.",
-					Line:    1,
-					Column:  1,
-				},
-			},
+			// ZC1030's `printf` advice is consolidated under ZC1037
+			// (`print -r --`), so it no longer fires on `echo`.
+			name:     "echo with a simple string defers to ZC1037",
+			input:    `echo "hello"`,
+			expected: []katas.Violation{},
 		},
 		{
 			name:     "printf with a simple string",
@@ -1031,16 +1033,9 @@ func TestCheckZC1030(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:  "echo with a variable",
-			input: `echo "$foo"`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1030",
-					Message: "Use `printf` for more reliable and portable string formatting instead of `echo`.",
-					Line:    1,
-					Column:  1,
-				},
-			},
+			name:     "echo with a variable defers to ZC1037",
+			input:    `echo "$foo"`,
+			expected: []katas.Violation{},
 		},
 	}
 
@@ -1230,9 +1225,18 @@ func TestZC1037(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
-			name:     "single-quoted dollar is literal",
-			input:    `echo 'cost is $5'`,
-			expected: []katas.Violation{},
+			// ZC1037 is now the single canonical echo recommendation and
+			// fires on every `echo`, including literal ones.
+			name:  "literal echo is flagged",
+			input: `echo 'cost is $5'`,
+			expected: []katas.Violation{
+				{
+					KataID:  "ZC1037",
+					Message: "Use `print -r --` instead of `echo`. `echo` behaviour varies with options and escape handling; `print -r --` is the reliable Zsh builtin.",
+					Line:    1,
+					Column:  1,
+				},
+			},
 		},
 		{
 			name:  "invalid echo with variable",
@@ -1240,7 +1244,7 @@ func TestZC1037(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1037",
-					Message: "Use 'print -r --' instead of 'echo' to reliably print variable expansions.",
+					Message: "Use `print -r --` instead of `echo`. `echo` behaviour varies with options and escape handling; `print -r --` is the reliable Zsh builtin.",
 					Line:    1,
 					Column:  1,
 				},
@@ -1252,7 +1256,7 @@ func TestZC1037(t *testing.T) {
 			expected: []katas.Violation{
 				{
 					KataID:  "ZC1037",
-					Message: "Use 'print -r --' instead of 'echo' to reliably print variable expansions.",
+					Message: "Use `print -r --` instead of `echo`. `echo` behaviour varies with options and escape handling; `print -r --` is the reliable Zsh builtin.",
 					Line:    1,
 					Column:  1,
 				},
@@ -3432,6 +3436,19 @@ func TestZC1075(t *testing.T) {
 			expected: []katas.Violation{},
 		},
 		{
+			// Word-splitting parameter flags (`${(f)x}`, `${(@)arr}`,
+			// `${(s:,:)x}`) deliberately yield multiple words; quoting
+			// would join them, so they are not elision hazards.
+			name:     "split-producing parameter flag is not flagged",
+			input:    `print -l -- ${(f)lines}`,
+			expected: []katas.Violation{},
+		},
+		{
+			name:     "array flag is not flagged",
+			input:    `print -- ${(@)arr}`,
+			expected: []katas.Violation{},
+		},
+		{
 			// A path modifier (`:h`) can still produce an empty word, so
 			// it stays flagged — and a scalar is not mislabelled as an
 			// array element.
@@ -4602,28 +4619,16 @@ func TestZC1092(t *testing.T) {
 		expected []katas.Violation
 	}{
 		{
-			name:  "invalid echo",
-			input: `echo "hello world"`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1092",
-					Message: "Prefer `print` over `echo`. `echo` behavior varies. `print` is the Zsh builtin. Especially with flags, `print -n` or `print -r` is more reliable.",
-					Line:    1,
-					Column:  1,
-				},
-			},
+			// ZC1092's generic "prefer print" advice is consolidated
+			// under ZC1037 (`print -r --`), so it no longer fires.
+			name:     "echo defers to ZC1037",
+			input:    `echo "hello world"`,
+			expected: []katas.Violation{},
 		},
 		{
-			name:  "invalid echo with flags",
-			input: `echo -n "hello"`,
-			expected: []katas.Violation{
-				{
-					KataID:  "ZC1092",
-					Message: "Prefer `print` over `echo`. `echo` behavior varies. `print` is the Zsh builtin. Especially with flags, `print -n` or `print -r` is more reliable.",
-					Line:    1,
-					Column:  1,
-				},
-			},
+			name:     "echo with flags defers to ZC1037",
+			input:    `echo -n "hello"`,
+			expected: []katas.Violation{},
 		},
 		{
 			name:     "valid print",

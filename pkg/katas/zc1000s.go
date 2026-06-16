@@ -766,6 +766,16 @@ func checkZC1010(node ast.Node) []Violation {
 	if cmd, ok := node.(*ast.SimpleCommand); ok {
 		// Check if command name is "["
 		if cmd.Name.String() == "[" {
+			// An arithmetic comparison (`[ "$a" -eq "$b" ]`) is better
+			// rewritten as `(( a == b ))` than `[[ … ]]`; ZC1003 owns that
+			// advice (and the fix). Defer to it rather than stack a
+			// conflicting `[[ … ]]` suggestion on the same line.
+			for _, arg := range cmd.Arguments {
+				switch arg.TokenLiteral() {
+				case "-eq", "-ne", "-lt", "-le", "-gt", "-ge":
+					return violations
+				}
+			}
 			violations = append(violations, Violation{
 				KataID:  "ZC1010",
 				Message: "Use `[[ ... ]]` instead of `[ ... ]` or `test`. `[[` is safer and more powerful.",
@@ -1709,28 +1719,15 @@ func checkZC1030(node ast.Node) []Violation {
 		return nil
 	}
 
-	if cmd.Name.TokenLiteral() != "echo" {
+	if cmd.Name == nil || cmd.Name.TokenLiteral() != "echo" {
 		return nil
 	}
 
-	// Defer to ZC1037 if any argument is a variable.
-	for _, arg := range cmd.Arguments {
-		if ident, ok := arg.(*ast.Identifier); ok {
-			if ident.Token.Type == "VARIABLE" {
-				return nil
-			}
-		}
-	}
-
-	return []Violation{
-		{
-			KataID:  "ZC1030",
-			Message: "Use `printf` for more reliable and portable string formatting instead of `echo`.",
-			Line:    cmd.Token.Line,
-			Column:  cmd.Token.Column,
-			Level:   SeverityStyle,
-		},
-	}
+	// The `echo` replacement advice is consolidated under ZC1037
+	// (`print -r --`, the idiomatic Zsh builtin, which carries the
+	// auto-fix). Emitting a second `printf` suggestion on the same line
+	// only produced a divergent double finding, so defer entirely.
+	return nil
 }
 
 func init() {
@@ -2046,7 +2043,7 @@ func init() {
 
 func checkZC1037(node ast.Node) []Violation {
 	cmd, ok := node.(*ast.SimpleCommand)
-	if !ok {
+	if !ok || cmd.Name == nil {
 		return nil
 	}
 
@@ -2054,39 +2051,20 @@ func checkZC1037(node ast.Node) []Violation {
 		return nil
 	}
 
-	for _, arg := range cmd.Arguments {
-		if ident, ok := arg.(*ast.Identifier); ok && ident.Token.Type == token.VARIABLE {
-			return []Violation{
-				{
-					KataID:  "ZC1037",
-					Message: "Use 'print -r --' instead of 'echo' to reliably print variable expansions.",
-					Line:    cmd.Token.Line,
-					Column:  cmd.Token.Column,
-					Level:   SeverityStyle,
-				},
-			}
-		}
-		if str, ok := arg.(*ast.StringLiteral); ok && strings.Contains(str.Value, "$") {
-			// A single-quoted string never expands `$` — it is a literal
-			// dollar sign, so `echo 'cost is $5'` has no expansion to
-			// preserve and `print -r --` offers no benefit. Only flag
-			// double-quoted (or unquoted) strings where the `$` is live.
-			if len(str.Value) > 0 && str.Value[0] == '\'' {
-				continue
-			}
-			return []Violation{
-				{
-					KataID:  "ZC1037",
-					Message: "Use 'print -r --' instead of 'echo' to reliably print variable expansions.",
-					Line:    cmd.Token.Line,
-					Column:  cmd.Token.Column,
-					Level:   SeverityStyle,
-				},
-			}
-		}
+	// ZC1037 is the single canonical `echo` → `print -r --` recommendation
+	// for Zsh: `print -r --` is the idiomatic, option-safe replacement.
+	// It carries the auto-fix and fires on every `echo`. ZC1030 (printf)
+	// and ZC1092 (generic "prefer print") defer to it so a single `echo`
+	// no longer stacks two or three divergent suggestions on one line.
+	return []Violation{
+		{
+			KataID:  "ZC1037",
+			Message: "Use `print -r --` instead of `echo`. `echo` behaviour varies with options and escape handling; `print -r --` is the reliable Zsh builtin.",
+			Line:    cmd.Token.Line,
+			Column:  cmd.Token.Column,
+			Level:   SeverityStyle,
+		},
 	}
-
-	return nil
 }
 
 func init() {
@@ -5350,6 +5328,22 @@ func zc1075IsBareExpansion(v string) bool {
 // operand, leaving a trailing `:`. Path modifiers (`:h`, `:t`, `:r`)
 // keep their letter and are intentionally not matched — they can still
 // elide.
+// zc1075HasSplitFlag reports whether a `${(flags)name}` flag group
+// contains a word-splitting flag — `f` (lines), `s`/`0`/`z`/`w` (string,
+// null, shell, word split), `@` (array), `k`/`v` (assoc keys/values),
+// `p` (print escapes for s/f). Such an expansion deliberately yields
+// multiple words; quoting it would collapse them, so it is not an
+// elision hazard. Only the leading flag characters (before any
+// `:delimiter:` section) are inspected so a delimiter's contents do not
+// produce a spurious match.
+func zc1075HasSplitFlag(flags string) bool {
+	head := flags
+	if i := strings.IndexByte(head, ':'); i >= 0 {
+		head = head[:i]
+	}
+	return strings.ContainsAny(head, "fs0zwpkv@")
+}
+
 func zc1075HasDefaultModifier(left ast.Expression) bool {
 	ident, ok := left.(*ast.Identifier)
 	if !ok {
@@ -5409,6 +5403,13 @@ func checkZC1075(node ast.Node) []Violation {
 			// Path modifiers (`:h`, `:t`, `:r`) still can elide, so keep
 			// flagging those.
 			if zc1075HasDefaultModifier(aa.Left) {
+				continue
+			}
+			// A word-splitting parameter flag (`${(f)x}`, `${(s:,:)x}`,
+			// `${(@)arr}`, `${(kv)map}`) is meant to expand to multiple
+			// words; quoting it would join them and defeat the idiom, so
+			// it is not an elision hazard.
+			if zc1075HasSplitFlag(aa.Flags) {
 				continue
 			}
 			// Distinguish a true array element (`${arr[i]}`, Index set)
@@ -7049,29 +7050,12 @@ func checkZC1092(node ast.Node) []Violation {
 		return nil
 	}
 
-	if cmd.Name == nil {
-		return nil
-	}
-
-	if cmd.Name.String() == "echo" {
-		// Check if it's just a simple echo or if flags are involved
-		// If flags are used (like -n, -e), print is definitely better.
-		// Even without flags, print is idiomatic Zsh.
-
-		// We can be slightly lenient and only warn if flags are present OR if it contains backslashes?
-		// The prompt suggests "Prefer 'print' over 'echo'". Let's be strict for now as it's "Platinum Standard".
-
-		msg := "Prefer `print` over `echo`. `echo` behavior varies. `print` is the Zsh builtin. Especially with flags, `print -n` or `print -r` is more reliable."
-
-		return []Violation{{
-			KataID:  "ZC1092",
-			Message: msg,
-			Line:    cmd.Token.Line,
-			Column:  cmd.Token.Column,
-			Level:   SeverityWarning,
-		}}
-	}
-
+	// The `echo` → `print` advice is consolidated under ZC1037
+	// (`print -r --`, the canonical Zsh replacement carrying the
+	// auto-fix). ZC1092's generic "prefer print" Warning fired on every
+	// `echo` on top of ZC1037/ZC1030 — a redundant second/third finding
+	// with the same intent. Defer entirely; the auto-fix lives on ZC1037.
+	_ = cmd
 	return nil
 }
 

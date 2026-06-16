@@ -458,6 +458,11 @@ type ArrayAccess struct {
 	Token token.Token // The '$' token
 	Left  Expression
 	Index Expression
+	// Flags holds the parameter-expansion flag group from
+	// `${(flags)name}` (e.g. "f", "kv", "s:,:"), empty when absent.
+	// Katas use it to tell a word-splitting expansion (`${(f)x}`) from a
+	// plain one (`${x}`), which otherwise parse to the same shape.
+	Flags string
 }
 
 func (aa *ArrayAccess) expressionNode()               {}
